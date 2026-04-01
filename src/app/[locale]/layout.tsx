@@ -12,10 +12,21 @@ const montserrat = Montserrat({
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: '55candles',
-  description:
-    'Eco-friendly, non-toxic candles with hand-sculpted wax fruit. No nasties, ever.',
+const descriptions: Record<string, string> = {
+  en: 'Eco-friendly, non-toxic candles with hand-sculpted wax fruit. No nasties, ever.',
+  bg: 'Екологични, нетоксични свещи с ръчно изработени плодове от восък. Без вредни съставки, никога.',
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  return {
+    title: '55candles',
+    description: descriptions[locale] ?? descriptions.en,
+  }
 }
 
 export default async function LocaleLayout({
