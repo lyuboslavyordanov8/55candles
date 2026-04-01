@@ -28,4 +28,14 @@ describe('CandleCarePage', () => {
     await renderPage()
     expect(screen.getByText(/wick care/i)).toBeInTheDocument()
   })
+
+  it('renders burn time section', async () => {
+    await renderPage()
+    expect(screen.getByText(/burn time/i)).toBeInTheDocument()
+  })
+
+  it('renders storage section', async () => {
+    await renderPage()
+    expect(screen.getByText(/storage/i)).toBeInTheDocument()
+  })
 })

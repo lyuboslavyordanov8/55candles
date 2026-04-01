@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
 import messages from '../../../../../messages/en.json'
 import ContactPage from '../page'
@@ -37,5 +38,15 @@ describe('ContactPage', () => {
   it('renders Instagram link', () => {
     renderPage()
     expect(screen.getByRole('link', { name: /instagram/i })).toBeInTheDocument()
+  })
+
+  it('shows success message after form submission', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(screen.getByPlaceholderText(/your name/i), 'Alice')
+    await user.type(screen.getByPlaceholderText(/email address/i), 'alice@example.com')
+    await user.type(screen.getByPlaceholderText(/message/i), 'Hello!')
+    await user.click(screen.getByRole('button', { name: /send message/i }))
+    expect(screen.getByText(new RegExp(messages.contact.success, 'i'))).toBeInTheDocument()
   })
 })

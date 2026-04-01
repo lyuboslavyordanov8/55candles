@@ -29,18 +29,21 @@ export default function ContactPage() {
               type="text"
               required
               placeholder={t('name')}
+              aria-label={t('name')}
               className="w-full border border-espresso/20 rounded-xl px-5 py-4 text-sm bg-white text-espresso placeholder:text-espresso/30 focus:outline-none focus:border-terracotta transition-colors"
             />
             <input
               type="email"
               required
               placeholder={t('email')}
+              aria-label={t('email')}
               className="w-full border border-espresso/20 rounded-xl px-5 py-4 text-sm bg-white text-espresso placeholder:text-espresso/30 focus:outline-none focus:border-terracotta transition-colors"
             />
             <textarea
               required
               rows={6}
               placeholder={t('message')}
+              aria-label={t('message')}
               className="w-full border border-espresso/20 rounded-xl px-5 py-4 text-sm bg-white text-espresso placeholder:text-espresso/30 focus:outline-none focus:border-terracotta transition-colors resize-none"
             />
             <button
