@@ -1,0 +1,88 @@
+{
+  "nav": {
+    "home": "Home",
+    "products": "Products",
+    "ourStory": "Our Story",
+    "candleCare": "Candle Care",
+    "contact": "Contact"
+  },
+  "hero": {
+    "headline": "Candles you'll want to eat.",
+    "subtext": "Eco-friendly, non-toxic candles with hand-sculpted wax fruit. No nasties, ever.",
+    "cta": "Shop the collection"
+  },
+  "values": {
+    "eco": "Eco-friendly ingredients",
+    "nonToxic": "No toxins, ever",
+    "fruit": "Hand-sculpted wax fruit"
+  },
+  "collection": {
+    "title": "The Scent Collection",
+    "learnMore": "Learn more",
+    "seasonal": "Seasonal",
+    "comingSoon": "Coming soon"
+  },
+  "storyTeaser": {
+    "headline": "We make candles that look too good to burn.",
+    "cta": "Our story"
+  },
+  "candleCareSection": {
+    "title": "How to love your candle",
+    "tip1Title": "First burn",
+    "tip1Body": "Let it burn 2–3 hours so the wax melts fully to the edges.",
+    "tip2Title": "Trim the wick",
+    "tip2Body": "Trim to 5mm before each re-light for a clean, even flame.",
+    "tip3Title": "Max 3 hours",
+    "tip3Body": "Don't burn more than 3 hours at a time.",
+    "tip4Title": "Cool first",
+    "tip4Body": "Let it reach room temperature before lighting again.",
+    "cta": "Full care guide"
+  },
+  "product": {
+    "scentNotes": "Scent notes",
+    "top": "Top",
+    "heart": "Heart",
+    "base": "Base",
+    "ingredients": "Ingredients",
+    "addToCart": "Add to cart — coming soon",
+    "relatedProducts": "You might also like"
+  },
+  "ourStory": {
+    "title": "Our story",
+    "intro": "55candles was born from a simple idea: candles should be honest, beautiful, and safe for your home.",
+    "edibleTitle": "Wait — is it edible?",
+    "edibleBody": "No. But we totally understand why you'd ask. The wax fruit on every candle is hand-sculpted to look almost impossibly real. It's a compliment we hear every day.",
+    "valuesTitle": "What we stand for",
+    "value1Title": "Eco-friendly",
+    "value1Body": "Every candle uses soy wax and a cotton wick. No paraffin, no lead, no compromises.",
+    "value2Title": "Non-toxic",
+    "value2Body": "We use only phthalate-free fragrance oils. Safe for you, your family, and your pets.",
+    "value3Title": "Honest",
+    "value3Body": "No fillers, no mystery ingredients. Every component is listed on the label."
+  },
+  "candleCarePage": {
+    "title": "Candle care",
+    "subtitle": "Simple steps to make your 55candles last longer and burn better.",
+    "firstBurnTitle": "The first burn",
+    "firstBurnBody": "Always burn your candle until the wax melts fully to the edges of the can — this usually takes 2 to 3 hours. Skipping this step can cause tunnelling, where wax builds up around the wick and reduces your candle's life.",
+    "wickTitle": "Wick care",
+    "wickBody": "Trim the wick to 5mm before every burn. A long wick creates a larger, sootier flame. A quick trim keeps the burn clean and even.",
+    "burnTimeTitle": "Burn time",
+    "burnTimeBody": "Keep burns to 3 hours maximum. After 3 hours the can gets hot enough to affect the wax quality. Give your candle a rest — it'll reward you with a longer life.",
+    "storageTitle": "Storage",
+    "storageBody": "Keep the lid on when not burning. Store away from direct sunlight and in a cool room. Wax can soften in heat, which may shift the wax fruit decoration."
+  },
+  "contact": {
+    "title": "Get in touch",
+    "subtitle": "Questions, gift orders, or just want to say hello — we'd love to hear from you.",
+    "name": "Your name",
+    "email": "Email address",
+    "message": "Message",
+    "send": "Send message",
+    "success": "Message sent! We'll get back to you soon.",
+    "instagramCta": "Or find us on Instagram"
+  },
+  "footer": {
+    "rights": "All rights reserved"
+  }
+}
