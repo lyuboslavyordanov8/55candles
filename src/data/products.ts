@@ -14,7 +14,7 @@ export const products: Product[] = [
     emoji: '🍒',
     seasonal: null,
     price: null,
-    imagePath: '/images/products/cherry.jpg',
+    imagePath: '/images/candles/IMG_7520.webp',
   },
   {
     slug: 'orange',
@@ -29,7 +29,7 @@ export const products: Product[] = [
     emoji: '🍊',
     seasonal: null,
     price: null,
-    imagePath: '/images/products/orange.jpg',
+    imagePath: '/images/candles/IMG_7522.webp',
   },
   {
     slug: 'vanilla',
@@ -44,7 +44,7 @@ export const products: Product[] = [
     emoji: '🍦',
     seasonal: null,
     price: null,
-    imagePath: '/images/products/vanilla.jpg',
+    imagePath: '/images/candles/IMG_7523.webp',
   },
   {
     slug: 'strawberry',
@@ -59,7 +59,7 @@ export const products: Product[] = [
     emoji: '🍓',
     seasonal: null,
     price: null,
-    imagePath: '/images/products/strawberry.jpg',
+    imagePath: '/images/candles/IMG_7521.webp',
   },
   {
     slug: 'espresso-martini',
@@ -74,7 +74,7 @@ export const products: Product[] = [
     emoji: '🍸',
     seasonal: null,
     price: null,
-    imagePath: '/images/products/espresso-martini.jpg',
+    imagePath: '/images/candles/IMG_7524.webp',
   },
   {
     slug: 'winter-wonderland',
