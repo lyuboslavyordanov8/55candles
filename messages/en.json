@@ -24,7 +24,22 @@
   },
   "storyTeaser": {
     "headline": "We make candles that look too good to burn.",
+    "body": "Started in a small kitchen with too much wax and a serious fruit obsession. Today every candle is still handcrafted, with the same obsessive attention to detail.",
     "cta": "Our story"
+  },
+  "testimonials": {
+    "title": "Loved by candle people",
+    "1name": "Anna M.",
+    "1text": "The cherry one looks so real I almost tried to eat it — and the scent is absolutely gorgeous.",
+    "2name": "Sofia K.",
+    "2text": "Bought four as gifts. Everyone was obsessed. Already placed my second order.",
+    "3name": "Martin D.",
+    "3text": "Finally a candle that's actually eco-friendly and smells incredible. The espresso martini one is unreal."
+  },
+  "ctaBanner": {
+    "headline": "Ready to find your scent?",
+    "sub": "Six scents. All handcrafted. All non-toxic. Zero compromises.",
+    "cta": "Shop all candles"
   },
   "candleCareSection": {
     "title": "How to love your candle",

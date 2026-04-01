@@ -14,7 +14,8 @@ export default function StoryTeaser({ locale }: Props) {
         </div>
         <div className="flex flex-col gap-6">
           <h2 className="text-3xl md:text-4xl font-bold tracking-wide text-espresso leading-tight">{t('headline')}</h2>
-          <Link href={`/${locale}/our-story`} className="inline-block text-sm font-bold tracking-widest uppercase text-terracotta hover:text-amber transition-colors">
+          <p className="text-base text-espresso/70 leading-relaxed max-w-md">{t('body')}</p>
+          <Link href={`/${locale}/our-story`} className="inline-block text-sm font-bold tracking-widest uppercase text-terracotta hover:text-amber transition-colors duration-200 cursor-pointer">
             {t('cta')} →
           </Link>
         </div>

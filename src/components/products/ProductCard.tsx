@@ -14,7 +14,7 @@ export default function ProductCard({ product, locale }: Props) {
 
   return (
     <div
-      className="group relative bg-white rounded-2xl overflow-hidden border-2 transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+      className="group relative bg-white rounded-2xl overflow-hidden border-2 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer"
       style={{ borderColor: product.accentColor }}
     >
       <div className="relative aspect-square overflow-hidden bg-sand">

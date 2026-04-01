@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"candle artisan eco luxury lifestyle ecommerce warm elegant\" --design-system -p \"55candles\")",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"warm earthy artisan handmade candle home decor\" --design-system -p \"55candles\")",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"landing page hero testimonial social proof\" --domain landing)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"elegant organic natural warm\" --domain style -n 3)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"candle home decor lifestyle ecommerce\" --domain color -n 3)",
+      "Bash(python .claire/skills/ui-ux-pro-max/scripts/search.py \"layout responsive animation accessibility\" --domain ux -n 4)",
+      "Bash(python .claire/skills/ui-ux-pro-max/scripts/search.py \"layout responsive animation\" --stack nextjs)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"layout responsive animation accessibility\" --domain ux -n 4)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"layout responsive animation\" --stack nextjs)",
+      "Bash(npx tsc:*)",
+      "Bash(npx jest:*)",
+      "Bash(npx vitest:*)"
+    ]
+  }
+}
