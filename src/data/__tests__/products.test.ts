@@ -8,7 +8,6 @@ describe('products', () => {
 
   it('every product has required fields with correct types', () => {
     for (const p of products) {
-      expect(typeof p.id).toBe('string')
       expect(typeof p.slug).toBe('string')
       expect(typeof p.name).toBe('string')
       expect(typeof p.descriptor).toBe('string')
@@ -31,5 +30,11 @@ describe('products', () => {
 
   it('getProductBySlug returns undefined for unknown slug', () => {
     expect(getProductBySlug('does-not-exist')).toBeUndefined()
+  })
+
+  it('every product slug matches its scent value', () => {
+    for (const p of products) {
+      expect(p.slug).toBe(p.scent)
+    }
   })
 })

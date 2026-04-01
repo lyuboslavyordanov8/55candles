@@ -2,7 +2,6 @@ import type { Product } from '@/types/product'
 
 export const products: Product[] = [
   {
-    id: '1',
     slug: 'cherry',
     scent: 'cherry',
     name: 'Cherry',
@@ -18,7 +17,6 @@ export const products: Product[] = [
     imagePath: '/images/products/cherry.jpg',
   },
   {
-    id: '2',
     slug: 'orange',
     scent: 'orange',
     name: 'Orange',
@@ -34,7 +32,6 @@ export const products: Product[] = [
     imagePath: '/images/products/orange.jpg',
   },
   {
-    id: '3',
     slug: 'vanilla',
     scent: 'vanilla',
     name: 'Vanilla',
@@ -50,7 +47,6 @@ export const products: Product[] = [
     imagePath: '/images/products/vanilla.jpg',
   },
   {
-    id: '4',
     slug: 'strawberry',
     scent: 'strawberry',
     name: 'Strawberry',
@@ -66,7 +62,6 @@ export const products: Product[] = [
     imagePath: '/images/products/strawberry.jpg',
   },
   {
-    id: '5',
     slug: 'espresso-martini',
     scent: 'espresso-martini',
     name: 'Espresso Martini',
@@ -82,7 +77,6 @@ export const products: Product[] = [
     imagePath: '/images/products/espresso-martini.jpg',
   },
   {
-    id: '6',
     slug: 'winter-wonderland',
     scent: 'winter-wonderland',
     name: 'Winter Wonderland',

@@ -13,7 +13,6 @@ export interface ScentNotes {
 }
 
 export interface Product {
-  id: string
   slug: string
   scent: Scent
   name: string
