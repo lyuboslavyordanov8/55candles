@@ -40,13 +40,12 @@ describe('ProductCard', () => {
     expect(link).toHaveAttribute('href', '/en/products/cherry')
   })
 
-  it('shows seasonal badge when seasonal product is active', () => {
+  it('shows highlight badge when seasonal product is active', () => {
     const activeWinter = { ...winter, seasonal: { active: true } }
     renderCard(activeWinter)
-    // Should find the badge span with the seasonal text (positioned at top-right)
-    const seasonalSpans = screen.getAllByText(/seasonal/i)
-    const badgeSpan = seasonalSpans.find((el) => el.className.includes('top-3'))
-    expect(badgeSpan).toBeInTheDocument()
+    // Highlight badge (top-3 span) should be visible when in season
+    const badge = screen.getByText(activeWinter.highlight!)
+    expect(badge.className).toContain('top-3')
   })
 
   it('shows out-of-season overlay when seasonal product is inactive', () => {
