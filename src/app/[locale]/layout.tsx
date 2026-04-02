@@ -22,7 +22,7 @@ const playfair = Playfair_Display({
 
 const descriptions: Record<string, string> = {
   en: 'Eco-friendly, non-toxic candles with hand-sculpted wax fruit. No nasties, ever.',
-  bg: 'Екологични, нетоксични свещи с ръчно изработени плодове от восък. Без вредни съставки, никода.',
+  bg: 'Екологични, нетоксични свещи с ръчно изработени плодове от восък. Без вредни съставки, никога.',
 }
 
 export async function generateMetadata({
