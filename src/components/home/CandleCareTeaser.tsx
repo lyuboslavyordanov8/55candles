@@ -37,25 +37,21 @@ const SnowflakeIcon = () => (
 interface Props { locale: string }
 
 const tips = [
-  { Icon: FlameIcon, titleKey: 'tip1Title', bodyKey: 'tip1Body', color: '#f59e0b' },
-  { Icon: ScissorsIcon, titleKey: 'tip2Title', bodyKey: 'tip2Body', color: '#a78bfa' },
-  { Icon: ClockIcon, titleKey: 'tip3Title', bodyKey: 'tip3Body', color: '#60a5fa' },
-  { Icon: SnowflakeIcon, titleKey: 'tip4Title', bodyKey: 'tip4Body', color: '#7dd3fc' },
+  { Icon: FlameIcon, titleKey: 'tip1Title', bodyKey: 'tip1Body' },
+  { Icon: ScissorsIcon, titleKey: 'tip2Title', bodyKey: 'tip2Body' },
+  { Icon: ClockIcon, titleKey: 'tip3Title', bodyKey: 'tip3Body' },
+  { Icon: SnowflakeIcon, titleKey: 'tip4Title', bodyKey: 'tip4Body' },
 ] as const
 
 export default function CandleCareTeaser({ locale }: Props) {
   const t = useTranslations('candleCareSection')
 
   return (
-    <section className="relative py-28 px-6 bg-[#0a0a0a] text-white overflow-hidden">
-
-      {/* 🔥 ambient glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(255,180,100,0.1),transparent_60%)]" />
-
-      <div className="relative max-w-7xl mx-auto">
+    <section className="py-28 px-6 bg-cream-base">
+      <div className="max-w-7xl mx-auto">
 
         {/* Title */}
-        <h2 className="text-3xl md:text-4xl font-semibold tracking-[0.2em] uppercase text-center mb-16">
+        <h2 className="font-serif text-3xl md:text-4xl font-normal text-center text-charcoal mb-16">
           {t('title')}
         </h2>
 
@@ -64,33 +60,20 @@ export default function CandleCareTeaser({ locale }: Props) {
           {tips.map((tip, i) => (
             <motion.div
               key={tip.titleKey}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.08 }}
-              whileHover={{ y: -6 }}
-              className="group relative p-6 rounded-2xl bg-white/5 backdrop-blur-lg border border-white/10 text-center"
+              className="p-6 bg-cream-surface border border-border rounded-sm text-center"
             >
-              {/* glow */}
-              <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 blur-2xl"
-                style={{ background: `${tip.color}33` }}
-              />
-
-              {/* icon */}
-              <div
-                className="relative mb-3 transition group-hover:scale-110"
-                style={{ color: tip.color }}
-              >
+              <div className="text-clay mb-3 flex justify-center">
                 <tip.Icon />
               </div>
 
-              {/* title */}
-              <h3 className="text-sm font-semibold tracking-widest uppercase text-white/80 group-hover:text-white transition">
+              <h3 className="text-xs font-semibold tracking-widest uppercase text-charcoal mb-2">
                 {t(tip.titleKey)}
               </h3>
 
-              {/* body */}
-              <p className="text-sm text-white/50 leading-relaxed mt-2">
+              <p className="text-sm text-ink-secondary leading-relaxed">
                 {t(tip.bodyKey)}
               </p>
             </motion.div>
@@ -101,12 +84,9 @@ export default function CandleCareTeaser({ locale }: Props) {
         <div className="text-center">
           <Link
             href={`/${locale}/candle-care`}
-            className="inline-flex items-center gap-2 text-sm font-semibold tracking-widest uppercase transition"
+            className="inline-flex items-center gap-2 text-xs font-medium tracking-widest uppercase text-clay border-b border-clay pb-0.5 hover:opacity-70 transition-opacity duration-200"
           >
-            <span className="text-white/70 hover:text-white transition">
-              {t('cta')}
-            </span>
-            <span className="transition-transform group-hover:translate-x-1">→</span>
+            {t('cta')} →
           </Link>
         </div>
       </div>
