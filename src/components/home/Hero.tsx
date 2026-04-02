@@ -8,6 +8,7 @@ interface Props { locale: string }
 
 export default function Hero({ locale }: Props) {
   const t = useTranslations('hero')
+  const tNav = useTranslations('nav')
 
   return (
     <section className="relative min-h-screen flex items-center justify-center bg-cream-base overflow-hidden">
@@ -70,7 +71,7 @@ export default function Hero({ locale }: Props) {
             href={`/${locale}/our-story`}
             className="text-xs tracking-widest uppercase text-clay border-b border-clay pb-0.5 hover:opacity-70 transition-opacity duration-200"
           >
-            Our story →
+            {tNav('ourStory')} →
           </Link>
         </motion.div>
       </div>
