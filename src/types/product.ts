@@ -1,28 +1,49 @@
-export type Scent =
-  | 'cherry'
-  | 'orange'
-  | 'vanilla'
-  | 'strawberry'
-  | 'espresso-martini'
-  | 'winter-wonderland'
-
-export interface ScentNotes {
-  top: string
-  heart: string
-  base: string
-}
-
-export interface Product {
+export type Product = {
   slug: string
-  scent: Scent
+  scent: string
   name: string
-  descriptor: string      // e.g. "Sweet & fruity · Cherry wax top"
+
+  // ✨ More expressive, but still guided
+  mood:
+  | 'Playful'
+  | 'Bright'
+  | 'Comforting'
+  | 'Juicy'
+  | 'Deep'
+  | 'Seasonal'
+  | string // fallback for future expansion
+
+  descriptor: string
   description: string
-  scentNotes: ScentNotes
+
+  scentNotes: {
+    top: string
+    heart: string
+    base: string
+  }
+
   ingredients: string[]
-  accentColor: string     // hex — matches tailwind scent colors
+
+  accentColor: string
+  glowColor?: string
+
   emoji: string
-  seasonal: { active: boolean } | null  // null = year-round; developer toggles active manually
-  price: number | null    // null until payments are enabled
-  imagePath: string       // relative to /public, e.g. "/images/products/cherry.jpg"
+
+  // ✨ Brand-first, not ecommerce-first
+  highlight?:
+  | 'Signature'
+  | 'Just added'
+  | 'Limited release'
+  | 'Evening favourite'
+  | string // allow custom labels
+
+  seasonal: null | { active: boolean }
+
+  price?: {
+    value: number
+    currency: string
+  }
+
+  imagePath: string
+  hoverImagePath?: string
 }

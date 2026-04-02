@@ -13,89 +13,130 @@ export async function generateStaticParams() {
   )
 }
 
-function ProductDetailContent({ locale, product }: { locale: string; product: Product }) {
+function ProductDetailContent({
+  locale,
+  product,
+}: {
+  locale: string
+  product: Product
+}) {
   const t = useTranslations('product')
   const tNav = useTranslations('nav')
-  const related = products.filter((p) => p.slug !== product.slug).slice(0, 3)
+
+  const related = products
+    .filter((p) => p.slug !== product.slug)
+    .slice(0, 3)
 
   return (
-    <div className="pt-32 pb-24 px-6 bg-cream min-h-screen">
-      <div className="max-w-5xl mx-auto">
+    <div className="relative pt-32 pb-24 px-6 bg-[#0a0a0a] text-white min-h-screen overflow-hidden">
+
+      {/* 🔥 Ambient glow (SAFE now) */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-20 blur-[120px]"
+        style={{ background: product.glowColor }}
+      />
+
+      <div className="relative max-w-5xl mx-auto">
+
+        {/* Back */}
         <Link
           href={`/${locale}/products`}
-          className="text-xs font-bold tracking-widest uppercase text-espresso/40 hover:text-terracotta transition-colors mb-12 inline-block"
+          className="text-xs text-white/40 hover:text-white transition-colors mb-12 inline-block"
         >
           ← {tNav('products')}
         </Link>
 
+        {/* MAIN */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 mb-24">
-          <div
-            className="relative aspect-square rounded-2xl overflow-hidden border-2"
-            style={{ borderColor: product.accentColor }}
-          >
+
+          {/* Image */}
+          <div className="relative aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-xl">
             <Image
               src={product.imagePath}
               alt={product.name}
               fill
               priority
-              className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover"
             />
           </div>
 
+          {/* Content */}
           <div className="flex flex-col justify-center gap-6">
+
+            {/* Title */}
             <div className="flex items-center gap-3">
-              <span className="text-5xl" aria-hidden="true">{product.emoji}</span>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-widest uppercase text-espresso">
+              <span className="text-4xl" aria-hidden="true">
+                {product.emoji}
+              </span>
+
+              <h1 className="text-3xl md:text-4xl font-medium tracking-tight text-white/90">
                 {product.name}
               </h1>
             </div>
-            <p className="text-sm text-espresso/50 tracking-wide">{product.descriptor}</p>
-            <p className="text-base text-espresso/80 leading-relaxed">{product.description}</p>
 
-            <div>
-              <h2 className="text-xs font-bold tracking-widest uppercase text-espresso/40 mb-3">
+            {/* Descriptor */}
+            <p className="text-sm text-white/50">
+              {product.descriptor}
+            </p>
+
+            {/* Description */}
+            <p className="text-base text-white/80 leading-relaxed">
+              {product.description}
+            </p>
+
+            {/* Scent Notes */}
+            <div className="pt-4 border-t border-white/10">
+              <p className="text-xs text-white/40 mb-2">
                 {t('scentNotes')}
-              </h2>
-              <div className="flex flex-col gap-1 text-sm text-espresso/70">
-                <p><span className="font-semibold">{t('top')}:</span> {product.scentNotes.top}</p>
-                <p><span className="font-semibold">{t('heart')}:</span> {product.scentNotes.heart}</p>
-                <p><span className="font-semibold">{t('base')}:</span> {product.scentNotes.base}</p>
+              </p>
+
+              <div className="text-sm text-white/70 space-y-1">
+                <p>{product.scentNotes.top}</p>
+                <p>{product.scentNotes.heart}</p>
+                <p>{product.scentNotes.base}</p>
               </div>
             </div>
 
-            <div>
-              <h2 className="text-xs font-bold tracking-widest uppercase text-espresso/40 mb-3">
-                {t('ingredients')}
-              </h2>
-              <ul className="flex flex-wrap gap-2">
-                {product.ingredients.map((ing) => (
-                  <li key={ing} className="text-xs font-semibold tracking-wide bg-sand px-3 py-1 rounded-full text-espresso/70">
-                    {ing}
-                  </li>
-                ))}
-              </ul>
+            {/* Ingredients */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              {product.ingredients.map((ing) => (
+                <span
+                  key={ing}
+                  className="text-xs text-white/60 bg-white/5 border border-white/10 px-3 py-1 rounded-full"
+                >
+                  {ing}
+                </span>
+              ))}
             </div>
 
+            {/* CTA */}
             <button
               disabled
-              className="mt-4 w-full py-4 bg-espresso/10 text-espresso/30 font-bold text-sm tracking-widest uppercase rounded cursor-not-allowed"
+              className="mt-6 w-full py-4 text-sm font-medium rounded-xl cursor-not-allowed bg-white/10 text-white/40"
             >
               {t('addToCart')}
             </button>
           </div>
         </div>
 
+        {/* RELATED */}
         <div>
-          <h2 className="text-xs font-bold tracking-widest uppercase text-espresso/40 mb-8 text-center">
+          <h2 className="text-sm text-white/40 text-center mb-8">
             {t('relatedProducts')}
           </h2>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {related.map((p) => (
-              <ProductCard key={p.slug} product={p} locale={locale} />
+              <ProductCard
+                key={p.slug}
+                product={p}
+                locale={locale}
+              />
             ))}
           </div>
         </div>
+
       </div>
     </div>
   )
@@ -107,10 +148,11 @@ export default async function ProductDetailPage({
   params: Promise<{ locale: string; slug: string }>
 }) {
   const { locale, slug } = await params
+
   const product = getProductBySlug(slug)
+
   if (!product) {
     notFound()
-    return null
   }
 
   return <ProductDetailContent locale={locale} product={product} />

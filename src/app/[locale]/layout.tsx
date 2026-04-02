@@ -2,8 +2,11 @@ import type { Metadata } from 'next'
 import { Montserrat } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
+
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import CursorGlow from '@/components/ui/GlowingCursor'
+
 import '../globals.css'
 
 const montserrat = Montserrat({
@@ -23,6 +26,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>
 }): Promise<Metadata> {
   const { locale } = await params
+
   return {
     title: '55candles',
     description: descriptions[locale] ?? descriptions.en,
@@ -41,7 +45,9 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} className={montserrat.variable}>
-      <body className="bg-cream font-sans text-espresso antialiased">
+      <body className="bg-[#0a0a0a] text-white font-sans antialiased">
+        <CursorGlow />
+
         <NextIntlClientProvider messages={messages}>
           <Navbar />
           <main>{children}</main>

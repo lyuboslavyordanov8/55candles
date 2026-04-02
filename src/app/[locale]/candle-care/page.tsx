@@ -1,44 +1,88 @@
+'use client'
+
+import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 
 const sections = [
-  { icon: '🕯️', titleKey: 'firstBurnTitle', bodyKey: 'firstBurnBody' },
-  { icon: '✂️', titleKey: 'wickTitle', bodyKey: 'wickBody' },
-  { icon: '⏱️', titleKey: 'burnTimeTitle', bodyKey: 'burnTimeBody' },
-  { icon: '📦', titleKey: 'storageTitle', bodyKey: 'storageBody' },
+  { icon: '🕯️', titleKey: 'firstBurnTitle', bodyKey: 'firstBurnBody', color: '#f59e0b' },
+  { icon: '✂️', titleKey: 'wickTitle', bodyKey: 'wickBody', color: '#a78bfa' },
+  { icon: '⏱️', titleKey: 'burnTimeTitle', bodyKey: 'burnTimeBody', color: '#60a5fa' },
+  { icon: '📦', titleKey: 'storageTitle', bodyKey: 'storageBody', color: '#7dd3fc' },
 ] as const
 
 function CandleCareContent() {
   const t = useTranslations('candleCarePage')
 
   return (
-    <div className="pt-32 pb-24 bg-cream min-h-screen">
-      <div className="max-w-3xl mx-auto px-6 text-center mb-24">
-        <h1 className="text-5xl md:text-6xl font-bold tracking-widest uppercase text-espresso mb-6">
+    <div className="relative pt-32 pb-28 bg-[#0a0a0a] text-white min-h-screen overflow-hidden">
+
+      {/* 🔥 ambient glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(255,180,100,0.12),transparent_60%)]" />
+
+      {/* HEADER */}
+      <div className="relative max-w-3xl mx-auto px-6 text-center mb-28">
+        <motion.h1
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-5xl md:text-6xl font-semibold tracking-[0.2em] uppercase mb-6"
+        >
           {t('title')}
-        </h1>
-        <p className="text-lg text-espresso/60 leading-relaxed">{t('subtitle')}</p>
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 0.7, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-lg text-white/60 leading-relaxed"
+        >
+          {t('subtitle')}
+        </motion.p>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 flex flex-col gap-16">
-        {sections.map((s) => (
-          <div key={s.titleKey} className="bg-sand rounded-2xl p-10 flex gap-8 items-start">
-            <span className="text-5xl shrink-0" aria-hidden="true">{s.icon}</span>
-            <div>
-              <h2 className="text-lg font-bold tracking-widest uppercase text-espresso mb-3">{t(s.titleKey)}</h2>
-              <p className="text-base text-espresso/70 leading-relaxed">{t(s.bodyKey)}</p>
+      {/* SECTIONS */}
+      <div className="relative max-w-4xl mx-auto px-6 flex flex-col gap-16">
+
+        {sections.map((s, i) => (
+          <motion.div
+            key={s.titleKey}
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.08 }}
+            whileHover={{ y: -6 }}
+            className="group relative flex gap-6 items-start p-8 rounded-2xl bg-white/5 backdrop-blur-lg border border-white/10"
+          >
+            {/* 🔥 glow */}
+            <div
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 blur-2xl"
+              style={{ background: `${s.color}33` }}
+            />
+
+            {/* Icon */}
+            <div
+              className="relative text-4xl shrink-0 transition group-hover:scale-110"
+              style={{ color: s.color }}
+            >
+              {s.icon}
             </div>
-          </div>
+
+            {/* Content */}
+            <div>
+              <h2 className="text-sm font-semibold tracking-widest uppercase text-white/80 mb-3 group-hover:text-white transition">
+                {t(s.titleKey)}
+              </h2>
+
+              <p className="text-base text-white/60 leading-relaxed">
+                {t(s.bodyKey)}
+              </p>
+            </div>
+          </motion.div>
         ))}
+
       </div>
     </div>
   )
 }
 
-export default async function CandleCarePage({
-  params,
-}: {
-  params: Promise<{ locale: string }>
-}) {
-  await params
+export default function CandleCarePage() {
   return <CandleCareContent />
 }
