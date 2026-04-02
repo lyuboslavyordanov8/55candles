@@ -4,13 +4,13 @@ import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 
 const StarIcon = () => (
-  <svg className="w-4 h-4 fill-amber text-amber" viewBox="0 0 24 24">
+  <svg className="w-4 h-4 fill-clay text-clay" viewBox="0 0 24 24">
     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2z" />
   </svg>
 )
 
 const Stars = () => (
-  <div className="flex gap-0.5 opacity-80">
+  <div className="flex gap-0.5">
     {Array.from({ length: 5 }).map((_, i) => <StarIcon key={i} />)}
   </div>
 )
@@ -30,18 +30,14 @@ export default function Testimonials() {
   const t = useTranslations('testimonials')
 
   return (
-    <section className="relative py-28 px-6 bg-[#0a0a0a] text-white overflow-hidden">
-
-      {/* 🔥 ambient glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(255,180,100,0.1),transparent_60%)]" />
-
-      <div className="relative max-w-7xl mx-auto">
+    <section className="py-28 px-6 bg-cream-surface">
+      <div className="max-w-7xl mx-auto">
 
         {/* Title */}
         <motion.h2
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
-          className="text-3xl md:text-5xl font-semibold tracking-[0.2em] uppercase text-center mb-16"
+          className="font-serif text-3xl md:text-5xl font-normal text-center text-charcoal mb-16"
         >
           {t('title')}
         </motion.h2>
@@ -51,27 +47,20 @@ export default function Testimonials() {
           {reviews.map((review, i) => (
             <motion.div
               key={review.nameKey}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.08 }}
-              whileHover={{ y: -6 }}
-              className="group relative p-8 rounded-2xl bg-white/5 backdrop-blur-lg border border-white/10 flex flex-col gap-5"
+              className="p-8 bg-cream-base border border-border rounded-sm flex flex-col gap-5"
             >
-              {/* glow */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 blur-2xl bg-orange-300/20" />
-
-              {/* stars */}
               <Stars />
 
-              {/* text */}
-              <p className="text-base text-white/70 leading-relaxed italic flex-1">
+              <p className="text-base text-ink-secondary leading-relaxed italic flex-1 font-serif">
                 &ldquo;{t(review.textKey)}&rdquo;
               </p>
 
-              {/* name */}
-              <p className="text-sm font-semibold tracking-wide text-white">
+              <p className="text-sm font-medium tracking-wide text-charcoal">
                 {t(review.nameKey)}
-                <span className="font-normal text-white/40 ml-2 tracking-normal">
+                <span className="font-normal text-ink-ghost ml-2 tracking-normal">
                   · Verified buyer
                 </span>
               </p>
