@@ -51,9 +51,8 @@ describe('ProductCard', () => {
 
   it('shows out-of-season overlay when seasonal product is inactive', () => {
     renderCard(winter) // winter.seasonal.active = false
-    // Should find the overlay span with the seasonal text, not the descriptor
     const seasonalSpans = screen.getAllByText(/seasonal/i)
-    const overlaySpan = seasonalSpans.find((el) => el.className.includes('text-white'))
+    const overlaySpan = seasonalSpans.find((el) => el.tagName === 'SPAN' && !el.className.includes('top-3'))
     expect(overlaySpan).toBeInTheDocument()
   })
 
