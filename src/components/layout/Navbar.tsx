@@ -33,19 +33,19 @@ export default function Navbar() {
 
   return (
     <>
-      {/* 🔥 Navbar */}
       <header
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${isHome && !scrolled
+        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+          isHome && !scrolled
             ? 'bg-transparent'
-            : 'bg-black/40 backdrop-blur-xl border-b border-white/10'
-          }`}
+            : 'bg-cream-base border-b border-border'
+        }`}
       >
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
 
           {/* Logo */}
           <Link
             href={`/${locale}`}
-            className="text-lg md:text-xl font-semibold tracking-[0.3em] uppercase text-white"
+            className="text-lg md:text-xl font-semibold tracking-[0.3em] uppercase text-charcoal"
           >
             55CANDLES
           </Link>
@@ -56,12 +56,10 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="group relative text-xs tracking-widest uppercase text-white/60 hover:text-white transition"
+                className="group relative text-xs tracking-widest uppercase text-ink-secondary hover:text-charcoal transition-colors duration-200"
               >
                 {link.label}
-
-                {/* 🔥 underline animation */}
-                <span className="absolute left-0 -bottom-1 w-0 h-px bg-white/80 transition-all duration-300 group-hover:w-full" />
+                <span className="absolute left-0 -bottom-1 w-0 h-px bg-clay transition-all duration-300 group-hover:w-full" />
               </Link>
             ))}
           </nav>
@@ -76,27 +74,27 @@ export default function Navbar() {
               className="md:hidden flex flex-col gap-1.5 p-1"
               aria-label="Open menu"
             >
-              <span className="block w-6 h-0.5 bg-white" />
-              <span className="block w-6 h-0.5 bg-white" />
-              <span className="block w-6 h-0.5 bg-white" />
+              <span className="block w-6 h-0.5 bg-charcoal" />
+              <span className="block w-6 h-0.5 bg-charcoal" />
+              <span className="block w-6 h-0.5 bg-charcoal" />
             </button>
           </div>
         </div>
       </header>
 
-      {/* 🔥 Mobile menu */}
+      {/* Mobile menu */}
       <AnimatePresence>
         {menuOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex flex-col p-8"
+            className="fixed inset-0 z-50 bg-cream-base flex flex-col p-8"
           >
             {/* Close */}
             <button
               onClick={() => setMenuOpen(false)}
-              className="self-end text-2xl text-white mb-10"
+              className="self-end text-2xl text-charcoal mb-10"
             >
               ✕
             </button>
@@ -113,7 +111,7 @@ export default function Navbar() {
                   <Link
                     href={link.href}
                     onClick={() => setMenuOpen(false)}
-                    className="text-2xl font-semibold tracking-widest uppercase text-white/80 hover:text-white transition"
+                    className="text-2xl font-semibold tracking-widest uppercase text-ink-secondary hover:text-charcoal transition-colors duration-200"
                   >
                     {link.label}
                   </Link>
@@ -121,7 +119,6 @@ export default function Navbar() {
               ))}
             </nav>
 
-            {/* Bottom */}
             <div className="mt-auto flex justify-center">
               <LanguageSwitcher />
             </div>
