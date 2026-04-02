@@ -5,12 +5,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        cream: '#faf6f0',
-        espresso: '#2a1f14',
-        terracotta: '#c85a2a',
-        amber: '#e8a050',
-        sage: '#7a9e6a',
-        sand: '#eee6da',
+        cream: {
+          base: '#F6F1EB',
+          surface: '#FAF7F3',
+          muted: '#EDE5DC',
+        },
+        charcoal: '#2B2B2B',
+        clay: '#8B6F4E',
+        border: '#DDD4C8',
+        ink: {
+          primary: '#2B2B2B',
+          secondary: '#7A7065',
+          ghost: '#9B8E82',
+        },
         scent: {
           cherry: '#e83a3a',
           orange: '#f07020',
@@ -22,6 +29,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-montserrat)', 'sans-serif'],
+        serif: ['var(--font-playfair)', 'Georgia', 'serif'],
       },
     },
   },
