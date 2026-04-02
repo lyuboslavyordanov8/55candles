@@ -1,11 +1,10 @@
 import type { Metadata } from 'next'
-import { Montserrat } from 'next/font/google'
+import { Montserrat, Playfair_Display } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import CursorGlow from '@/components/ui/GlowingCursor'
 
 import '../globals.css'
 
@@ -15,9 +14,15 @@ const montserrat = Montserrat({
   display: 'swap',
 })
 
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-playfair',
+  display: 'swap',
+})
+
 const descriptions: Record<string, string> = {
   en: 'Eco-friendly, non-toxic candles with hand-sculpted wax fruit. No nasties, ever.',
-  bg: 'Екологични, нетоксични свещи с ръчно изработени плодове от восък. Без вредни съставки, никога.',
+  bg: 'Екологични, нетоксични свещи с ръчно изработени плодове от восък. Без вредни съставки, никода.',
 }
 
 export async function generateMetadata({
@@ -44,10 +49,8 @@ export default async function LocaleLayout({
   const messages = await getMessages()
 
   return (
-    <html lang={locale} className={montserrat.variable}>
-      <body className="bg-[#0a0a0a] text-white font-sans antialiased">
-        <CursorGlow />
-
+    <html lang={locale} className={`${montserrat.variable} ${playfair.variable}`}>
+      <body className="bg-cream-base text-charcoal font-sans antialiased">
         <NextIntlClientProvider messages={messages}>
           <Navbar />
           <main>{children}</main>
