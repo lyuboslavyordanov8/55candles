@@ -19,13 +19,13 @@ export default function LanguageSwitcher() {
   ]
 
   return (
-    <div className="relative flex items-center bg-white/5 backdrop-blur-md rounded-full p-1 border border-white/10">
+    <div className="relative flex items-center bg-cream-muted rounded-full p-1 border border-border">
 
-      {/* 🔥 Sliding active background */}
+      {/* Sliding active background */}
       <motion.div
         layout
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        className="absolute top-1 bottom-1 w-1/2 rounded-full bg-white shadow-sm"
+        className="absolute top-1 bottom-1 w-1/2 rounded-full bg-cream-base shadow-sm"
         style={{
           left: locale === 'en' ? '4px' : 'calc(50% - 4px)',
         }}
@@ -40,13 +40,7 @@ export default function LanguageSwitcher() {
             href={hrefFor(lang.code)}
             className="relative z-10 px-4 py-1.5 text-xs font-semibold tracking-widest uppercase transition-colors"
           >
-            <span
-              className={
-                isActive
-                  ? 'text-black'
-                  : 'text-white/50 hover:text-white'
-              }
-            >
+            <span className={isActive ? 'text-charcoal' : 'text-ink-ghost hover:text-charcoal'}>
               {lang.label}
             </span>
           </Link>
