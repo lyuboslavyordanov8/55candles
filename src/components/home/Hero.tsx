@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 
@@ -11,7 +12,20 @@ export default function Hero({ locale }: Props) {
   const tNav = useTranslations('nav')
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center bg-cream-base overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+
+      {/* Background image */}
+      <Image
+        src="/images/hero.jpg"
+        alt="55candles hero"
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover object-center"
+      />
+
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-charcoal/40 via-charcoal/55 to-charcoal/75" />
 
       {/* Content */}
       <div className="relative z-10 text-center px-6 max-w-3xl mx-auto">
@@ -23,11 +37,11 @@ export default function Hero({ locale }: Props) {
           transition={{ duration: 0.6 }}
           className="flex items-center justify-center gap-4 mb-8"
         >
-          <span className="block w-10 h-px bg-border" />
-          <span className="text-[10px] tracking-[0.35em] uppercase text-ink-ghost">
+          <span className="block w-10 h-px bg-cream-base/40" />
+          <span className="text-[10px] tracking-[0.35em] uppercase text-cream-base/70">
             Handcrafted in Sofia
           </span>
-          <span className="block w-10 h-px bg-border" />
+          <span className="block w-10 h-px bg-cream-base/40" />
         </motion.div>
 
         {/* Headline */}
@@ -35,7 +49,7 @@ export default function Hero({ locale }: Props) {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="font-serif text-5xl md:text-7xl font-normal tracking-tight leading-snug mb-8 text-charcoal"
+          className="font-serif text-5xl md:text-7xl font-normal tracking-tight leading-snug mb-8 text-cream-base"
         >
           {t('headline').split(' ').slice(0, -1).join(' ')}{' '}
           <em className="text-clay">
@@ -48,7 +62,7 @@ export default function Hero({ locale }: Props) {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="text-base md:text-lg leading-relaxed mb-12 text-ink-secondary max-w-xl mx-auto"
+          className="text-base md:text-lg leading-relaxed mb-12 text-cream-base/75 max-w-xl mx-auto"
         >
           {t('subtext')}
         </motion.p>
@@ -62,14 +76,14 @@ export default function Hero({ locale }: Props) {
         >
           <Link
             href={`/${locale}/products`}
-            className="inline-flex items-center justify-center px-8 py-3 bg-charcoal text-cream-base text-xs font-medium tracking-widest uppercase rounded-sm hover:bg-clay transition-colors duration-300"
+            className="inline-flex items-center justify-center px-8 py-3 bg-cream-base text-charcoal text-xs font-medium tracking-widest uppercase rounded-sm hover:bg-clay hover:text-cream-base transition-colors duration-300"
           >
             {t('cta')}
           </Link>
 
           <Link
             href={`/${locale}/our-story`}
-            className="text-xs tracking-widest uppercase text-clay border-b border-clay pb-0.5 hover:opacity-70 transition-opacity duration-200"
+            className="text-xs tracking-widest uppercase text-cream-base/80 border-b border-cream-base/50 pb-0.5 hover:text-cream-base hover:border-cream-base transition-colors duration-200"
           >
             {tNav('ourStory')} →
           </Link>

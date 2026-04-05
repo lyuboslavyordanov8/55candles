@@ -45,7 +45,9 @@ export default function Navbar() {
           {/* Logo */}
           <Link
             href={`/${locale}`}
-            className="text-lg md:text-xl font-semibold tracking-[0.3em] uppercase text-charcoal"
+            className={`text-lg md:text-xl font-semibold tracking-[0.3em] uppercase transition-colors duration-300 ${
+              isHome && !scrolled ? 'text-cream-base' : 'text-charcoal'
+            }`}
           >
             55CANDLES
           </Link>
@@ -56,7 +58,11 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="group relative text-xs tracking-widest uppercase text-ink-secondary hover:text-charcoal transition-colors duration-200"
+                className={`group relative text-xs tracking-widest uppercase transition-colors duration-200 ${
+                  isHome && !scrolled
+                    ? 'text-cream-base/80 hover:text-cream-base'
+                    : 'text-ink-secondary hover:text-charcoal'
+                }`}
               >
                 {link.label}
                 <span className="absolute left-0 -bottom-1 w-0 h-px bg-clay transition-all duration-300 group-hover:w-full" />
@@ -74,9 +80,9 @@ export default function Navbar() {
               className="md:hidden flex flex-col gap-1.5 p-1"
               aria-label="Open menu"
             >
-              <span className="block w-6 h-0.5 bg-charcoal" />
-              <span className="block w-6 h-0.5 bg-charcoal" />
-              <span className="block w-6 h-0.5 bg-charcoal" />
+              <span className={`block w-6 h-0.5 transition-colors duration-300 ${isHome && !scrolled ? 'bg-cream-base' : 'bg-charcoal'}`} />
+              <span className={`block w-6 h-0.5 transition-colors duration-300 ${isHome && !scrolled ? 'bg-cream-base' : 'bg-charcoal'}`} />
+              <span className={`block w-6 h-0.5 transition-colors duration-300 ${isHome && !scrolled ? 'bg-cream-base' : 'bg-charcoal'}`} />
             </button>
           </div>
         </div>
