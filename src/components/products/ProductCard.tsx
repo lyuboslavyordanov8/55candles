@@ -54,7 +54,9 @@ export default function ProductCard({ product, locale }: Props) {
               priority
               sizes="(max-width: 768px) 100vw, 33vw"
               onLoad={() => setHoverLoaded(true)}
-              className="object-cover opacity-0 group-hover:opacity-100 transition duration-500 ease-out will-change-opacity"
+              className={`object-cover transition duration-500 ease-out will-change-opacity ${
+                hoverLoaded ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'
+              }`}
             />
           )}
 

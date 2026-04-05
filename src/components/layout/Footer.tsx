@@ -41,7 +41,7 @@ export default function Footer() {
 
         {/* Instagram */}
         <a
-          href="https://instagram.com/55candles"
+          href="https://www.instagram.com/55candles.bg/"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Instagram"
