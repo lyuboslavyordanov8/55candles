@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
@@ -31,7 +32,7 @@ const brandValues = [
   { Icon: TagIcon, titleKey: 'value3Title', bodyKey: 'value3Body' },
 ] as const
 
-function ValueCard({ Icon, title, body }: { Icon: () => JSX.Element; title: string; body: string }) {
+function ValueCard({ Icon, title, body }: { Icon: () => React.ReactElement; title: string; body: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
