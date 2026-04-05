@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accent Color</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="http://localhost:53078/helper.js"></script>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:#F6F1EB; color:#2B2B2B;
+    font-family:'Montserrat',sans-serif;
+    padding:32px 24px 80px; min-height:100vh;
+  }
+  .page-title { font-size:11px; letter-spacing:.3em; text-transform:uppercase; color:#8a7f74; text-align:center; margin-bottom:8px; }
+  .page-sub { font-size:13px; color:#7a7065; text-align:center; margin-bottom:36px; line-height:1.6; }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:24px; max-width:880px; margin:0 auto; }
+
+  .panel {
+    background:#FAF7F3; border:2px solid transparent;
+    border-radius:6px; overflow:hidden; cursor:pointer;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .panel:hover { box-shadow:0 6px 24px rgba(0,0,0,.07); }
+  .panel.selected { border-color:#2B2B2B; }
+
+  .preview {
+    padding:28px 22px 24px;
+    border-bottom:1px solid #E2D9CE;
+    display:flex; flex-direction:column; gap:18px;
+  }
+
+  /* nav row */
+  .nav-row { display:flex; justify-content:space-between; align-items:center; padding-bottom:14px; border-bottom:1px solid #E2D9CE; }
+  .nav-logo { font-size:11px; letter-spacing:.25em; text-transform:uppercase; color:#2B2B2B; }
+  .nav-links { font-size:9px; letter-spacing:.15em; color:#8a7f74; }
+
+  /* hero text */
+  .hero-text h2 { font-family:'Playfair Display',serif; font-size:28px; font-weight:400; line-height:1.25; color:#2B2B2B; margin-bottom:10px; }
+  .hero-text p { font-size:11px; color:#7a7065; line-height:1.7; margin-bottom:16px; }
+
+  /* buttons */
+  .btn-solid { display:inline-block; padding:9px 22px; border-radius:3px; font-size:9px; letter-spacing:.2em; text-transform:uppercase; font-family:'Montserrat',sans-serif; font-weight:500; cursor:pointer; }
+  .btn-ghost { display:inline-block; padding:8px 22px; border-radius:3px; font-size:9px; letter-spacing:.2em; text-transform:uppercase; font-family:'Montserrat',sans-serif; font-weight:500; cursor:pointer; margin-left:8px; }
+  .link-cta { font-size:10px; letter-spacing:.2em; text-transform:uppercase; padding-bottom:1px; display:inline-block; }
+
+  /* card hint */
+  .card-hint { background:#F0EBE3; border-radius:4px; padding:12px 14px; display:flex; gap:12px; align-items:center; }
+  .card-emoji { font-size:28px; }
+  .card-text .name { font-family:'Playfair Display',serif; font-size:16px; color:#2B2B2B; margin-bottom:2px; }
+  .card-text .desc { font-size:10px; color:#8a7f74; line-height:1.5; }
+
+  .meta { padding:16px 20px; }
+  .meta h4 { font-size:11px; letter-spacing:.15em; text-transform:uppercase; font-weight:500; color:#2B2B2B; margin-bottom:4px; }
+  .meta p { font-size:11px; color:#7a7065; line-height:1.5; }
+  .badge { display:none; font-size:10px; letter-spacing:.15em; text-transform:uppercase; color:#8B6F4E; margin-top:8px; }
+  .panel.selected .badge { display:block; }
+
+  #indicator { position:fixed; bottom:0; left:0; right:0; background:#2B2B2B; color:#F6F1EB; text-align:center; padding:10px; font-size:11px; letter-spacing:.15em; text-transform:uppercase; display:none; }
+</style>
+</head>
+<body>
+
+<p class="page-title">Question 4 of 4</p>
+<p class="page-sub">What accent color anchors the palette?<br>The current orange (#f97316) is too aggressive for a cream theme. Pick a direction.</p>
+
+<div class="grid">
+
+  <!-- A: Clay / Warm Brown -->
+  <div class="panel" data-choice="clay" onclick="pick(this)">
+    <div class="preview">
+      <div class="nav-row">
+        <span class="nav-logo">55CANDLES</span>
+        <span class="nav-links">Products · Story · Care</span>
+      </div>
+      <div class="hero-text">
+        <h2>Light your<br><em>ritual.</em></h2>
+        <p>Eco soy candles, hand-sculpted wax fruit.</p>
+        <span class="btn-solid" style="background:#8B6F4E; color:#FAF7F3;">Shop the collection</span>
+        <span class="btn-ghost" style="border:1px solid #8B6F4E; color:#8B6F4E;">Our story</span>
+      </div>
+      <div class="card-hint">
+        <span class="card-emoji">🍒</span>
+        <div class="card-text">
+          <div class="name">Cherry</div>
+          <div class="desc">Sweet, ripe cherry</div>
+          <span class="link-cta" style="color:#8B6F4E; border-bottom:1px solid #8B6F4E;">Discover →</span>
+        </div>
+      </div>
+    </div>
+    <div class="meta">
+      <h4>A — Clay / Warm Brown <span style="display:inline-block;width:12px;height:12px;background:#8B6F4E;border-radius:50%;vertical-align:middle;margin-left:6px;"></span></h4>
+      <p>Earthy clay brown. Warm, grounded, very premium artisan. Feels hand-made and intentional. Pairs naturally with cream.</p>
+      <div class="badge">✓ Selected</div>
+    </div>
+  </div>
+
+  <!-- B: Charcoal mono -->
+  <div class="panel" data-choice="charcoal" onclick="pick(this)">
+    <div class="preview">
+      <div class="nav-row">
+        <span class="nav-logo">55CANDLES</span>
+        <span class="nav-links">Products · Story · Care</span>
+      </div>
+      <div class="hero-text">
+        <h2>Light your<br><em>ritual.</em></h2>
+        <p>Eco soy candles, hand-sculpted wax fruit.</p>
+        <span class="btn-solid" style="background:#2B2B2B; color:#FAF7F3;">Shop the collection</span>
+        <span class="btn-ghost" style="border:1px solid #2B2B2B; color:#2B2B2B;">Our story</span>
+      </div>
+      <div class="card-hint">
+        <span class="card-emoji">🍒</span>
+        <div class="card-text">
+          <div class="name">Cherry</div>
+          <div class="desc">Sweet, ripe cherry</div>
+          <span class="link-cta" style="color:#2B2B2B; border-bottom:1px solid #2B2B2B;">Discover →</span>
+        </div>
+      </div>
+    </div>
+    <div class="meta">
+      <h4>A — Pure Charcoal <span style="display:inline-block;width:12px;height:12px;background:#2B2B2B;border-radius:50%;vertical-align:middle;margin-left:6px;"></span></h4>
+      <p>No color accent at all — just cream and near-black. Maximum restraint. Very Celine / The Row. Lets the product photography carry all the color.</p>
+      <div class="badge">✓ Selected</div>
+    </div>
+  </div>
+
+  <!-- C: Muted Terracotta -->
+  <div class="panel" data-choice="terracotta" onclick="pick(this)">
+    <div class="preview">
+      <div class="nav-row">
+        <span class="nav-logo">55CANDLES</span>
+        <span class="nav-links">Products · Story · Care</span>
+      </div>
+      <div class="hero-text">
+        <h2>Light your<br><em>ritual.</em></h2>
+        <p>Eco soy candles, hand-sculpted wax fruit.</p>
+        <span class="btn-solid" style="background:#B5714A; color:#FAF7F3;">Shop the collection</span>
+        <span class="btn-ghost" style="border:1px solid #B5714A; color:#B5714A;">Our story</span>
+      </div>
+      <div class="card-hint">
+        <span class="card-emoji">🍒</span>
+        <div class="card-text">
+          <div class="name">Cherry</div>
+          <div class="desc">Sweet, ripe cherry</div>
+          <span class="link-cta" style="color:#B5714A; border-bottom:1px solid #B5714A;">Discover →</span>
+        </div>
+      </div>
+    </div>
+    <div class="meta">
+      <h4>C — Muted Terracotta <span style="display:inline-block;width:12px;height:12px;background:#B5714A;border-radius:50%;vertical-align:middle;margin-left:6px;"></span></h4>
+      <p>Warmer and more vivid than clay, but still earthy. More personality than charcoal. Sunset pottery vibes — warm Mediterranean craft.</p>
+      <div class="badge">✓ Selected</div>
+    </div>
+  </div>
+
+</div>
+
+<div id="indicator"></div>
+
+<script>
+function pick(el) {
+  document.querySelectorAll('.panel').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const choice = el.dataset.choice;
+  const text = el.querySelector('h4').textContent.trim();
+  if (window.recordEvent) window.recordEvent({ type:'click', choice, text });
+  const ind = document.getElementById('indicator');
+  ind.style.display = 'block';
+  ind.textContent = '✓ Selected: ' + text + '  —  confirm in terminal';
+}
+</script>
+</body>
+</html>

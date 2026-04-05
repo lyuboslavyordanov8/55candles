@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typography Direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@300;400;500&family=DM+Sans:wght@300;400&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+<script src="http://localhost:53078/helper.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #F6F1EB;
+    color: #2B2B2B;
+    font-family: 'Montserrat', sans-serif;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+
+  .page-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: #8a7f74;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .page-sub {
+    font-size: 13px;
+    color: #7a7065;
+    text-align: center;
+    margin-bottom: 32px;
+    font-family: 'Montserrat', sans-serif;
+    line-height: 1.6;
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  .type-card {
+    background: #FAF7F3;
+    border: 1.5px solid #E2D9CE;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .type-card:hover {
+    border-color: #8B6F4E;
+    box-shadow: 0 4px 20px rgba(139,111,78,.12);
+  }
+  .type-card.selected {
+    border-color: #2B2B2B;
+    box-shadow: 0 0 0 3px rgba(43,43,43,.12);
+  }
+
+  .type-preview {
+    background: #F6F1EB;
+    padding: 28px 24px;
+    border-bottom: 1px solid #E2D9CE;
+  }
+
+  .eyebrow {
+    font-size: 9px;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: #9B7E5A;
+    margin-bottom: 10px;
+  }
+
+  .body-label {
+    font-size: 10px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: #8a7f74;
+    margin-top: 14px;
+    margin-bottom: 4px;
+    font-family: 'Montserrat', sans-serif;
+  }
+
+  .type-meta {
+    padding: 16px 20px;
+  }
+  .type-meta h4 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #2B2B2B;
+    margin-bottom: 4px;
+  }
+  .type-meta p {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px;
+    color: #7a7065;
+    line-height: 1.5;
+  }
+
+  .select-badge {
+    display: none;
+    margin-top: 10px;
+    font-size: 10px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: #8B6F4E;
+    font-family: 'Montserrat', sans-serif;
+  }
+  .type-card.selected .select-badge { display: block; }
+
+  /* indicator bar */
+  #indicator {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #2B2B2B;
+    color: #F6F1EB;
+    text-align: center;
+    padding: 10px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<p class="page-title">Question 2 of 4</p>
+<p class="page-sub">Which serif typeface feels right for 55candles?<br>All pairings keep Montserrat for body/nav — click to select.</p>
+
+<div class="cards-grid">
+
+  <!-- A: Playfair Display -->
+  <div class="type-card" data-choice="playfair" onclick="selectCard(this)">
+    <div class="type-preview">
+      <p class="eyebrow" style="font-family:'Montserrat',sans-serif;">Handcrafted in Sofia</p>
+      <h2 style="font-family:'Playfair Display',serif; font-size:34px; font-weight:400; line-height:1.2; color:#2B2B2B; margin-bottom:4px;">
+        Light your<br><em>ritual.</em>
+      </h2>
+      <p class="body-label">Body (Montserrat)</p>
+      <p style="font-family:'Montserrat',sans-serif; font-size:12px; color:#7a7065; line-height:1.7;">Eco soy candles with hand-sculpted wax fruit. No toxins, ever.</p>
+      <p class="body-label">Product name</p>
+      <p style="font-family:'Playfair Display',serif; font-size:18px; color:#2B2B2B;">Cherry</p>
+      <p style="font-family:'Montserrat',sans-serif; font-size:10px; color:#9B7E5A; letter-spacing:.15em; text-transform:uppercase;">Sweet, ripe cherry</p>
+    </div>
+    <div class="type-meta">
+      <h4>A — Playfair Display</h4>
+      <p>High contrast, dramatic serifs. Classic luxury editorial. Bold personality, confident. Think Vogue, high-end perfume brands.</p>
+      <div class="select-badge">✓ Selected</div>
+    </div>
+  </div>
+
+  <!-- B: Cormorant Garamond -->
+  <div class="type-card" data-choice="cormorant" onclick="selectCard(this)">
+    <div class="type-preview">
+      <p class="eyebrow" style="font-family:'Montserrat',sans-serif;">Handcrafted in Sofia</p>
+      <h2 style="font-family:'Cormorant Garamond',serif; font-size:38px; font-weight:300; line-height:1.2; color:#2B2B2B; margin-bottom:4px;">
+        Light your<br><em>ritual.</em>
+      </h2>
+      <p class="body-label">Body (Montserrat)</p>
+      <p style="font-family:'Montserrat',sans-serif; font-size:12px; color:#7a7065; line-height:1.7;">Eco soy candles with hand-sculpted wax fruit. No toxins, ever.</p>
+      <p class="body-label">Product name</p>
+      <p style="font-family:'Cormorant Garamond',serif; font-size:22px; color:#2B2B2B;">Cherry</p>
+      <p style="font-family:'Montserrat',sans-serif; font-size:10px; color:#9B7E5A; letter-spacing:.15em; text-transform:uppercase;">Sweet, ripe cherry</p>
+    </div>
+    <div class="type-meta">
+      <h4>B — Cormorant Garamond</h4>
+      <p>Ultra-refined, delicate, featherlight. The most "expensive" feeling of the three. Très haute couture — artemis-home territory.</p>
+      <div class="select-badge">✓ Selected</div>
+    </div>
+  </div>
+
+  <!-- C: DM Serif Display -->
+  <div class="type-card" data-choice="dm-serif" onclick="selectCard(this)">
+    <div class="type-preview">
+      <p class="eyebrow" style="font-family:'Montserrat',sans-serif;">Handcrafted in Sofia</p>
+      <h2 style="font-family:'DM Serif Display',serif; font-size:32px; font-weight:400; line-height:1.2; color:#2B2B2B; margin-bottom:4px;">
+        Light your<br><em>ritual.</em>
+      </h2>
+      <p class="body-label">Body (Montserrat)</p>
+      <p style="font-family:'Montserrat',sans-serif; font-size:12px; color:#7a7065; line-height:1.7;">Eco soy candles with hand-sculpted wax fruit. No toxins, ever.</p>
+      <p class="body-label">Product name</p>
+      <p style="font-family:'DM Serif Display',serif; font-size:20px; color:#2B2B2B;">Cherry</p>
+      <p style="font-family:'Montserrat',sans-serif; font-size:10px; color:#9B7E5A; letter-spacing:.15em; text-transform:uppercase;">Sweet, ripe cherry</p>
+    </div>
+    <div class="type-meta">
+      <h4>C — DM Serif Display</h4>
+      <p>Warm, contemporary serif. More approachable than Cormorant, less theatrical than Playfair. Modern artisan — like a premium candle shop, not a fashion house.</p>
+      <div class="select-badge">✓ Selected</div>
+    </div>
+  </div>
+
+</div>
+
+<div id="indicator"></div>
+
+<script>
+function selectCard(el) {
+  document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const choice = el.dataset.choice;
+  const text = el.querySelector('h4').textContent;
+  if (window.recordEvent) {
+    window.recordEvent({ type: 'click', choice, text });
+  }
+  const ind = document.getElementById('indicator');
+  ind.style.display = 'block';
+  ind.textContent = '✓ Selected: ' + text + '  —  confirm your choice in the terminal';
+}
+</script>
+
+</body>
+</html>

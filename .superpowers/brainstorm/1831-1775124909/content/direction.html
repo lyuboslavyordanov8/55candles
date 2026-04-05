@@ -1,0 +1,103 @@
+<h2>What's the overall design direction?</h2>
+<p class="subtitle">Three takes on "creamy minimal" for 55candles. All use warm off-white, editorial typography, and breathing whitespace — but differ in personality.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="
+      background: #F6F1EB;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 28px 20px; gap: 14px;
+      font-family: Georgia, serif;
+    ">
+      <!-- Minimal nav -->
+      <div style="width:100%; display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #d8cfc4; padding-bottom: 10px; margin-bottom: 6px;">
+        <span style="font-size:11px; letter-spacing:.25em; text-transform:uppercase; color:#2B2B2B; font-family:sans-serif;">55CANDLES</span>
+        <span style="font-size:10px; letter-spacing:.15em; color:#8a7f74; font-family:sans-serif;">Products &nbsp;·&nbsp; Story &nbsp;·&nbsp; Care</span>
+      </div>
+      <!-- Hero text block -->
+      <div style="text-align:center; padding: 12px 0;">
+        <p style="font-size:9px; letter-spacing:.3em; text-transform:uppercase; color:#8a7f74; margin-bottom:8px; font-family:sans-serif;">Handcrafted in Sofia</p>
+        <h3 style="font-size:26px; font-weight:400; line-height:1.2; color:#2B2B2B; margin:0 0 10px 0; letter-spacing:-.01em;">Light your<br><em style="color:#8B6F4E;">ritual.</em></h3>
+        <p style="font-size:10px; color:#7a7065; line-height:1.7; max-width:180px; margin:0 auto 14px; font-family:sans-serif;">Eco soy candles with hand-sculpted wax fruit. No toxins, ever.</p>
+        <div style="display:inline-block; border:1px solid #2B2B2B; padding:6px 18px; font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:#2B2B2B; font-family:sans-serif; border-radius:2px;">Shop the collection</div>
+      </div>
+      <!-- Product row hint -->
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <div style="width:56px; height:64px; background:#EDE5DC; border-radius:4px;"></div>
+        <div style="width:56px; height:64px; background:#E8DDD2; border-radius:4px;"></div>
+        <div style="width:56px; height:64px; background:#F0E9E1; border-radius:4px;"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Pure Editorial</h3>
+      <p>No hero image at all. Typography-first, text-driven hero like a magazine cover. Clean borders, restrained palette, serif headings. Maximum "luxury object" energy. Artemis-home style.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="
+      background: #F8F5F2;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 28px 20px; gap: 14px;
+      font-family: Georgia, serif;
+    ">
+      <!-- Nav -->
+      <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+        <span style="font-size:11px; letter-spacing:.25em; text-transform:uppercase; color:#2B2B2B; font-family:sans-serif;">55CANDLES</span>
+        <span style="font-size:10px; letter-spacing:.15em; color:#8a7f74; font-family:sans-serif;">Products &nbsp; Story &nbsp; Care</span>
+      </div>
+      <!-- Split hero -->
+      <div style="display:flex; gap:12px; width:100%; align-items:center;">
+        <div style="flex:1; padding-right:8px;">
+          <p style="font-size:8px; letter-spacing:.3em; text-transform:uppercase; color:#9B7E5A; margin-bottom:6px; font-family:sans-serif;">Eco · Non-toxic · Handcrafted</p>
+          <h3 style="font-size:22px; font-weight:400; line-height:1.25; color:#2B2B2B; margin:0 0 8px;">Scent as<br>ceremony.</h3>
+          <p style="font-size:9px; color:#7a7065; line-height:1.6; margin-bottom:12px; font-family:sans-serif;">Each candle is a ritual object, sculpted by hand.</p>
+          <div style="display:inline-block; background:#2B2B2B; color:#F8F5F2; padding:5px 14px; font-size:8px; letter-spacing:.2em; text-transform:uppercase; font-family:sans-serif; border-radius:2px;">Explore</div>
+        </div>
+        <!-- Product image stand-in -->
+        <div style="width:90px; height:110px; background:linear-gradient(135deg,#E8DDD2,#D4C5B5); border-radius:6px; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+          <span style="font-size:28px;">🍒</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Warm Editorial + Product</h3>
+      <p>Split hero: large serif headline on left, featured product image on right. Feels like a lifestyle brand lookbook. Warm cream tones, subtle depth. The product is the hero, but typography frames it.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="
+      background: #F3EDE5;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 28px 20px; gap: 14px;
+      font-family: Georgia, serif;
+      position: relative; overflow: hidden;
+    ">
+      <!-- Soft background texture hint -->
+      <div style="position:absolute; inset:0; background:radial-gradient(circle at 60% 40%, rgba(180,140,100,0.12), transparent 70%);"></div>
+      <!-- Nav -->
+      <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; position:relative;">
+        <span style="font-size:11px; letter-spacing:.25em; text-transform:uppercase; color:#2B2B2B; font-family:sans-serif;">55CANDLES</span>
+        <span style="font-size:10px; letter-spacing:.15em; color:#8a7f74; font-family:sans-serif;">Products &nbsp; Story &nbsp; Care</span>
+      </div>
+      <!-- Full-image hero with cream overlay -->
+      <div style="width:100%; height:140px; background:linear-gradient(160deg, #D4C0A8 0%, #C8B090 100%); border-radius:6px; position:relative; overflow:hidden; display:flex; align-items:flex-end; padding:14px;">
+        <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(243,237,229,0.82) 0%, rgba(243,237,229,0.2) 60%, transparent 100%);"></div>
+        <div style="position:relative; z-index:1;">
+          <h3 style="font-size:20px; font-weight:400; line-height:1.2; color:#2B2B2B; margin:0 0 6px;">Made with<br><em>intention.</em></h3>
+          <div style="display:inline-block; border-bottom:1px solid #8B6F4E; font-size:8px; letter-spacing:.25em; text-transform:uppercase; color:#8B6F4E; font-family:sans-serif; padding-bottom:2px;">Shop candles →</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Soft Photo + Cream Overlay</h3>
+      <p>Keeps the product photography hero but replaces the dark overlay with a warm cream fade-in from the bottom. The photo breathes, text sits on the creamy wash. Most similar to current layout but completely flipped in mood.</p>
+    </div>
+  </div>
+
+</div>

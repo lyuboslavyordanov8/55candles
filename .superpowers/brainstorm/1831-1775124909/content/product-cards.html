@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Card Style</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="http://localhost:53078/helper.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #F6F1EB;
+    color: #2B2B2B;
+    font-family: 'Montserrat', sans-serif;
+    padding: 32px 24px 80px;
+    min-height: 100vh;
+  }
+  .page-title {
+    font-size: 11px; letter-spacing: .3em; text-transform: uppercase;
+    color: #8a7f74; text-align: center; margin-bottom: 8px;
+  }
+  .page-sub {
+    font-size: 13px; color: #7a7065; text-align: center;
+    margin-bottom: 36px; line-height: 1.6;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 24px;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .wrapper {
+    cursor: pointer;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .wrapper:hover { border-color: #8B6F4E; box-shadow: 0 6px 24px rgba(139,111,78,.1); }
+  .wrapper.selected { border-color: #2B2B2B; box-shadow: 0 0 0 3px rgba(43,43,43,.1); }
+
+  .label-bar {
+    background: #F6F1EB;
+    padding: 14px 18px 18px;
+    border-top: 1px solid #E2D9CE;
+  }
+  .label-bar h4 {
+    font-size: 11px; letter-spacing: .15em; text-transform: uppercase;
+    font-weight: 500; color: #2B2B2B; margin-bottom: 4px;
+  }
+  .label-bar p { font-size: 11px; color: #7a7065; line-height: 1.5; }
+  .badge { display:none; font-size:10px; letter-spacing:.15em; text-transform:uppercase; color:#8B6F4E; margin-top:8px; }
+  .wrapper.selected .badge { display:block; }
+
+  /* CARD A — Borderless float */
+  .card-a {
+    background: #FAF7F3;
+    border-radius: 6px 6px 0 0;
+    overflow: hidden;
+  }
+  .card-a .img {
+    width: 100%; aspect-ratio: 1;
+    background: linear-gradient(135deg, #E8DDD2 0%, #D4C5B5 100%);
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 52px;
+  }
+  .card-a .img .tag {
+    position:absolute; top:12px; left:12px;
+    font-size:9px; letter-spacing:.15em; text-transform:uppercase;
+    color:#2B2B2B; background:#F6F1EB; padding:4px 10px; border-radius:2px;
+    font-family:'Montserrat',sans-serif;
+  }
+  .card-a .body { padding: 18px 16px 20px; }
+  .card-a .body .name {
+    font-family:'Playfair Display',serif; font-size:20px; font-weight:400;
+    color:#2B2B2B; margin-bottom:4px;
+  }
+  .card-a .body .desc {
+    font-size:11px; color:#8a7f74; line-height:1.6; margin-bottom:12px;
+  }
+  .card-a .body .cta {
+    font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    color:#8B6F4E; border-bottom:1px solid #8B6F4E; padding-bottom:1px;
+    display:inline-block;
+  }
+
+  /* CARD B — Ruled minimal */
+  .card-b {
+    background: #F6F1EB;
+    border: 1px solid #DDD4C8;
+    border-radius: 4px 4px 0 0;
+    overflow: hidden;
+  }
+  .card-b .img {
+    width:100%; aspect-ratio:1;
+    background:linear-gradient(135deg,#EDE5DC 0%,#D8CCC0 100%);
+    display:flex; align-items:center; justify-content:center;
+    font-size:52px; border-bottom:1px solid #DDD4C8;
+  }
+  .card-b .body { padding:16px; }
+  .card-b .row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .card-b .name {
+    font-family:'Playfair Display',serif; font-size:18px; color:#2B2B2B;
+  }
+  .card-b .mood {
+    font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:#9B7E5A;
+  }
+  .card-b .desc { font-size:11px; color:#8a7f74; line-height:1.6; margin-bottom:14px; }
+  .card-b .rule { height:1px; background:#DDD4C8; margin-bottom:12px; }
+  .card-b .cta {
+    font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    color:#2B2B2B; display:flex; align-items:center; gap:6px;
+  }
+
+  /* CARD C — Large image, minimal text */
+  .card-c {
+    background: #F6F1EB;
+    border-radius: 4px 4px 0 0;
+    overflow: hidden;
+  }
+  .card-c .img {
+    width:100%; aspect-ratio:.85;
+    background:linear-gradient(160deg,#E0D5C8 0%,#C8B8A6 100%);
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    font-size:64px;
+  }
+  .card-c .img .overlay {
+    position:absolute; inset:0;
+    background:linear-gradient(to top, rgba(246,241,235,.7) 0%, transparent 50%);
+  }
+  .card-c .img .bottom {
+    position:absolute; bottom:14px; left:16px; right:16px;
+    display:flex; justify-content:space-between; align-items:flex-end;
+  }
+  .card-c .img .bottom .name {
+    font-family:'Playfair Display',serif; font-size:22px; color:#2B2B2B; line-height:1;
+  }
+  .card-c .img .bottom .cta {
+    font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:#8B6F4E;
+    border-bottom:1px solid #8B6F4E; padding-bottom:1px;
+  }
+  .card-c .body { padding:12px 16px 16px; }
+  .card-c .desc { font-size:11px; color:#8a7f74; line-height:1.6; }
+
+  #indicator {
+    position:fixed; bottom:0; left:0; right:0;
+    background:#2B2B2B; color:#F6F1EB;
+    text-align:center; padding:10px;
+    font-size:11px; letter-spacing:.15em; text-transform:uppercase;
+    display:none;
+  }
+</style>
+</head>
+<body>
+
+<p class="page-title">Question 3 of 4</p>
+<p class="page-sub">How should product cards look?<br>All use Playfair Display + warm cream — pick the card structure.</p>
+
+<div class="grid">
+
+  <!-- A -->
+  <div class="wrapper" data-choice="a" onclick="pick(this)">
+    <div class="card-a">
+      <div class="img">
+        🍒
+        <span class="tag">Signature</span>
+      </div>
+      <div class="body">
+        <div class="name">Cherry</div>
+        <div class="desc">Sweet, ripe cherry — rich and juicy, like late summer.</div>
+        <span class="cta">Discover →</span>
+      </div>
+    </div>
+    <div class="label-bar">
+      <h4>A — Warm Float</h4>
+      <p>Soft off-white card, no visible border. Name in serif, descriptor in light sans. Clean "Learn more" link in clay/gold. Feels luxe and warm.</p>
+      <div class="badge">✓ Selected</div>
+    </div>
+  </div>
+
+  <!-- B -->
+  <div class="wrapper" data-choice="b" onclick="pick(this)">
+    <div class="card-b">
+      <div class="img">🍊</div>
+      <div class="body">
+        <div class="row">
+          <span class="name">Orange</span>
+          <span class="mood">Bright</span>
+        </div>
+        <div class="desc">Fresh citrus peel — uplifting and effortless.</div>
+        <div class="rule"></div>
+        <div class="cta">View candle <span>→</span></div>
+      </div>
+    </div>
+    <div class="label-bar">
+      <h4>B — Ruled Editorial</h4>
+      <p>Thin border card, rule above the CTA. Mood label floated right. Very structured, editorial, like a product catalog page.</p>
+      <div class="badge">✓ Selected</div>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="wrapper" data-choice="c" onclick="pick(this)">
+    <div class="card-c">
+      <div class="img">
+        🍓
+        <div class="overlay"></div>
+        <div class="bottom">
+          <span class="name">Strawberry</span>
+          <span class="cta">View →</span>
+        </div>
+      </div>
+      <div class="body">
+        <div class="desc">Bright and floral — summer in a glass.</div>
+      </div>
+    </div>
+    <div class="label-bar">
+      <h4>C — Image-First</h4>
+      <p>Tall image dominates. Name overlays the photo on a cream fade. Minimal text below. Product photography is the entire story.</p>
+      <div class="badge">✓ Selected</div>
+    </div>
+  </div>
+
+</div>
+
+<div id="indicator"></div>
+
+<script>
+function pick(el) {
+  document.querySelectorAll('.wrapper').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const choice = el.dataset.choice;
+  const text = el.querySelector('h4').textContent;
+  if (window.recordEvent) window.recordEvent({ type:'click', choice, text });
+  const ind = document.getElementById('indicator');
+  ind.style.display = 'block';
+  ind.textContent = '✓ Selected: ' + text + '  —  confirm in terminal';
+}
+</script>
+</body>
+</html>
