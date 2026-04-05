@@ -28,20 +28,13 @@ function ProductDetailContent({
     .slice(0, 3)
 
   return (
-    <div className="relative pt-32 pb-24 px-6 bg-[#0a0a0a] text-white min-h-screen overflow-hidden">
-
-      {/* 🔥 Ambient glow (SAFE now) */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-20 blur-[120px]"
-        style={{ background: product.glowColor }}
-      />
-
-      <div className="relative max-w-5xl mx-auto">
+    <div className="pt-32 pb-24 px-6 bg-cream-base min-h-screen">
+      <div className="max-w-5xl mx-auto">
 
         {/* Back */}
         <Link
           href={`/${locale}/products`}
-          className="text-xs text-white/40 hover:text-white transition-colors mb-12 inline-block"
+          className="text-xs text-ink-ghost hover:text-clay transition-colors duration-200 mb-12 inline-block tracking-widest uppercase"
         >
           ← {tNav('products')}
         </Link>
@@ -50,7 +43,7 @@ function ProductDetailContent({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 mb-24">
 
           {/* Image */}
-          <div className="relative aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-xl">
+          <div className="relative aspect-square rounded-sm overflow-hidden border border-border bg-cream-surface">
             <Image
               src={product.imagePath}
               alt={product.name}
@@ -65,33 +58,27 @@ function ProductDetailContent({
           <div className="flex flex-col justify-center gap-6">
 
             {/* Title */}
-            <div className="flex items-center gap-3">
-              <span className="text-4xl" aria-hidden="true">
-                {product.emoji}
-              </span>
-
-              <h1 className="text-3xl md:text-4xl font-medium tracking-tight text-white/90">
-                {product.name}
-              </h1>
-            </div>
+            <h1 className="font-serif text-3xl md:text-4xl font-normal text-charcoal">
+              {product.name}
+            </h1>
 
             {/* Descriptor */}
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-ink-ghost tracking-wide">
               {product.descriptor}
             </p>
 
             {/* Description */}
-            <p className="text-base text-white/80 leading-relaxed">
+            <p className="text-base text-ink-secondary leading-relaxed">
               {product.description}
             </p>
 
             {/* Scent Notes */}
-            <div className="pt-4 border-t border-white/10">
-              <p className="text-xs text-white/40 mb-2">
+            <div className="pt-4 border-t border-border">
+              <p className="text-xs text-ink-ghost tracking-widest uppercase mb-3">
                 {t('scentNotes')}
               </p>
 
-              <div className="text-sm text-white/70 space-y-1">
+              <div className="text-sm text-ink-secondary space-y-1 leading-relaxed">
                 <p>{product.scentNotes.top}</p>
                 <p>{product.scentNotes.heart}</p>
                 <p>{product.scentNotes.base}</p>
@@ -103,7 +90,7 @@ function ProductDetailContent({
               {product.ingredients.map((ing) => (
                 <span
                   key={ing}
-                  className="text-xs text-white/60 bg-white/5 border border-white/10 px-3 py-1 rounded-full"
+                  className="text-xs text-ink-secondary bg-cream-surface border border-border px-3 py-1 rounded-full"
                 >
                   {ing}
                 </span>
@@ -113,7 +100,7 @@ function ProductDetailContent({
             {/* CTA */}
             <button
               disabled
-              className="mt-6 w-full py-4 text-sm font-medium rounded-xl cursor-not-allowed bg-white/10 text-white/40"
+              className="mt-6 w-full py-4 text-sm font-medium rounded-sm cursor-not-allowed bg-cream-muted text-ink-ghost tracking-widest uppercase"
             >
               {t('addToCart')}
             </button>
@@ -122,7 +109,7 @@ function ProductDetailContent({
 
         {/* RELATED */}
         <div>
-          <h2 className="text-sm text-white/40 text-center mb-8">
+          <h2 className="text-xs text-ink-ghost tracking-widest uppercase text-center mb-8">
             {t('relatedProducts')}
           </h2>
 
