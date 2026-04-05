@@ -8,20 +8,16 @@ function ProductsContent({ locale }: { locale: string }) {
   const seasonalCount = products.filter(p => p.seasonal !== null).length
 
   return (
-    <div className="relative pt-32 pb-24 px-6 bg-[#0a0a0a] text-white min-h-screen overflow-hidden">
-
-      {/* 🔥 subtle ambient glow */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.06),transparent_60%)]" />
-
-      <div className="relative max-w-6xl mx-auto">
+    <div className="pt-32 pb-24 px-6 bg-cream-base min-h-screen">
+      <div className="max-w-6xl mx-auto">
 
         {/* Header */}
         <div className="text-center mb-20">
-          <h1 className="text-4xl md:text-5xl font-medium tracking-tight text-white/90 mb-4">
+          <h1 className="font-serif text-4xl md:text-5xl font-normal text-charcoal mb-4">
             {t('title')}
           </h1>
 
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-ink-ghost">
             {products.length} scents
             {seasonalCount > 0 && ` · ${seasonalCount} seasonal`}
           </p>
