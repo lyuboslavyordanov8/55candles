@@ -41,7 +41,7 @@ export default function CtaBanner({ locale }: Props) {
         >
           <Link
             href={`/${locale}/products`}
-            className="inline-flex items-center justify-center px-10 py-4 bg-clay text-cream-base text-sm font-medium tracking-widest uppercase rounded-sm hover:opacity-85 transition-opacity duration-200"
+            className="inline-flex items-center justify-center px-10 py-4 bg-clay text-cream-base text-sm font-medium tracking-widest uppercase rounded-sm hover:opacity-80 transition-opacity duration-200"
           >
             {t('cta')}
           </Link>
