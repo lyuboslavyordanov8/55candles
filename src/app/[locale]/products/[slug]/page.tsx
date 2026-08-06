@@ -6,6 +6,8 @@ import { useTranslations } from 'next-intl'
 import { getProductBySlug, products } from '@/data/products'
 import ProductCard from '@/components/products/ProductCard'
 import Price from '@/components/commerce/Price'
+import { isPurchasable } from '@/data/pricing'
+import { checkoutHref } from '@/lib/cart-params'
 import { locales } from '@/i18n/locales'
 import type { Product } from '@/types/product'
 
@@ -139,13 +141,28 @@ function ProductDetailContent({
               </ul>
             </div>
 
-            {/* CTA */}
-            <button
-              disabled
-              className="mt-6 w-full py-4 text-sm font-medium rounded-sm cursor-not-allowed bg-cream-muted text-ink-ghost tracking-widest uppercase"
-            >
-              {t('addToCart')}
-            </button>
+            {/*
+              CTA. There is no cart yet (B-05), so this goes straight to
+              checkout with a one-item URL cart rather than pretending to add
+              to a basket that does not exist. Unpurchasable products keep the
+              disabled button — an out-of-season or unpriced product must not
+              lead to a checkout that will refuse it.
+            */}
+            {isPurchasable(product.slug) ? (
+              <Link
+                href={checkoutHref(locale, product.slug)}
+                className="mt-6 w-full py-4 text-sm font-medium rounded-sm bg-charcoal text-cream-base tracking-widest uppercase text-center transition-opacity duration-200 hover:opacity-80"
+              >
+                {t('orderNow')}
+              </Link>
+            ) : (
+              <button
+                disabled
+                className="mt-6 w-full py-4 text-sm font-medium rounded-sm cursor-not-allowed bg-cream-muted text-ink-ghost tracking-widest uppercase"
+              >
+                {t('notAvailable')}
+              </button>
+            )}
           </div>
         </div>
 

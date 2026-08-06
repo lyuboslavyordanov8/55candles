@@ -30,10 +30,26 @@ function formData(overrides: Record<string, string> = {}): FormData {
 
 const IDLE = { status: 'idle' as const }
 
+/**
+ * Both tables ship populated now, so restore them rather than deleting keys —
+ * a bare `delete` would strip a real entry for every later test in the run.
+ */
+const PRICING_SNAPSHOT = { ...pricing }
+const TARIFFS_SNAPSHOT = { ...tariffs }
+
 afterEach(() => {
-  delete pricing.cherry
-  delete tariffs[KEY]
+  for (const key of Object.keys(pricing)) delete pricing[key]
+  Object.assign(pricing, PRICING_SNAPSHOT)
+
+  for (const key of Object.keys(tariffs)) delete tariffs[key]
+  Object.assign(tariffs, TARIFFS_SNAPSHOT)
 })
+
+/** Empty both tables, to exercise the unconfigured paths. */
+function withNothingConfigured(): void {
+  for (const key of Object.keys(pricing)) delete pricing[key]
+  for (const key of Object.keys(tariffs)) delete tariffs[key]
+}
 
 describe('submitCheckout', () => {
   it('rejects invalid delivery details with per-field codes', async () => {
@@ -61,6 +77,8 @@ describe('submitCheckout', () => {
   })
 
   it('reports an unpriced product rather than charging for it', async () => {
+    withNothingConfigured()
+
     const state = await submitCheckout(IDLE, formData())
 
     expect(state.status).toBe('unconfigured')
@@ -69,12 +87,28 @@ describe('submitCheckout', () => {
   })
 
   it('distinguishes an unset courier tariff from an unpriced product', async () => {
+    withNothingConfigured()
     pricing.cherry = { price: eur(24.5), packedWeightGrams: 500 }
 
     const state = await submitCheckout(IDLE, formData())
 
     expect(state.status).toBe('unconfigured')
     expect(state.messageKey).toBe('deliveryNotPricedYet')
+  })
+
+  it('prices a real order from the shipped tables', async () => {
+    // No fixtures: the configured 19.99 price and placeholder rate card, i.e.
+    // what the owner will actually see. 2 × 19.99 = 39.98; 1150 g → 5.99.
+    const state = await submitCheckout(IDLE, formData())
+
+    expect(state.status).toBe('readyToPay')
+    expect(state.summary).toEqual({
+      goodsMinor: 3998,
+      shippingMinor: 599,
+      codFeeMinor: null,
+      totalMinor: 4597,
+      weightGrams: 1150,
+    })
   })
 
   it('prices the order server-side and stops short of storing it', async () => {

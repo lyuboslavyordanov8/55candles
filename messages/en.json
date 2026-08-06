@@ -63,7 +63,9 @@
     "base": "Base",
     "ingredients": "Ingredients",
     "addToCart": "Add to cart — coming soon",
-    "relatedProducts": "You might also like"
+    "relatedProducts": "You might also like",
+    "orderNow": "Order now",
+    "notAvailable": "Not available yet"
   },
   "ourStory": {
     "title": "Our story",
@@ -380,7 +382,7 @@
     "breadcrumbHome": "Home",
     "title": "Checkout",
     "intro": "Tell us where the parcel should go and how you would like to pay.",
-    "notLiveYet": "This checkout is not live yet. Orders cannot be placed: the shop has no prices or courier rates set, and no order storage. The form below is complete and will work as soon as those are in place — nothing you enter here is saved or sent.",
+    "notLiveYet": "This checkout is not live yet. Orders cannot be placed and no payment is taken: there is nowhere to store an order, and card payment is not connected. The form below is complete and validates everything for real — but nothing you enter is saved or sent.",
     "unpricedCount": "{count, plural, one {# product is still unpriced.} other {# products are still unpriced.}}",
     "shippingNotConfigured": "Delivery prices are not set yet, so no shipping cost can be shown. They come from the courier merchant contracts.",
     "recipient": "Recipient",
@@ -474,6 +476,20 @@
       "notPricedYet": "One or more items in your basket has no price yet, so the order can't be completed. Please contact us and we'll help directly.",
       "deliveryNotPricedYet": "We can't calculate delivery for that choice yet. Please contact us and we'll arrange it directly.",
       "noOrderStorageYet": "Your details are valid, but orders can't be saved yet, so nothing has been placed and no payment was taken. Please contact us to order."
+    },
+    "provisionalNumbers": "The prices shown are real, but the parcel weights and delivery rates are placeholders while the courier contracts are being set up. Delivery costs shown here are illustrative and are not what you would be charged.",
+    "basket": "Your basket",
+    "basketEmpty": "Your basket is empty.",
+    "browseProducts": "Browse the candles",
+    "lineUnpriced": "Price on request",
+    "shippingAddedAfterMethod": "Delivery is added once you choose a courier and method below.",
+    "summary": {
+      "title": "Order summary",
+      "goods": "Candles",
+      "delivery": "Delivery",
+      "codFee": "Cash-on-delivery fee",
+      "total": "Total",
+      "weight": "Parcel weight: {grams} g, including packaging."
     }
   }
 }

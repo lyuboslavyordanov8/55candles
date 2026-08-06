@@ -18,6 +18,7 @@ function renderForm(props: Partial<Parameters<typeof DeliveryForm>[0]> = {}) {
         cart={[{ slug: 'cherry', quantity: 1 }]}
         paymentMethods={['cod']}
         shippingConfigured={false}
+        locale="en"
         {...props}
       />
     </NextIntlClientProvider>
@@ -116,6 +117,14 @@ describe('DeliveryForm', () => {
     expect(JSON.parse(hidden!.getAttribute('value')!)).toEqual([
       { slug: 'cherry', quantity: 2 },
     ])
+  })
+
+  it('shows no order breakdown before the server has priced anything', () => {
+    // The breakdown itself is covered in `OrderSummary.test.tsx`; what matters
+    // here is that it does not appear until the server has produced one.
+    renderForm()
+
+    expect(screen.queryByRole('heading', { name: /order summary/i })).not.toBeInTheDocument()
   })
 
   it('tells the customer the office list is not connected yet', () => {

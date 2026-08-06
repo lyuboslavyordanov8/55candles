@@ -53,9 +53,40 @@ export interface Tariff {
 }
 
 /**
+ * True while any rate below is a placeholder rather than a contracted rate.
+ *
+ * The checkout says so visibly while this is set, and a test fails if you clear
+ * it while `PLACEHOLDER_BANDS` is still referenced — the same guard pattern as
+ * `LEGAL_IS_DRAFT`. Clear it when the real cards are in.
+ */
+export const TARIFFS_ARE_PLACEHOLDER = true
+
+/**
+ * Stand-in rate card (AUDIT.md Q-22 — **not** from a merchant contract).
+ *
+ * Added 2026-08-06 so the owner can exercise the order flow: with no tariff at
+ * all, `quote()` correctly returns `unconfigured` and checkout never reaches a
+ * total, so there is nothing to test. These numbers are roughly the shape of
+ * Bulgarian courier list pricing for a sub-2 kg parcel, which makes the band
+ * selection realistic — they are **not** your rates, and a contracted rate is
+ * usually well below list.
+ *
+ * Every method shares this card, which is also wrong: office and locker are
+ * normally cheaper than to-the-door. Real cards differ per courier and method,
+ * which is exactly why `tariffs` is keyed that way.
+ */
+const PLACEHOLDER_BANDS: WeightBand[] = [
+  { upToGrams: 1000, price: money(499) },
+  { upToGrams: 2000, price: money(599) },
+  { upToGrams: 5000, price: money(799) },
+  { upToGrams: null, price: money(1199) },
+]
+
+/**
  * Rate cards, keyed `${courier}:${method}` (AUDIT.md Q-22).
  *
- * **Deliberately empty.** Fill a key with bands from your merchant contract:
+ * Replace each entry with bands from your merchant contract, then clear
+ * `TARIFFS_ARE_PLACEHOLDER`:
  *
  * ```ts
  * 'econt:office': {
@@ -69,7 +100,13 @@ export interface Tariff {
  * ```
  */
 export const tariffs: Partial<Record<string, Tariff>> = {
-  // [TODO: Q-22 — rate cards from the Econt and Speedy merchant contracts.]
+  // [TODO: Q-22 — replace with the real Econt and Speedy rate cards.]
+  'econt:door': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
+  'econt:office': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
+  'econt:locker': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
+  'speedy:door': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
+  'speedy:office': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
+  'speedy:locker': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
 }
 
 export function tariffKey(option: DeliveryOption): string {

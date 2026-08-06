@@ -13,9 +13,12 @@ Five chunks of work are complete and verified:
 - **Phase 0.6** — S-14, the server/client component split
 - **Phase 0.7** — legal identity, the real contact form, structured data
 - **Phase 1a** — commerce foundations: money, shipping, checkout form
-  (**machinery only — every business number is still empty**)
+- **Phase 1b (partial)** — the flow is now exercisable end to end: every candle
+  is priced at **19,99 €** (the owner's real figure), and placeholder courier
+  rate cards plus a URL-based cart let an order be walked through to the point
+  where it would be stored
 
-All five are recorded in detail in `AUDIT.md`, in the "Phase 0 status" …
+All are recorded in detail in `AUDIT.md`, in the "Phase 0 status" …
 "Phase 1a status" sections near the top. **`AUDIT.md` is the source of
 truth** — read it first.
 
@@ -23,7 +26,7 @@ Verified state at handoff:
 
 ```
 npx tsc --noEmit          # clean
-npm test                  # 240 passed / 240 (26 files)
+npm test                  # 278 passed / 278 (29 files)
 npm run build             # succeeds (Next 16.3.0)
 npm audit --omit=dev      # 0 vulnerabilities
 ```
@@ -41,14 +44,26 @@ Two things to know before changing code:
    `src/lib/legal.ts` is `true`, so each page shows a warning banner, sends
    `noindex`, and stays out of `sitemap.xml`. Do not flip it before a Bulgarian
    lawyer has read them.
-3. **Nothing in Phase 1a is priced, and that is deliberate.** `src/data/pricing.ts`
-   and the tariff table in `src/lib/shipping.ts` are empty. Every module returns
-   an explicit `unconfigured` result rather than a zero, and the UI renders it —
-   an unpriced product says "price on request", a missing rate card refuses to
-   quote, card payment is hidden. Fill a table entry and it starts working; there
-   is nothing to un-fake first. Tests assert the tables are empty, so they will
-   fail the moment someone invents a number — change the test in the same commit
-   as the real number.
+3. **Two of the three number tables are placeholders, and the code says so out
+   loud.** The **price** — `UNIFORM_PRICE = 19,99 €` in `src/data/pricing.ts` —
+   is real: the owner gave it. Two things next to it are not:
+   - `PLACEHOLDER_WEIGHT_GRAMS = 500` — a guess. No candle has been weighed in
+     its box. Weight selects the courier rate band, so every gram of error is
+     money lost on every parcel. `PRICING_IS_PROVISIONAL` is `true` while any
+     product still carries it; `provisionallyWeighedSlugs()` lists them.
+   - `PLACEHOLDER_BANDS` in `src/lib/shipping.ts` — roughly the shape of
+     Bulgarian courier list pricing, but **not** anyone's contracted rates, and
+     one card is shared across door/office/locker, which is wrong too (office
+     and locker are normally cheaper). `TARIFFS_ARE_PLACEHOLDER` is `true`.
+
+   Either flag being `true` puts a visible notice on the checkout page saying
+   the delivery cost shown is illustrative — the same pattern as
+   `LEGAL_IS_DRAFT`. Replace the numbers and clear the flags in one commit; the
+   tests assert the flags match the data, so a stale flag fails the build.
+
+   The machinery underneath still refuses rather than guessing: an unpriced
+   product says "price on request", a missing rate card returns `unconfigured`
+   instead of quoting free, card payment stays hidden while Stripe is unset.
 
 ## Starting a new session
 
@@ -81,21 +96,25 @@ needs `experimental.globalNotFound`.
 | 6 | **Legal review** — the six documents under `/[locale]/legal/` are drafts with 18 `[TODO: …]` markers rendered visibly on the page. They are not fit to publish. | A Bulgarian lawyer reads all six, the TODOs get real answers, then set `LEGAL_IS_DRAFT = false` in `src/lib/legal.ts`. A test fails if you clear the flag while any marker remains. |
 | 7 | **Identity fields still missing** — `src/lib/company.ts` has 6 unresolved fields: ДДС number (or a confirmation you are not VAT-registered), street, city, postal code, управител, and a contact email on your own domain. | Fill them in `company.ts`; the footer impressum, legal pages and JSON-LD all update from that one file. The ДДС number is deliberately **not** derived from the ЕИК — VAT registration is a fact about the company, and it changes what your prices must include. |
 | 8 | **`/api/contact` returns 503** — the endpoint is real and validated, but no email provider is wired, so every submission is refused with a visible "email isn't set up yet, please call" message and a loud server-side `console.error`. | Pick a provider (Resend, Postmark, SendGrid …), set `CONTACT_EMAIL_TO` and `EMAIL_PROVIDER_API_KEY` per `.env.example`, then implement `deliver()` in `src/lib/mailer.ts` (B-17). Until then the form works but cannot deliver. |
-| 9 | **Q-11 + Q-12 prices and packed weights** — `src/data/pricing.ts` has all six slugs listed and commented out. Every product currently shows "price on request" and nothing can be bought. The **weight** is not optional: it is what selects a courier rate band, so a price without a weight still cannot check out. | Weigh one finished candle **in its shipping box** (grams), and set a price per scent. Then uncomment the six lines: `cherry: { price: eur(24.5), packedWeightGrams: 520 }`. Prices are authored in major units and stored as integer cents. |
-| 10 | **Q-22 courier rate cards** — `tariffs` in `src/lib/shipping.ts` is empty, so every delivery option returns `unconfigured` and refuses to quote rather than shipping free. There are 6 keys to fill: econt/speedy × door/office/locker. | Get the signed rate card from each merchant contract and enter it as ascending weight bands with an open-ended last band (`upToGrams: null`). Also decide **Q-23: who pays the наложен платеж fee** — currently modelled as `COD_FEE_PAID_BY = 'merchant'`, i.e. absorbed, not added to the customer's total. |
+| 9 | **Q-12 packed weight** — the price is set (19,99 € for all six, your figure). The **weight** is still a guess: every product carries `PLACEHOLDER_WEIGHT_GRAMS = 500`. Weight is what selects a courier rate band, so this is the number that decides what shipping costs you. | Weigh one finished candle **in its shipping box** (grams) and put the real figure on each slug in `src/data/pricing.ts`. When none is left at 500, `provisionallyWeighedSlugs()` empties — set `PRICING_IS_PROVISIONAL = false` in the same commit. If scents differ in weight, give each its own number. |
+| 10 | **Q-22 courier rate cards** — `tariffs` in `src/lib/shipping.ts` now ships `PLACEHOLDER_BANDS` on all 6 keys (econt/speedy × door/office/locker) so the flow can be tested. They are **not** your rates, and the same card is reused for door, office and locker, which real cards never do. | Get the signed rate card from each merchant contract and replace each entry with its real ascending weight bands, open-ended last band (`upToGrams: null`). Then set `TARIFFS_ARE_PLACEHOLDER = false` — until you do, the checkout page tells customers the delivery cost is illustrative. Also decide **Q-23: who pays the наложен платеж fee** — currently `COD_FEE_PAID_BY = 'merchant'`, i.e. absorbed, not added to the customer's total. |
 | 11 | **Q-22 courier API credentials** — separate from the rate cards. Without them the office/locker picker is a free-text box, because a picker full of invented offices produces orders addressed to offices that do not exist. | Set `ECONT_USERNAME` / `ECONT_PASSWORD` and `SPEEDY_USERNAME` / `SPEEDY_PASSWORD` per `.env.example`, then implement the client in `src/lib/couriers/` against the interface already defined there. |
 | 12 | **Q-20 Stripe account** — the card option is hidden at checkout while `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET` is unset, and the server action refuses `card` even if someone posts it directly. Only наложен платеж is offered today. | Open the Stripe account under „ВиреонЛабс“ ЕООД, set both keys plus `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, and decide **Q-26: the statement descriptor** — what customers see on their bank statement. `55CANDLES` is more recognisable than the legal name; it must be set deliberately, so `STATEMENT_DESCRIPTOR` is `null` until you choose. |
 | 13 | **Q-24 free-delivery threshold** — `FREE_DELIVERY_OVER` is `null`, so no order ever ships free. This is a margin decision, not a technical one. | Either give an amount in EUR, or confirm there is no threshold and leave it `null`. The quote logic already handles both and flags `free: true` when it applies. |
 
 ## What to do next
 
-**Phase 1a built the commerce machinery; Phase 1b is where it starts taking
-money, and that is blocked on business decisions.** Four decisions are already
-made and encoded: **EUR only**, **Stripe + наложен платеж**, **all three
-delivery methods** (door / office / locker), and **prices deferred on purpose**.
+**The order flow can now be walked end to end.** Open a product page, click
+"Order now", and you land on `/{locale}/checkout?items=cherry:1` with a priced
+basket, a delivery form, and a server-side breakdown of goods + delivery +
+total. It stops at "orders can't be saved yet" — Q-34, no database.
 
-What Phase 1b still needs from you is blockers **9–13** above — the numbers.
-Nothing in that list is development time; each one is a table entry.
+Four decisions are already made and encoded: **EUR only**, **Stripe + наложен
+платеж**, **all three delivery methods** (door / office / locker), and **19,99 €
+per candle**.
+
+What Phase 1b still needs from you is blockers **9–13** above — the remaining
+numbers. Nothing in that list is development time; each one is a table entry.
 
 Still unanswered and still blocking:
 
@@ -114,11 +133,14 @@ All 36 open questions are in `AUDIT.md` §5.
 **Unblocked work still available**, if you want progress without decisions:
 
 - Descriptive `alt` text for product images (N-10, still partial)
-- A cart: the checkout accepts a cart of slugs and quantities, but nothing
-  builds one yet — there is no "add to basket" and no cart persistence. This can
-  be built and tested with the pricing table still empty.
-- `Product` / `Offer` JSON-LD — `toMajorUnits()` in `src/lib/money.ts` exists to
-  format the `Offer` price, but an `Offer` needs a price, so this waits on Q-11
+- **A real cart (B-05).** The stopgap is `src/lib/cart-params.ts`: the basket
+  lives in the query string (`?items=cherry:2,vanilla:1`), which is enough to
+  test the flow but has no "add to basket" and does not survive a shared link
+  being edited. It is safe — the URL carries only slugs and quantities, and
+  prices are re-read server-side — but it is not a cart. **When the real one
+  lands, delete that module rather than extending it.**
+- `Product` / `Offer` JSON-LD — now unblocked: `toMajorUnits()` in
+  `src/lib/money.ts` exists for exactly this, and there is a price to emit
 - Wire `BreadcrumbJsonLd` into the product and listing pages (the checkout page
   already uses it; product and listing pages do not)
 

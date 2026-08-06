@@ -15,13 +15,29 @@ function renderPrice(slug: string, locale = 'en') {
   )
 }
 
+const SNAPSHOT = { ...pricing }
+
 afterEach(() => {
-  delete pricing.cherry
+  for (const key of Object.keys(pricing)) delete pricing[key]
+  Object.assign(pricing, SNAPSHOT)
 })
 
+/** Remove a slug's price for one test, to exercise the unpriced path. */
+function unprice(slug: string): void {
+  delete pricing[slug]
+}
+
 describe('Price', () => {
+  it('shows the configured 19,99 EUR price', () => {
+    const { container } = renderPrice('cherry')
+
+    expect(container.querySelector('[data-price="1999"]')).toBeInTheDocument()
+    expect(screen.getByText(/19\.99/)).toBeInTheDocument()
+  })
+
   it('says "price on request" rather than showing a blank or a zero', () => {
     // A blank looks like a bug; a 0.00 looks like it is free.
+    unprice('cherry')
     renderPrice('cherry')
 
     expect(screen.getByText(/price on request/i)).toBeInTheDocument()
@@ -29,6 +45,7 @@ describe('Price', () => {
   })
 
   it('translates the unpriced state', () => {
+    unprice('cherry')
     renderPrice('cherry', 'bg')
 
     expect(screen.getByText(/Цена при запитване/)).toBeInTheDocument()

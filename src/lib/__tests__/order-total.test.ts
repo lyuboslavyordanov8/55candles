@@ -5,36 +5,51 @@ import { tariffs, tariffKey, type DeliveryOption } from '../shipping'
 import { pricing } from '@/data/pricing'
 
 const DELIVERY: DeliveryOption = { courier: 'econt', method: 'office' }
+const KEY = tariffKey(DELIVERY)
 
-/** Install prices and a rate card for the duration of one test. */
+/**
+ * Both tables now ship populated, so tests snapshot and restore rather than
+ * deleting: a bare `delete` would strip a real entry for every later test in
+ * the run and make failures depend on file order.
+ */
+const PRICING_SNAPSHOT = { ...pricing }
+const TARIFFS_SNAPSHOT = { ...tariffs }
+
+afterEach(() => {
+  for (const key of Object.keys(pricing)) delete pricing[key]
+  Object.assign(pricing, PRICING_SNAPSHOT)
+
+  for (const key of Object.keys(tariffs)) delete tariffs[key]
+  Object.assign(tariffs, TARIFFS_SNAPSHOT)
+})
+
+/** Fixed prices and a single flat rate, so the arithmetic is checkable by hand. */
 function withPricedCatalogue(run: () => void): void {
   pricing.cherry = { price: eur(24.5), packedWeightGrams: 500 }
   pricing.vanilla = { price: eur(19.99), packedWeightGrams: 450 }
-  tariffs[tariffKey(DELIVERY)] = { bands: [{ upToGrams: null, price: eur(4) }] }
+  tariffs[KEY] = { bands: [{ upToGrams: null, price: eur(4) }] }
 
-  try {
-    run()
-  } finally {
-    delete pricing.cherry
-    delete pricing.vanilla
-    delete tariffs[tariffKey(DELIVERY)]
-  }
+  run()
 }
 
-afterEach(() => {
-  delete pricing.cherry
-  delete pricing.vanilla
-  delete tariffs[tariffKey(DELIVERY)]
-})
+/** Empty both tables, to exercise the unconfigured paths. */
+function withNothingConfigured(run: () => void): void {
+  for (const key of Object.keys(pricing)) delete pricing[key]
+  for (const key of Object.keys(tariffs)) delete tariffs[key]
+
+  run()
+}
 
 describe('calculateTotal', () => {
   it('blocks the order while any line is unpriced (B-03)', () => {
-    const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'cod')
+    withNothingConfigured(() => {
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'cod')
 
-    expect(result.status).toBe('incomplete')
-    if (result.status === 'incomplete') {
-      expect(result.unpriced).toEqual(['cherry'])
-    }
+      expect(result.status).toBe('incomplete')
+      if (result.status === 'incomplete') {
+        expect(result.unpriced).toEqual(['cherry'])
+      }
+    })
   })
 
   it('blocks the order when a product is priced but has no weight', () => {
@@ -48,15 +63,33 @@ describe('calculateTotal', () => {
   })
 
   it('reports the shipping problem separately from pricing', () => {
-    pricing.cherry = { price: eur(24.5), packedWeightGrams: 500 }
+    withNothingConfigured(() => {
+      pricing.cherry = { price: eur(24.5), packedWeightGrams: 500 }
 
-    const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'cod')
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'cod')
 
-    expect(result.status).toBe('incomplete')
-    if (result.status === 'incomplete') {
-      expect(result.unpriced).toEqual([])
-      expect(result.shippingQuote).toEqual({ status: 'unconfigured', reason: 'noTariff' })
-    }
+      expect(result.status).toBe('incomplete')
+      if (result.status === 'incomplete') {
+        expect(result.unpriced).toEqual([])
+        expect(result.shippingQuote).toEqual({ status: 'unconfigured', reason: 'noTariff' })
+      }
+    })
+  })
+
+  it('prices a real order from the shipped tables, end to end', () => {
+    // No fixtures: the actual configured price and rate card, which is what the
+    // customer will be quoted. 19.99 × 2 = 39.98 goods; 1150 g picks the
+    // second placeholder band at 5.99; merchant absorbs the COD fee.
+    const result = calculateTotal([{ slug: 'cherry', quantity: 2 }], DELIVERY, 'cod')
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+
+    expect(result.goods.amountMinor).toBe(3998)
+    expect(result.weightGrams).toBe(1150)
+    expect(result.shipping.amountMinor).toBe(599)
+    expect(result.codFee).toBeNull()
+    expect(result.total.amountMinor).toBe(4597)
   })
 
   it('totals goods, weight and shipping once everything is configured', () => {

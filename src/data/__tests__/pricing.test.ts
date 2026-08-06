@@ -4,27 +4,46 @@ import {
   isCatalogueFullyPriced,
   isPurchasable,
   pricing,
+  PLACEHOLDER_WEIGHT_GRAMS,
   PRICING_EXAMPLE,
+  PRICING_IS_PROVISIONAL,
+  provisionallyWeighedSlugs,
+  UNIFORM_PRICE,
   unpricedSlugs,
 } from '../pricing'
 import { products } from '../products'
 import { eur } from '@/lib/money'
 
+const ORIGINAL = { ...pricing }
+
 afterEach(() => {
-  delete pricing.cherry
-  delete pricing['winter-wonderland']
+  for (const key of Object.keys(pricing)) delete pricing[key]
+  Object.assign(pricing, ORIGINAL)
 })
 
 describe('pricing table', () => {
-  it('is empty, because nobody has supplied prices yet (B-03, Q-11)', () => {
-    // If this fails, someone invented a price. A guessed price is a wrong
-    // price, and it would be charged to a real customer.
-    expect(Object.keys(pricing)).toHaveLength(0)
-    expect(isCatalogueFullyPriced()).toBe(false)
+  it("prices every product at the owner's 19,99 EUR (Q-11)", () => {
+    expect(UNIFORM_PRICE.amountMinor).toBe(1999)
+    expect(unpricedSlugs()).toEqual([])
+    expect(isCatalogueFullyPriced()).toBe(true)
+
+    for (const product of products) {
+      expect(getPricing(product.slug)?.price).toEqual(UNIFORM_PRICE)
+    }
   })
 
-  it('names every product as awaiting a price', () => {
-    expect(unpricedSlugs()).toEqual(products.map((p) => p.slug))
+  it('stores the price as integer cents, never a float', () => {
+    // 19.99 held as a float and multiplied is where a cent goes missing.
+    expect(Number.isInteger(UNIFORM_PRICE.amountMinor)).toBe(true)
+    expect(UNIFORM_PRICE.currency).toBe('EUR')
+  })
+
+  it('flags itself as provisional while the weights are placeholders (Q-12)', () => {
+    // The guard that matters: this flag drives the visible notice on the product
+    // page and at checkout. Clearing it while a stand-in weight is still in the
+    // table would present a made-up shipping cost as a real one.
+    expect(provisionallyWeighedSlugs().length).toBeGreaterThan(0)
+    expect(PRICING_IS_PROVISIONAL).toBe(true)
   })
 
   it('documents the authoring style in integer minor units', () => {
@@ -35,10 +54,11 @@ describe('pricing table', () => {
 })
 
 describe('isPurchasable', () => {
-  it('is false for everything while the table is empty', () => {
-    for (const product of products) {
-      expect(isPurchasable(product.slug)).toBe(false)
-    }
+  it('is true for the five in-season products', () => {
+    const purchasable = products.filter((p) => isPurchasable(p.slug)).map((p) => p.slug)
+
+    expect(purchasable).toHaveLength(5)
+    expect(purchasable).not.toContain('winter-wonderland')
   })
 
   it('needs a weight as well as a price', () => {
@@ -51,17 +71,22 @@ describe('isPurchasable', () => {
   })
 
   it('stays false for an out-of-season product even when priced', () => {
-    pricing['winter-wonderland'] = { price: eur(24.5), packedWeightGrams: 500 }
-
     const winter = products.find((p) => p.slug === 'winter-wonderland')
-    // The fixture this relies on: it is the one seasonal product.
-    expect(winter?.seasonal).not.toBeNull()
 
+    // It *is* priced — the exclusion is the season, checked independently.
+    expect(getPricing('winter-wonderland')).toBeDefined()
+    expect(winter?.seasonal).not.toBeNull()
     expect(isPurchasable('winter-wonderland')).toBe(winter?.seasonal?.active === true)
   })
 
   it('is false for a slug that is not in the catalogue', () => {
     expect(isPurchasable('does-not-exist')).toBe(false)
     expect(getPricing('does-not-exist')).toBeUndefined()
+  })
+
+  it('uses the same stand-in weight everywhere, so shipping bands are uniform', () => {
+    for (const product of products) {
+      expect(getPricing(product.slug)?.packedWeightGrams).toBe(PLACEHOLDER_WEIGHT_GRAMS)
+    }
   })
 })

@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { submitCheckout, type CheckoutState } from '@/app/[locale]/checkout/actions'
 import { COURIERS, DELIVERY_METHODS, type Courier, type DeliveryMethod } from '@/lib/shipping'
+import OrderSummary from './OrderSummary'
 import type { PaymentMethod } from '@/lib/payments'
 
 /**
@@ -87,9 +88,16 @@ interface Props {
   paymentMethods: readonly PaymentMethod[]
   /** True when at least one courier rate card exists (Q-22). */
   shippingConfigured: boolean
+  /** For currency formatting — Bulgarian writes `24,50 €`, English `€24.50`. */
+  locale: string
 }
 
-export default function DeliveryForm({ cart, paymentMethods, shippingConfigured }: Props) {
+export default function DeliveryForm({
+  cart,
+  paymentMethods,
+  shippingConfigured,
+  locale,
+}: Props) {
   const t = useTranslations('checkout')
   const [state, formAction, pending] = useActionState(submitCheckout, INITIAL)
 
@@ -234,6 +242,9 @@ export default function DeliveryForm({ cart, paymentMethods, shippingConfigured 
           <p className="text-xs text-ink-ghost">{t('cardNotConfigured')}</p>
         )}
       </fieldset>
+
+      {/* The priced breakdown, shown only once the server has produced one. */}
+      {state.summary && <OrderSummary summary={state.summary} locale={locale} />}
 
       {state.status !== 'idle' && state.messageKey && (
         <p

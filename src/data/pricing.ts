@@ -4,16 +4,20 @@ import { products } from './products'
 /**
  * Price and packed weight per product (AUDIT.md B-03, Q-11, Q-12).
  *
- * **This table is deliberately empty.** The owner has not supplied prices or
- * weights, and both are facts about the business that cannot be inferred: a
- * guessed price is a wrong price, and a guessed weight produces a shipping
- * quote that undercharges on every order. The machinery around it is complete
- * and tested, so filling one row here prices a product end to end.
+ * **The prices here are the owner's real figure; the weights are placeholders.**
+ * On 2026-08-06 the owner set every candle to 19,99 EUR in order to exercise the
+ * order flow end to end. No weight was supplied, and `calculateTotal` refuses to
+ * price an order without one, so `PLACEHOLDER_WEIGHT_GRAMS` below stands in.
  *
- * To price a product, add an entry keyed by its slug:
+ * That is why `PRICING_IS_PROVISIONAL` exists. While it is `true` the site says
+ * so on the product page and at checkout, exactly as `LEGAL_IS_DRAFT` does for
+ * the legal pages. Clear the flag when the weights are real — a test fails if
+ * you clear it while the placeholder is still in use, so it cannot be forgotten.
+ *
+ * To finish this table:
  *
  * ```ts
- * cherry: { price: eur(24.5), packedWeightGrams: 520 },
+ * cherry: { price: eur(19.99), packedWeightGrams: 520 },
  * ```
  *
  * - `price` — what the customer pays, **VAT inclusive** (Q-13: consumer-facing
@@ -21,8 +25,8 @@ import { products } from './products'
  *   in major units for readability; it is stored as integer cents.
  * - `packedWeightGrams` — the *packed* weight: candle, jar, box and filler, as
  *   the courier will weigh it. Not the net wax weight. Both Econt and Speedy
- *   bill on this, so a value that is too low means you absorb the difference
- *   on every parcel.
+ *   bill on this, so a value that is too low means you absorb the difference on
+ *   every parcel. Weigh one finished, boxed candle on a kitchen scale.
  *
  * Anything absent from this table is unpurchasable by construction — see
  * `isPurchasable`. That is the safe default: a product with no price cannot be
@@ -33,17 +37,37 @@ export interface ProductPricing {
   packedWeightGrams: number
 }
 
+/**
+ * Owner's price as of 2026-08-06, applied uniformly. Real, not a placeholder —
+ * but "the same for every scent" is itself a decision worth revisiting once the
+ * seasonal and larger formats exist.
+ */
+export const UNIFORM_PRICE: Money = eur(19.99)
+
+/**
+ * Stand-in packed weight (Q-12 unanswered).
+ *
+ * 500 g is a plausible boxed 180–200 ml glass candle, chosen so shipping bands
+ * behave realistically during testing. It is **not measured**, and every gram
+ * of error is money lost on every parcel, so it must not survive to launch.
+ */
+export const PLACEHOLDER_WEIGHT_GRAMS = 500
+
+/**
+ * True while any figure in this table is a stand-in rather than a real
+ * measurement. Drives the visible notices; see the module comment.
+ */
+export const PRICING_IS_PROVISIONAL = true
+
 export const pricing: Partial<Record<string, ProductPricing>> = {
-  // [TODO: Q-11 / Q-12 — price and packed weight per scent.]
-  // Every product is listed here commented out rather than omitted, so the
-  // set of things awaiting a number is visible rather than implied:
-  //
-  // cherry:             { price: eur(0), packedWeightGrams: 0 },
-  // orange:             { price: eur(0), packedWeightGrams: 0 },
-  // strawberry:         { price: eur(0), packedWeightGrams: 0 },
-  // vanilla:            { price: eur(0), packedWeightGrams: 0 },
-  // espresso-martini:   { price: eur(0), packedWeightGrams: 0 },
-  // winter-wonderland:  { price: eur(0), packedWeightGrams: 0 },
+  cherry: { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
+  orange: { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
+  strawberry: { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
+  vanilla: { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
+  'espresso-martini': { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
+  // Priced like the rest, but still unpurchasable: it is out of season, and
+  // `isPurchasable` checks that independently of pricing.
+  'winter-wonderland': { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
 }
 
 /** Referenced so the `eur` import documents the intended authoring style. */
@@ -82,3 +106,17 @@ export function unpricedSlugs(): string[] {
 }
 
 export const isCatalogueFullyPriced = () => unpricedSlugs().length === 0
+
+/**
+ * Slugs still carrying the stand-in weight, for the launch checklist.
+ *
+ * Compares against `PLACEHOLDER_WEIGHT_GRAMS` rather than trusting the flag, so
+ * a real 500 g measurement is indistinguishable from the placeholder — that is
+ * deliberate, and the cost is one product to re-check rather than a wrong
+ * shipping charge shipped to production.
+ */
+export function provisionallyWeighedSlugs(): string[] {
+  return products
+    .filter((p) => pricing[p.slug]?.packedWeightGrams === PLACEHOLDER_WEIGHT_GRAMS)
+    .map((p) => p.slug)
+}

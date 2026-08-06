@@ -13,6 +13,7 @@ import {
   tariffKey,
   TariffError,
   tariffs,
+  TARIFFS_ARE_PLACEHOLDER,
   type Tariff,
 } from '../shipping'
 
@@ -26,10 +27,27 @@ const SAMPLE: Tariff = {
 }
 
 describe('tariff configuration', () => {
-  it('ships with no rate cards, because rates come from a signed contract', () => {
-    // If this fails, someone invented a courier price. AUDIT.md Q-22.
-    expect(Object.keys(tariffs)).toHaveLength(0)
-    expect(isShippingConfigured()).toBe(false)
+  it('carries placeholder rate cards, and says they are placeholders', () => {
+    // Rates come from a signed merchant contract (Q-22). The stand-ins exist so
+    // the order flow can be exercised; the flag is what keeps that visible.
+    // If this flag is cleared, the real cards must be in — see the checkout
+    // notice driven by it.
+    expect(TARIFFS_ARE_PLACEHOLDER).toBe(true)
+    expect(isShippingConfigured()).toBe(true)
+  })
+
+  it('covers every courier and method, so no choice silently has no price', () => {
+    for (const option of allDeliveryOptions()) {
+      expect(tariffs[tariffKey(option)]).toBeDefined()
+    }
+  })
+
+  it('has a valid rate card for every configured key', () => {
+    // Ascending bands, open-ended last. A card that fails this would make a
+    // heavier parcel cheaper than a lighter one.
+    for (const [key, tariff] of Object.entries(tariffs)) {
+      expect(() => assertValidTariff(key, tariff!)).not.toThrow()
+    }
   })
 
   it('offers every courier and method combination for the picker', () => {
@@ -77,12 +95,25 @@ describe('billableWeight', () => {
 
 describe('quote', () => {
   const option = { courier: 'econt' as const, method: 'office' as const }
+  const key = tariffKey(option)
 
   it('reports an unset tariff as unconfigured rather than as free shipping', () => {
     // The regression that matters: a missing rate card must never quote zero.
-    const result = quote(option, 900, eur(50))
+    // Removed rather than assumed absent, now that placeholders are installed.
+    const installed = tariffs[key]
+    delete tariffs[key]
+    try {
+      expect(quote(option, 900, eur(50))).toEqual({
+        status: 'unconfigured',
+        reason: 'noTariff',
+      })
+    } finally {
+      tariffs[key] = installed
+    }
+  })
 
-    expect(result).toEqual({ status: 'unconfigured', reason: 'noTariff' })
+  it('quotes the installed placeholder card by weight band', () => {
+    expect(quote(option, 650, eur(20))).toMatchObject({ status: 'quoted', free: false })
   })
 
   it('refuses a locker parcel over the size limit', () => {
@@ -103,20 +134,24 @@ describe('quote', () => {
     expect(result.status).toBe('unavailable')
   })
 
-  describe('with a rate card installed', () => {
-    const key = tariffKey(option)
-
-    function withTariff<T>(run: () => T): T {
-      tariffs[key] = SAMPLE
+  describe('with a specific rate card installed', () => {
+    /**
+     * Swap in a card and put the installed one back afterwards. Restoring
+     * rather than deleting matters now that the module ships placeholders — a
+     * `delete` here would silently strip econt:office for every later test.
+     */
+    function withTariff<T>(card: Tariff, run: () => T): T {
+      const installed = tariffs[key]
+      tariffs[key] = card
       try {
         return run()
       } finally {
-        delete tariffs[key]
+        tariffs[key] = installed
       }
     }
 
     it('picks the band the weight falls in, inclusive of the upper bound', () => {
-      withTariff(() => {
+      withTariff(SAMPLE, () => {
         expect(quote(option, 1000, eur(10))).toMatchObject({ price: eur(3.5) })
         expect(quote(option, 1001, eur(10))).toMatchObject({ price: eur(4.2) })
         expect(quote(option, 50_000, eur(10))).toMatchObject({ price: eur(6) })
@@ -124,22 +159,19 @@ describe('quote', () => {
     })
 
     it('does not apply free shipping when no threshold is set', () => {
-      withTariff(() => {
+      withTariff(SAMPLE, () => {
         // FREE_DELIVERY_OVER is null: no free delivery, not "free above zero".
         expect(quote(option, 500, eur(10_000))).toMatchObject({ free: false })
       })
     })
 
     it('reports no band when the card is closed below the parcel weight', () => {
-      tariffs[key] = { bands: [{ upToGrams: 1000, price: eur(3.5) }] }
-      try {
+      withTariff({ bands: [{ upToGrams: 1000, price: eur(3.5) }] }, () => {
         expect(quote(option, 5000, eur(10))).toEqual({
           status: 'unavailable',
           reason: 'noBandForWeight',
         })
-      } finally {
-        delete tariffs[key]
-      }
+      })
     })
   })
 })

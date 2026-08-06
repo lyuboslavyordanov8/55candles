@@ -44,9 +44,26 @@ describe('ProductDetailPage', () => {
     expect(screen.getByText(/ingredients/i)).toBeInTheDocument()
   })
 
-  it('renders disabled add to cart button', async () => {
+  it('shows the price', async () => {
+    const { container } = await renderPage('cherry')
+    expect(container.querySelector('[data-price="1999"]')).toBeInTheDocument()
+  })
+
+  it('links a purchasable product straight to checkout with a one-item cart', async () => {
+    // There is no cart yet (B-05), so the CTA carries the item in the URL.
     await renderPage('cherry')
-    expect(screen.getByRole('button', { name: /add to cart/i })).toBeDisabled()
+
+    const cta = screen.getByRole('link', { name: /order now/i })
+    expect(cta).toHaveAttribute('href', '/en/checkout?items=cherry%3A1')
+  })
+
+  it('keeps an out-of-season product unbuyable, priced or not', async () => {
+    // winter-wonderland has a price, so only the season stops it. A link here
+    // would lead to a checkout that refuses the order.
+    await renderPage('winter-wonderland')
+
+    expect(screen.queryByRole('link', { name: /order now/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /not available yet/i })).toBeDisabled()
   })
 
   it('calls notFound for unknown slug', async () => {
