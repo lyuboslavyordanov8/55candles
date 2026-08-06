@@ -1,7 +1,5 @@
-'use client'
-
-import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
+import Reveal from '@/components/motion/Reveal'
 
 const LeafIcon = () => (
   <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -23,6 +21,8 @@ const SparkleIcon = () => (
   </svg>
 )
 
+// Server Component: the icons and copy are static, so only Reveal's animation
+// wrapper reaches the client (AUDIT.md S-14).
 export default function BrandValues() {
   const t = useTranslations('values')
 
@@ -36,11 +36,10 @@ export default function BrandValues() {
     <section className="py-20 px-6 bg-cream-surface border-y border-border">
       <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12">
         {values.map((v, i) => (
-          <motion.div
+          <Reveal
             key={v.label}
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
+            y={24}
+            delay={i * 0.1}
             className="flex flex-col items-center text-center gap-4 p-6"
           >
             <div className="text-clay transition-opacity duration-300 hover:opacity-70">
@@ -49,7 +48,7 @@ export default function BrandValues() {
             <p className="text-xs font-medium tracking-[0.2em] uppercase text-ink-secondary">
               {v.label}
             </p>
-          </motion.div>
+          </Reveal>
         ))}
       </div>
     </section>

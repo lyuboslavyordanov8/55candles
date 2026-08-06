@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # next requires >=20.9.0; 22 is the current LTS line.
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Production dependencies must stay clean. Dev-only findings are not
+      # gated here: one low-severity esbuild advisory (arbitrary file read via
+      # the esbuild dev server on Windows) has no fix that survives vitest's
+      # pinned vite range, and we never run that dev server.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=low

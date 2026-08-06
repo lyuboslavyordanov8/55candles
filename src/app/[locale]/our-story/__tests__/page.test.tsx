@@ -8,11 +8,12 @@ vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
 }))
 
-async function renderPage() {
-  const jsx = await OurStoryPage({ params: Promise.resolve({ locale: 'en' }) })
+// Now a Server Component that takes no props — the animations moved into
+// <Reveal>, so the separate client `OurStoryContent` is gone (AUDIT.md S-14).
+function renderPage() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      {jsx}
+      <OurStoryPage />
     </NextIntlClientProvider>
   )
 }

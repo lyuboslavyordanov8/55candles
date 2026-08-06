@@ -1,23 +1,40 @@
-'use client'
-
 import Link from 'next/link'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
+import Reveal from '@/components/motion/Reveal'
 
 interface Props { locale: string }
 
+/**
+ * Splits a headline so the last word can be italicised.
+ *
+ * Guards the empty/single-word cases, which the previous inline
+ * `.split(' ').slice(0, -1)` did not — a one-word translation rendered an
+ * empty lead and BG punctuation still lands inside the <em> (AUDIT.md N-08,
+ * still open: the fix is a translator-controlled markup key, not more string
+ * surgery).
+ */
+function splitLastWord(headline: string): [string, string] {
+  const words = headline.trim().split(/\s+/)
+  if (words.length < 2) return ['', headline]
+  return [words.slice(0, -1).join(' '), words[words.length - 1]]
+}
+
+// Server Component: the hero image, headline and CTAs are static. Only the
+// entrance animations cross to the client, via Reveal (AUDIT.md S-14).
 export default function Hero({ locale }: Props) {
   const t = useTranslations('hero')
   const tNav = useTranslations('nav')
 
+  const [lead, lastWord] = splitLastWord(t('headline'))
+
   return (
     <section className="relative h-screen min-h-[600px] overflow-hidden">
 
-      {/* Background image */}
+      {/* Background image — the LCP element, hence priority */}
       <Image
         src="/images/hero.jpg"
-        alt="55candles hero"
+        alt="A lit 55candles candle topped with hand-sculpted wax fruit"
         fill
         priority
         sizes="100vw"
@@ -32,10 +49,9 @@ export default function Hero({ locale }: Props) {
         <div className="text-center px-6 max-w-3xl mx-auto">
 
           {/* Eyebrow */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6 }}
+          <Reveal
+            trigger="mount"
+            duration={0.6}
             className="flex items-center justify-center gap-4 mb-8"
           >
             <span className="block w-10 h-px bg-cream-base/40" />
@@ -43,36 +59,37 @@ export default function Hero({ locale }: Props) {
               Handcrafted in Sofia
             </span>
             <span className="block w-10 h-px bg-cream-base/40" />
-          </motion.div>
+          </Reveal>
 
           {/* Headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
+          <Reveal
+            as="h1"
+            trigger="mount"
+            y={30}
+            duration={0.7}
+            delay={0.1}
             className="font-serif text-5xl md:text-7xl font-normal tracking-tight leading-snug mb-8 text-cream-base"
           >
-            {t('headline').split(' ').slice(0, -1).join(' ')}{' '}
-            <em className="text-clay">
-              {t('headline').split(' ').slice(-1)[0]}
-            </em>
-          </motion.h1>
+            {lead && `${lead} `}
+            <em className="text-clay">{lastWord}</em>
+          </Reveal>
 
           {/* Subtext */}
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
+          <Reveal
+            as="p"
+            trigger="mount"
+            y={16}
+            delay={0.25}
             className="text-base md:text-lg leading-relaxed mb-12 text-cream-base/75 max-w-xl mx-auto"
           >
             {t('subtext')}
-          </motion.p>
+          </Reveal>
 
           {/* CTAs */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.38 }}
+          <Reveal
+            trigger="mount"
+            y={12}
+            delay={0.38}
             className="flex items-center justify-center gap-8"
           >
             <Link
@@ -88,7 +105,7 @@ export default function Hero({ locale }: Props) {
             >
               {tNav('ourStory')} →
             </Link>
-          </motion.div>
+          </Reveal>
         </div>
       </div>
     </section>

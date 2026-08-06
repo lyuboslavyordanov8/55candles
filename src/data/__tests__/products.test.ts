@@ -13,7 +13,9 @@ describe('products', () => {
       expect(typeof p.descriptor).toBe('string')
       expect(typeof p.accentColor).toBe('string')
       expect(p.accentColor).toMatch(/^#[0-9a-fA-F]{6}$/)
-      expect(p.price).toBeNull()
+      // No product is priced yet — pricing lands with the commerce build
+      // (AUDIT.md B-03). Invert this assertion once prices exist.
+      expect(p.price).toBeUndefined()
     }
   })
 

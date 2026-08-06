@@ -8,9 +8,15 @@ import ProductDetailPage from '../page'
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
 }))
+// The real notFound() throws to halt rendering, so the mock must too —
+// otherwise execution continues past the guard with an undefined product.
+const NOT_FOUND = new Error('NEXT_NOT_FOUND')
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en/products/cherry',
-  notFound: vi.fn(),
+  notFound: vi.fn(() => {
+    throw NOT_FOUND
+  }),
 }))
 
 async function renderPage(slug = 'cherry') {
@@ -44,7 +50,7 @@ describe('ProductDetailPage', () => {
   })
 
   it('calls notFound for unknown slug', async () => {
-    await renderPage('does-not-exist')
+    await expect(renderPage('does-not-exist')).rejects.toThrow(NOT_FOUND)
     expect(notFound).toHaveBeenCalled()
   })
 })

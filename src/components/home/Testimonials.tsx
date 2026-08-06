@@ -1,7 +1,5 @@
-'use client'
-
-import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
+import Reveal from '@/components/motion/Reveal'
 
 const StarIcon = () => (
   <svg className="w-4 h-4 fill-clay text-clay" viewBox="0 0 24 24">
@@ -26,6 +24,9 @@ const reviews: Review[] = [
   { nameKey: '3name', textKey: '3text' },
 ]
 
+// Server Component (AUDIT.md S-14).
+// NOTE: "Verified buyer" is hardcoded English and the reviews are hardcoded
+// names — both still open, see AUDIT.md N-05 / Q-19.
 export default function Testimonials() {
   const t = useTranslations('testimonials')
 
@@ -34,22 +35,21 @@ export default function Testimonials() {
       <div className="max-w-7xl mx-auto">
 
         {/* Title */}
-        <motion.h2
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
+        <Reveal
+          as="h2"
+          y={24}
           className="font-serif text-3xl md:text-5xl font-normal text-center text-charcoal mb-16"
         >
           {t('title')}
-        </motion.h2>
+        </Reveal>
 
         {/* Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           {reviews.map((review, i) => (
-            <motion.div
+            <Reveal
               key={review.nameKey}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
+              y={24}
+              delay={i * 0.08}
               className="p-8 bg-cream-base border border-border rounded-sm flex flex-col gap-5"
             >
               <Stars />
@@ -64,7 +64,7 @@ export default function Testimonials() {
                   · Verified buyer
                 </span>
               </p>
-            </motion.div>
+            </Reveal>
           ))}
         </div>
       </div>

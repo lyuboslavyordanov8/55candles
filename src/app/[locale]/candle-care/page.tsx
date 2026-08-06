@@ -1,7 +1,8 @@
-'use client'
-
-import { motion } from 'framer-motion'
+import type { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
 import { useTranslations } from 'next-intl'
+import Reveal from '@/components/motion/Reveal'
+import { locales } from '@/i18n/locales'
 
 const FlameIcon = () => (
   <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -42,7 +43,28 @@ const sections = [
   { Icon: BoxIcon, titleKey: 'storageTitle', bodyKey: 'storageBody' },
 ] as const
 
-function CandleCareContent() {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'candleCarePage' })
+
+  return {
+    title: t('title'),
+    description: t('subtitle'),
+    alternates: {
+      canonical: `/${locale}/candle-care`,
+      languages: Object.fromEntries(locales.map((l) => [l, `/${l}/candle-care`])),
+    },
+  }
+}
+
+// Server Component. This page used to be a `'use client'` component behind a
+// thin server wrapper, purely because of its entrance animations. Hoisting
+// those into Reveal let the two files collapse back into one (AUDIT.md S-14).
+export default function CandleCarePage() {
   const t = useTranslations('candleCarePage')
 
   return (
@@ -50,33 +72,33 @@ function CandleCareContent() {
 
       {/* HEADER */}
       <div className="max-w-3xl mx-auto px-6 text-center mb-20">
-        <motion.h1
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
+        <Reveal
+          as="h1"
+          trigger="mount"
+          y={30}
           className="font-serif text-5xl md:text-6xl font-normal text-charcoal mb-6"
         >
           {t('title')}
-        </motion.h1>
+        </Reveal>
 
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+        <Reveal
+          as="p"
+          trigger="mount"
+          y={20}
+          delay={0.2}
           className="text-base text-ink-secondary leading-relaxed"
         >
           {t('subtitle')}
-        </motion.p>
+        </Reveal>
       </div>
 
       {/* SECTIONS */}
       <div className="max-w-4xl mx-auto px-6 flex flex-col gap-6">
-
         {sections.map((s, i) => (
-          <motion.div
+          <Reveal
             key={s.titleKey}
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
+            y={24}
+            delay={i * 0.08}
             className="flex gap-6 items-start p-8 rounded-sm bg-cream-surface border border-border"
           >
             {/* Icon */}
@@ -94,14 +116,9 @@ function CandleCareContent() {
                 {t(s.bodyKey)}
               </p>
             </div>
-          </motion.div>
+          </Reveal>
         ))}
-
       </div>
     </div>
   )
-}
-
-export default function CandleCarePage() {
-  return <CandleCareContent />
 }

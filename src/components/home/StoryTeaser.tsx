@@ -1,12 +1,11 @@
-'use client'
-
 import Link from 'next/link'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
+import Reveal from '@/components/motion/Reveal'
 
 interface Props { locale: string }
 
+// Server Component (AUDIT.md S-14).
 export default function StoryTeaser({ locale }: Props) {
   const t = useTranslations('storyTeaser')
 
@@ -15,28 +14,22 @@ export default function StoryTeaser({ locale }: Props) {
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
 
         {/* Image */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
+        <Reveal
+          scale={0.97}
+          duration={0.6}
           className="relative aspect-square rounded-sm overflow-hidden"
         >
           <Image
             src="/images/story.jpg"
-            alt="55candles story"
+            alt="Hand-sculpted wax fruit on a 55candles candle"
             fill
             className="object-cover"
             sizes="(max-width: 768px) 100vw, 50vw"
           />
-        </motion.div>
+        </Reveal>
 
         {/* Content */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="flex flex-col gap-6"
-        >
+        <Reveal y={24} delay={0.1} className="flex flex-col gap-6">
           <h2 className="font-serif text-3xl md:text-4xl font-normal leading-snug text-charcoal">
             {t('headline')}
           </h2>
@@ -51,7 +44,7 @@ export default function StoryTeaser({ locale }: Props) {
           >
             {t('cta')} →
           </Link>
-        </motion.div>
+        </Reveal>
       </div>
     </section>
   )

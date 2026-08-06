@@ -4,11 +4,12 @@ import { NextIntlClientProvider } from 'next-intl'
 import messages from '../../../../../messages/en.json'
 import CandleCarePage from '../page'
 
-async function renderPage() {
-  const jsx = await CandleCarePage({ params: Promise.resolve({ locale: 'en' }) })
+// Now a Server Component that takes no props — the animations moved into
+// <Reveal>, so the separate client `CandleCareContent` is gone (AUDIT.md S-14).
+function renderPage() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      {jsx}
+      <CandleCarePage />
     </NextIntlClientProvider>
   )
 }

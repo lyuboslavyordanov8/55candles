@@ -1,16 +1,48 @@
+import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { getProductBySlug, products } from '@/data/products'
 import ProductCard from '@/components/products/ProductCard'
+import { locales } from '@/i18n/locales'
 import type { Product } from '@/types/product'
 
 export async function generateStaticParams() {
-  const locales = ['en', 'bg']
   return locales.flatMap((locale) =>
     products.map((p) => ({ locale, slug: p.slug }))
   )
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>
+}): Promise<Metadata> {
+  const { locale, slug } = await params
+  const product = getProductBySlug(slug)
+
+  if (!product) return {}
+
+  const path = `/products/${slug}`
+
+  return {
+    // NOTE: product copy is English-only for both locales until the
+    // catalogue is translated (AUDIT.md B-22).
+    title: product.name,
+    description: product.description,
+    alternates: {
+      canonical: `/${locale}${path}`,
+      languages: Object.fromEntries(locales.map((l) => [l, `/${l}${path}`])),
+    },
+    openGraph: {
+      type: 'website',
+      title: `${product.name} — 55candles`,
+      description: product.description,
+      url: `/${locale}${path}`,
+      images: [{ url: product.imagePath, alt: product.name }],
+    },
+  }
 }
 
 function ProductDetailContent({
@@ -86,15 +118,21 @@ function ProductDetailContent({
             </div>
 
             {/* Ingredients */}
-            <div className="flex flex-wrap gap-2 pt-2">
-              {product.ingredients.map((ing) => (
-                <span
-                  key={ing}
-                  className="text-xs text-ink-secondary bg-cream-surface border border-border px-3 py-1 rounded-full"
-                >
-                  {ing}
-                </span>
-              ))}
+            <div className="pt-2">
+              <p className="text-xs text-ink-ghost tracking-widest uppercase mb-3">
+                {t('ingredients')}
+              </p>
+
+              <ul className="flex flex-wrap gap-2 list-none p-0 m-0">
+                {product.ingredients.map((ing) => (
+                  <li
+                    key={ing}
+                    className="text-xs text-ink-secondary bg-cream-surface border border-border px-3 py-1 rounded-full"
+                  >
+                    {ing}
+                  </li>
+                ))}
+              </ul>
             </div>
 
             {/* CTA */}

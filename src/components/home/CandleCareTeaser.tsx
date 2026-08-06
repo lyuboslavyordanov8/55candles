@@ -1,8 +1,6 @@
-'use client'
-
 import Link from 'next/link'
-import { motion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
+import Reveal from '@/components/motion/Reveal'
 
 const FlameIcon = () => (
   <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -43,6 +41,7 @@ const tips = [
   { Icon: SnowflakeIcon, titleKey: 'tip4Title', bodyKey: 'tip4Body' },
 ] as const
 
+// Server Component (AUDIT.md S-14).
 export default function CandleCareTeaser({ locale }: Props) {
   const t = useTranslations('candleCareSection')
 
@@ -58,11 +57,10 @@ export default function CandleCareTeaser({ locale }: Props) {
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-14">
           {tips.map((tip, i) => (
-            <motion.div
+            <Reveal
               key={tip.titleKey}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
+              y={24}
+              delay={i * 0.08}
               className="p-6 bg-cream-surface border border-border rounded-sm text-center"
             >
               <div className="text-clay mb-3 flex justify-center">
@@ -76,7 +74,7 @@ export default function CandleCareTeaser({ locale }: Props) {
               <p className="text-sm text-ink-secondary leading-relaxed">
                 {t(tip.bodyKey)}
               </p>
-            </motion.div>
+            </Reveal>
           ))}
         </div>
 

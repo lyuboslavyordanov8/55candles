@@ -4,7 +4,10 @@
     "products": "Products",
     "ourStory": "Our Story",
     "candleCare": "Candle Care",
-    "contact": "Contact"
+    "contact": "Contact",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "menuLabel": "Main menu"
   },
   "hero": {
     "headline": "Candles you'll want to eat.",
@@ -96,6 +99,18 @@
     "send": "Send message",
     "success": "Message sent! We'll get back to you soon.",
     "instagramCta": "Or find us on Instagram"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "The page you're looking for doesn't exist, or it has moved.",
+    "cta": "Back to home",
+    "browse": "Browse the collection"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "body": "An unexpected error occurred. Try again, or head back to the home page.",
+    "retry": "Try again",
+    "home": "Back to home"
   },
   "footer": {
     "rights": "All rights reserved"

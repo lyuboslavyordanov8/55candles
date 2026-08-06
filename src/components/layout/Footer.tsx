@@ -1,21 +1,16 @@
-'use client'
-
 import Link from 'next/link'
 import { useTranslations, useLocale } from 'next-intl'
 import LanguageSwitcher from './LanguageSwitcher'
+import { navLinks } from './nav-links'
 
+// Server Component: nothing here is interactive. The only client-side piece is
+// LanguageSwitcher, which needs the current pathname (AUDIT.md S-14).
 export default function Footer() {
   const t = useTranslations('nav')
   const tf = useTranslations('footer')
   const locale = useLocale()
 
-  const links = [
-    { href: `/${locale}`, label: t('home') },
-    { href: `/${locale}/products`, label: t('products') },
-    { href: `/${locale}/our-story`, label: t('ourStory') },
-    { href: `/${locale}/candle-care`, label: t('candleCare') },
-    { href: `/${locale}/contact`, label: t('contact') },
-  ]
+  const links = navLinks(locale, t)
 
   return (
     <footer className="bg-cream-base border-t border-border py-20 px-6">

@@ -34,7 +34,6 @@ export const products: Product[] = [
     seasonal: null,
 
     imagePath: '/images/candles/IMG_7520.webp',
-    hoverImagePath: '/images/candles/IMG_7520_alt.webp',
   },
 
   {
@@ -70,7 +69,6 @@ export const products: Product[] = [
     seasonal: null,
 
     imagePath: '/images/candles/IMG_7522.webp',
-    hoverImagePath: '/images/candles/IMG_7522_alt.webp',
   },
 
   {
@@ -106,7 +104,6 @@ export const products: Product[] = [
     seasonal: null,
 
     imagePath: '/images/candles/IMG_7523.webp',
-    hoverImagePath: '/images/candles/IMG_7523_alt.webp',
   },
 
   {
@@ -142,7 +139,6 @@ export const products: Product[] = [
     seasonal: null,
 
     imagePath: '/images/candles/IMG_7521.webp',
-    hoverImagePath: '/images/candles/IMG_7521_alt.webp',
   },
 
   {
@@ -178,7 +174,6 @@ export const products: Product[] = [
     seasonal: null,
 
     imagePath: '/images/candles/IMG_7524.webp',
-    hoverImagePath: '/images/candles/IMG_7524_alt.webp',
   },
 
   {

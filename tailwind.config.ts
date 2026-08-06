@@ -11,12 +11,18 @@ const config: Config = {
           muted: '#EDE5DC',
         },
         charcoal: '#2B2B2B',
-        clay: '#8B6F4E',
+        // Text tokens are tuned to clear WCAG AA (4.5:1) against every cream
+        // background, cream-muted included — it is the darkest and therefore
+        // the binding case. The originals failed: ink-ghost 2.56:1,
+        // clay 3.76:1, ink-secondary 3.89:1 on cream-muted.
+        // Hue and saturation are unchanged; only HSL lightness moved.
+        // Guarded by src/__tests__/contrast.test.ts.
+        clay: '#7C6346',
         border: '#DDD4C8',
         ink: {
           primary: '#2B2B2B',
-          secondary: '#7A7065',
-          ghost: '#9B8E82',
+          secondary: '#5B534B',
+          ghost: '#71655A',
         },
         scent: {
           cherry: '#e83a3a',

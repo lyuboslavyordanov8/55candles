@@ -8,3 +8,37 @@
 html {
   scroll-behavior: smooth;
 }
+
+/*
+ * Respect the OS-level "reduce motion" setting.
+ *
+ * This is the blanket CSS safety net covering Tailwind transitions and
+ * smooth scrolling. framer-motion animates via inline styles and is not
+ * caught by it, so the layout also wraps the tree in <MotionConfig
+ * reducedMotion="user">. Both are needed.
+ *
+ * Durations are near-zero rather than 0 so that transitionend/animationend
+ * listeners still fire and state machines do not stall.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible keyboard focus. The design removes default outlines on inputs via
+   focus:outline-none, so give every focusable element an explicit ring that
+   only shows for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--color-clay, #7c6346);
+  outline-offset: 2px;
+}

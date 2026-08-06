@@ -1,6 +1,26 @@
+import type { Metadata } from 'next'
 import { useTranslations } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
 import ProductCard from '@/components/products/ProductCard'
 import { products } from '@/data/products'
+import { locales } from '@/i18n/locales'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'collection' })
+
+  return {
+    title: t('title'),
+    alternates: {
+      canonical: `/${locale}/products`,
+      languages: Object.fromEntries(locales.map((l) => [l, `/${l}/products`])),
+    },
+  }
+}
 
 function ProductsContent({ locale }: { locale: string }) {
   const t = useTranslations('collection')
@@ -25,11 +45,12 @@ function ProductsContent({ locale }: { locale: string }) {
 
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
-          {products.map((product) => (
+          {products.map((product, i) => (
             <ProductCard
               key={product.slug}
               product={product}
               locale={locale}
+              priority={i < 3}
             />
           ))}
         </div>

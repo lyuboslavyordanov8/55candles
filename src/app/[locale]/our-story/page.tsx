@@ -1,9 +1,10 @@
-'use client'
-
+import type { Metadata } from 'next'
 import React from 'react'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
+import { getTranslations } from 'next-intl/server'
 import { useTranslations } from 'next-intl'
+import Reveal from '@/components/motion/Reveal'
+import { locales } from '@/i18n/locales'
 
 const LeafIcon = () => (
   <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -32,13 +33,20 @@ const brandValues = [
   { Icon: TagIcon, titleKey: 'value3Title', bodyKey: 'value3Body' },
 ] as const
 
-function ValueCard({ Icon, title, body }: { Icon: () => React.ReactElement; title: string; body: string }) {
+function ValueCard({
+  Icon,
+  title,
+  body,
+}: {
+  Icon: () => React.ReactElement
+  title: string
+  body: string
+}) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.4 }}
+    <Reveal
+      y={16}
+      once
+      duration={0.4}
       className="flex flex-col items-center text-center gap-4 p-7 rounded-sm bg-cream-surface border border-border"
     >
       <div className="text-clay">
@@ -52,21 +60,42 @@ function ValueCard({ Icon, title, body }: { Icon: () => React.ReactElement; titl
       <p className="text-[15px] text-ink-secondary leading-relaxed max-w-xs">
         {body}
       </p>
-    </motion.div>
+    </Reveal>
   )
 }
 
-function OurStoryContent() {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'ourStory' })
+
+  return {
+    title: t('title'),
+    description: t('intro'),
+    alternates: {
+      canonical: `/${locale}/our-story`,
+      languages: Object.fromEntries(locales.map((l) => [l, `/${l}/our-story`])),
+    },
+  }
+}
+
+// Server Component. This page used to be a `'use client'` component behind a
+// thin server wrapper, purely because of its entrance animations. Hoisting
+// those into Reveal let the two files collapse back into one (AUDIT.md S-14).
+export default function OurStoryPage() {
   const t = useTranslations('ourStory')
 
   return (
     <div className="min-h-screen pt-32 pb-28 bg-cream-base">
 
       {/* HERO */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+      <Reveal
+        trigger="mount"
+        y={20}
+        duration={0.6}
         className="max-w-3xl mx-auto px-6 text-center mb-24"
       >
         <h1 className="font-serif text-5xl md:text-6xl font-normal text-charcoal leading-tight mb-6">
@@ -76,7 +105,7 @@ function OurStoryContent() {
         <p className="text-lg text-ink-secondary max-w-xl mx-auto leading-relaxed">
           {t('intro')}
         </p>
-      </motion.div>
+      </Reveal>
 
       {/* Divider */}
       <div className="h-px bg-border max-w-3xl mx-auto mb-24" />
@@ -86,29 +115,23 @@ function OurStoryContent() {
         <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-20 items-center">
 
           {/* Image */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+          <Reveal
+            scale={0.97}
+            once
+            duration={0.6}
             className="relative aspect-[4/5] rounded-sm overflow-hidden border border-border bg-cream-surface"
           >
             <Image
               src="/images/story.jpg"
-              alt="Wax fruit on 55candles"
+              alt="Hand-sculpted wax fruit on a 55candles candle"
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
-          </motion.div>
+          </Reveal>
 
           {/* Text */}
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
+          <Reveal y={24} once duration={0.6}>
             <h2 className="font-serif text-2xl md:text-3xl font-normal text-charcoal mb-6">
               {t('edibleTitle')}
             </h2>
@@ -116,7 +139,7 @@ function OurStoryContent() {
             <p className="text-[15px] text-ink-secondary leading-relaxed">
               {t('edibleBody')}
             </p>
-          </motion.div>
+          </Reveal>
 
         </div>
       </div>
@@ -145,8 +168,4 @@ function OurStoryContent() {
       </div>
     </div>
   )
-}
-
-export default function OurStoryPage() {
-  return <OurStoryContent />
 }

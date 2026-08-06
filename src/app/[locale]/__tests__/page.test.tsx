@@ -21,9 +21,13 @@ async function renderPage() {
 }
 
 describe('HomePage', () => {
+  // The hero italicises the final word, so the headline is split across an <em>.
+  // Query by accessible name, which concatenates the heading's descendants.
   it('renders hero headline', async () => {
     await renderPage()
-    expect(screen.getByText("Candles you'll want to eat.")).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: "Candles you'll want to eat." })
+    ).toBeInTheDocument()
   })
 
   it('renders scent collection title', async () => {
