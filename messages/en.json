@@ -369,5 +369,111 @@
         ]
       }
     }
+  },
+  "commerce": {
+    "priceOnRequest": "Price on request",
+    "notAvailableYet": "not available yet"
+  },
+  "checkout": {
+    "metaTitle": "Checkout",
+    "metaDescription": "Delivery and payment details for your 55candles order.",
+    "breadcrumbHome": "Home",
+    "title": "Checkout",
+    "intro": "Tell us where the parcel should go and how you would like to pay.",
+    "notLiveYet": "This checkout is not live yet. Orders cannot be placed: the shop has no prices or courier rates set, and no order storage. The form below is complete and will work as soon as those are in place — nothing you enter here is saved or sent.",
+    "unpricedCount": "{count, plural, one {# product is still unpriced.} other {# products are still unpriced.}}",
+    "shippingNotConfigured": "Delivery prices are not set yet, so no shipping cost can be shown. They come from the courier merchant contracts.",
+    "recipient": "Recipient",
+    "delivery": "Delivery",
+    "payment": "Payment",
+    "optional": "(optional)",
+    "submit": "Continue to payment",
+    "submitting": "Checking…",
+    "officeLookupPending": "Type the office name or number for now. A searchable list will appear here once the courier accounts are connected.",
+    "cardNotConfigured": "Card payment is not connected yet, so only cash on delivery is offered.",
+    "field": {
+      "recipientName": "Full name",
+      "phone": "Phone number",
+      "email": "Email address",
+      "courier": "Courier",
+      "method": "Where should we deliver?",
+      "city": "City",
+      "postCode": "Post code",
+      "street": "Street, number and any block details",
+      "officeId": "Office or locker",
+      "note": "Note for the courier"
+    },
+    "courier": {
+      "econt": "Econt",
+      "speedy": "Speedy"
+    },
+    "method": {
+      "door": "To my address",
+      "office": "To a courier office",
+      "locker": "To a parcel locker"
+    },
+    "methodHint": {
+      "door": "The courier brings the parcel to your door.",
+      "office": "Collect it from a courier branch. Usually the cheapest option.",
+      "locker": "Collect it from an automated locker, any time of day."
+    },
+    "paymentMethod": {
+      "card": "Card",
+      "cod": "Cash on delivery"
+    },
+    "paymentHint": {
+      "card": "Paid securely now. Your card details never reach us.",
+      "cod": "Pay the courier in cash when the parcel arrives."
+    },
+    "error": {
+      "recipientName": {
+        "tooShort": "Please give the full name of the person receiving the parcel.",
+        "tooLong": "That name is too long."
+      },
+      "phone": {
+        "required": "A phone number is needed — the courier may have to call.",
+        "invalid": "That doesn't look like a phone number.",
+        "tooShort": "That number looks too short.",
+        "tooLong": "That number looks too long."
+      },
+      "email": {
+        "invalid": "That doesn't look like an email address.",
+        "tooLong": "That email address is too long."
+      },
+      "courier": {
+        "invalid": "Please choose a courier."
+      },
+      "method": {
+        "invalid": "Please choose where we should deliver."
+      },
+      "city": {
+        "required": "Please enter the city or village.",
+        "tooLong": "That name is too long."
+      },
+      "postCode": {
+        "invalid": "A Bulgarian post code is four digits."
+      },
+      "street": {
+        "required": "Please enter the street and number.",
+        "tooLong": "That address is too long."
+      },
+      "officeId": {
+        "required": "Please say which office or locker you'll collect from.",
+        "tooLong": "That is too long."
+      },
+      "note": {
+        "tooLong": "Please shorten the note."
+      }
+    },
+    "message": {
+      "fixTheFields": "Please check the highlighted fields.",
+      "choosePayment": "Please choose how you'd like to pay.",
+      "paymentUnavailable": "That payment method isn't available. Please choose another.",
+      "cartEmpty": "Your basket is empty.",
+      "cartUnreadable": "Something went wrong reading your basket. Please start again.",
+      "notPricedYet": "One or more items in your basket has no price yet, so the order can't be completed. Please contact us and we'll help directly.",
+      "deliveryNotPricedYet": "We can't calculate delivery for that choice yet. Please contact us and we'll arrange it directly.",
+      "noOrderStorageYet": "Your details are valid, but orders can't be saved yet, so nothing has been placed and no payment was taken. Please contact us to order."
+    }
   }
 }

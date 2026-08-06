@@ -13,9 +13,15 @@ describe('products', () => {
       expect(typeof p.descriptor).toBe('string')
       expect(typeof p.accentColor).toBe('string')
       expect(p.accentColor).toMatch(/^#[0-9a-fA-F]{6}$/)
-      // No product is priced yet — pricing lands with the commerce build
-      // (AUDIT.md B-03). Invert this assertion once prices exist.
-      expect(p.price).toBeUndefined()
+    }
+  })
+
+  it('carries no price of its own, so pricing has one source', () => {
+    for (const p of products) {
+      // Money needs integer minor units and a currency (AUDIT.md B-12), so it
+      // lives in `src/data/pricing.ts`. A second price field here would be a
+      // competing source that wins or loses depending on which one is read.
+      expect(p).not.toHaveProperty('price')
     }
   })
 

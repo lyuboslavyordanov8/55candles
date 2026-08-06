@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 import ProductImagePair from './ProductImagePair'
+import Price from '@/components/commerce/Price'
 import type { Product } from '@/types/product'
 
 interface Props {
@@ -81,6 +82,9 @@ export default function ProductCard({ product, locale, priority = false }: Props
           <p className="text-sm text-ink-secondary leading-relaxed">
             {product.descriptor}
           </p>
+
+          {/* Price (AUDIT.md B-03) */}
+          <Price slug={product.slug} locale={locale} className="text-sm font-medium" />
 
           {/* Mood */}
           <p className="text-[10px] uppercase tracking-wide text-ink-ghost">

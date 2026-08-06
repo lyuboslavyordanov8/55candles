@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { getProductBySlug, products } from '@/data/products'
 import ProductCard from '@/components/products/ProductCard'
+import Price from '@/components/commerce/Price'
 import { locales } from '@/i18n/locales'
 import type { Product } from '@/types/product'
 
@@ -98,6 +99,9 @@ function ProductDetailContent({
             <p className="text-sm text-ink-ghost tracking-wide">
               {product.descriptor}
             </p>
+
+            {/* Price (AUDIT.md B-03) */}
+            <Price slug={product.slug} locale={locale} className="text-xl" />
 
             {/* Description */}
             <p className="text-base text-ink-secondary leading-relaxed">

@@ -16,6 +16,7 @@ import type { Locale } from './locales'
  * | `contact`  | ContactContent — the form has real state |
  * | `notFound` | [locale]/not-found.tsx                   |
  * | `error`    | [locale]/error.tsx                       |
+ * | `checkout` | DeliveryForm — fields depend on method   |
  *
  * Everything else is rendered on the server and arrives as HTML. Note that
  * `nav` is deliberately absent: `MobileMenu` is a Client Component but receives
@@ -25,7 +26,7 @@ import type { Locale } from './locales'
  * `useTranslations` will throw `MISSING_MESSAGE` at runtime.
  * `src/i18n/__tests__/client-namespaces.test.ts` scans for that mistake.
  */
-export const CLIENT_NAMESPACES = ['contact', 'notFound', 'error'] as const
+export const CLIENT_NAMESPACES = ['contact', 'notFound', 'error', 'checkout'] as const
 
 type Messages = Record<string, unknown>
 
