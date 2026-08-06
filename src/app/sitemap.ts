@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { products } from '@/data/products'
 import { locales, defaultLocale } from '@/i18n/locales'
+import { LEGAL_DOCS, LEGAL_IS_DRAFT } from '@/lib/legal'
 import { absoluteUrl } from '@/lib/site'
 
 // Paths that exist under every locale, with their relative crawl priority.
@@ -43,5 +44,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       entry(path, priority, changeFrequency)
     ),
     ...products.map((product) => entry(`/products/${product.slug}`, 0.8, 'monthly')),
+    // Legal pages send `noindex` while they are unreviewed drafts, so listing
+    // them here would ask Google to crawl what the page then tells it to drop.
+    // They join the sitemap when LEGAL_IS_DRAFT flips to false.
+    ...(LEGAL_IS_DRAFT
+      ? []
+      : LEGAL_DOCS.map((doc) => entry(`/legal/${doc.slug}`, 0.3, 'monthly'))),
   ]
 }

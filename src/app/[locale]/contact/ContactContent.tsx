@@ -16,6 +16,17 @@ const PhoneIcon = () => (
   </svg>
 )
 
+/** Maps a server-side field error code to a message key. */
+const FIELD_ERROR_KEYS: Record<string, Record<string, string>> = {
+  name: { tooShort: 'errorNameTooShort', tooLong: 'errorNameTooLong' },
+  email: {
+    required: 'errorEmailRequired',
+    invalid: 'errorEmailInvalid',
+    tooLong: 'errorEmailTooLong',
+  },
+  message: { tooShort: 'errorMessageTooShort', tooLong: 'errorMessageTooLong' },
+}
+
 export default function ContactContent() {
   const t = useTranslations('contact')
 
@@ -23,16 +34,57 @@ export default function ContactContent() {
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  // Stays empty for every real user; see the hidden field below.
+  const [honeypot, setHoneypot] = useState('')
 
+  /**
+   * Real submission (AUDIT.md B-20). This used to await a 1000 ms timeout and
+   * then claim success unconditionally, destroying every enquiry. It now
+   * reports what actually happened — including that delivery is not yet
+   * configured (B-17), in which case the customer is pointed at the phone
+   * number rather than being told a lie.
+   */
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setFieldErrors({})
+
     try {
-      await new Promise((res) => setTimeout(res, 1000))
-      setSubmitted(true)
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, website: honeypot }),
+      })
+
+      if (response.ok) {
+        setSubmitted(true)
+        return
+      }
+
+      const body = await response.json().catch(() => ({}))
+
+      if (response.status === 400 && body.fields) {
+        const mapped: Record<string, string> = {}
+        for (const [field, code] of Object.entries(body.fields as Record<string, string>)) {
+          const key = FIELD_ERROR_KEYS[field]?.[code]
+          if (key) mapped[field] = t(key)
+        }
+        setFieldErrors(mapped)
+        setError(t('errorSummary'))
+        return
+      }
+
+      if (response.status === 429) {
+        setError(t('errorRateLimited'))
+        return
+      }
+
+      setError(response.status === 503 ? t('errorUnconfigured') : t('errorFailed'))
     } catch {
-      setError('Something went wrong.')
+      // Network-level failure: the request never reached the server.
+      setError(t('errorNetwork'))
     } finally {
       setLoading(false)
     }
@@ -105,7 +157,7 @@ export default function ContactContent() {
           >
             <div className="text-2xl text-clay">✓</div>
             <p className="text-charcoal text-lg font-medium">{t('success')}</p>
-            <p className="text-ink-ghost text-sm">We&apos;ll get back to you shortly.</p>
+            <p className="text-ink-ghost text-sm">{t('successDetail')}</p>
           </motion.div>
         ) : (
           <motion.form
@@ -126,8 +178,15 @@ export default function ContactContent() {
                 autoComplete="name"
                 value={form.name}
                 onChange={(e) => updateField('name', e.target.value)}
+                aria-invalid={fieldErrors.name ? true : undefined}
+                aria-describedby={fieldErrors.name ? 'contact-name-error' : undefined}
                 className="w-full rounded-sm px-4 py-3 text-sm bg-cream-base border border-border focus:border-clay focus:outline-none transition-colors duration-200 text-charcoal"
               />
+              {fieldErrors.name && (
+                <p id="contact-name-error" className="text-xs text-red-700">
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -141,8 +200,15 @@ export default function ContactContent() {
                 autoComplete="email"
                 value={form.email}
                 onChange={(e) => updateField('email', e.target.value)}
+                aria-invalid={fieldErrors.email ? true : undefined}
+                aria-describedby={fieldErrors.email ? 'contact-email-error' : undefined}
                 className="w-full rounded-sm px-4 py-3 text-sm bg-cream-base border border-border focus:border-clay focus:outline-none transition-colors duration-200 text-charcoal"
               />
+              {fieldErrors.email && (
+                <p id="contact-email-error" className="text-xs text-red-700">
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -155,12 +221,37 @@ export default function ContactContent() {
                 rows={5}
                 value={form.message}
                 onChange={(e) => updateField('message', e.target.value)}
+                aria-invalid={fieldErrors.message ? true : undefined}
+                aria-describedby={fieldErrors.message ? 'contact-message-error' : undefined}
                 className="w-full rounded-sm px-4 py-3 text-sm bg-cream-base border border-border focus:border-clay focus:outline-none transition-colors duration-200 text-charcoal resize-none"
+              />
+              {fieldErrors.message && (
+                <p id="contact-message-error" className="text-xs text-red-700">
+                  {fieldErrors.message}
+                </p>
+              )}
+            </div>
+
+            {/*
+              Honeypot. Hidden from sight and from assistive technology, and
+              skipped by keyboard navigation, so no real user can fill it —
+              which is what makes a populated value a reliable bot signal.
+            */}
+            <div aria-hidden="true" className="hidden">
+              <label htmlFor="contact-website">Website</label>
+              <input
+                id="contact-website"
+                name="website"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
               />
             </div>
 
             {error && (
-              <p role="alert" className="text-xs text-red-500">
+              <p role="alert" className="text-xs text-red-700">
                 {error}
               </p>
             )}
@@ -170,7 +261,7 @@ export default function ContactContent() {
               type="submit"
               className="mt-2 w-full py-4 rounded-sm text-sm font-medium tracking-widest uppercase bg-charcoal text-cream-base hover:bg-clay transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Sending...' : t('send')}
+              {loading ? t('sending') : t('send')}
             </button>
           </motion.form>
         )}

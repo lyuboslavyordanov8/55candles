@@ -9,14 +9,14 @@ Bilingual (BG/EN) storefront for a Bulgarian candle maker.
 
 ## Stack
 
-| Concern | Choice |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Language | TypeScript, `strict` |
-| Styling | Tailwind CSS v4 (tokens in `tailwind.config.ts`) |
-| i18n | `next-intl` — `en` and `bg` |
-| Animation | `framer-motion` |
-| Tests | Vitest + Testing Library + jsdom |
+| Concern   | Choice                                           |
+|-----------|--------------------------------------------------|
+| Framework | Next.js 16 (App Router, Turbopack)               |
+| Language  | TypeScript, `strict`                             |
+| Styling   | Tailwind CSS v4 (tokens in `tailwind.config.ts`) |
+| i18n      | `next-intl` — `en` and `bg`                      |
+| Animation | `framer-motion`                                  |
+| Tests     | Vitest + Testing Library + jsdom                 |
 
 ## Getting started
 
@@ -27,27 +27,36 @@ npm run dev          # http://localhost:3000 -> redirects to /en or /bg
 
 ## Scripts
 
-| Command | Purpose |
-|---|---|
-| `npm run dev` | Development server |
-| `npm run build` | Production build |
-| `npm start` | Serve the production build |
-| `npm test` | Run the test suite once |
-| `npm run test:watch` | Watch mode |
-| `npx tsc --noEmit` | Typecheck |
+| Command              | Purpose                    |
+|----------------------|----------------------------|
+| `npm run dev`        | Development server         |
+| `npm run build`      | Production build           |
+| `npm start`          | Serve the production build |
+| `npm test`           | Run the test suite once    |
+| `npm run test:watch` | Watch mode                 |
+| `npx tsc --noEmit`   | Typecheck                  |
 
 ## Environment
 
-No secrets are required yet. One optional variable:
+Copy `.env.example` to `.env.local` and fill in what you have. Nothing is
+required to run the site locally.
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `NEXT_PUBLIC_SITE_URL` | Production | Canonical origin for `metadataBase`, `sitemap.xml`, `robots.txt` and OG tags. |
+| Variable                 | Required             | Purpose                                                                       |
+|--------------------------|----------------------|-------------------------------------------------------------------------------|
+| `NEXT_PUBLIC_SITE_URL`   | Production           | Canonical origin for `metadataBase`, `sitemap.xml`, `robots.txt` and OG tags. |
+| `CONTACT_EMAIL_TO`       | For the contact form | Inbox that receives enquiries from `/api/contact`.                            |
+| `EMAIL_PROVIDER_API_KEY` | For the contact form | Credential for whichever transactional email provider is chosen.              |
 
-**If it is unset, the site marks itself `noindex` and `robots.txt` disallows
-everything.** That is deliberate — it keeps previews and local builds out of
-search results. Set it to the real origin (e.g. `https://example.com`, no
-trailing slash) before launch.
+**If `NEXT_PUBLIC_SITE_URL` is unset, the site marks itself `noindex` and
+`robots.txt` disallows everything.** That is deliberate — it keeps previews and
+local builds out of search results. Set it to the real origin (e.g.
+`https://example.com`, no trailing slash) before launch.
+
+**If either email variable is unset, `/api/contact` answers `503` and logs a
+`console.error`,** and the form tells the visitor to phone instead. Also
+deliberate: a form that visibly fails loses one enquiry, a form that lies loses
+every enquiry and nobody notices. Delivery itself is still unimplemented —
+see `deliver()` in `src/lib/mailer.ts`.
 
 ## Architecture notes
 
@@ -71,12 +80,12 @@ the list.
 
 ### Error and 404 boundaries
 
-| File | Handles |
-|---|---|
+| File                             | Handles                                   |
+|----------------------------------|-------------------------------------------|
 | `src/app/[locale]/not-found.tsx` | `notFound()` called inside a locale route |
-| `src/app/[locale]/error.tsx` | Runtime errors within a locale route |
-| `src/app/global-not-found.tsx` | URLs matching no route at all |
-| `src/app/global-error.tsx` | Errors thrown by the root layout itself |
+| `src/app/[locale]/error.tsx`     | Runtime errors within a locale route      |
+| `src/app/global-not-found.tsx`   | URLs matching no route at all             |
+| `src/app/global-error.tsx`       | Errors thrown by the root layout itself   |
 
 The two global files bypass all layouts, so they ship their own `<html>`,
 styles and fonts. Next 16 passes `unstable_retry` (not `reset`) to error
@@ -100,6 +109,24 @@ lighten `ink-ghost`, `ink-secondary` or `clay` without re-running it.
 Motion respects `prefers-reduced-motion` in two places, both needed: a CSS
 block in `src/app/globals.css` for transitions, and `<MotionConfig
 reducedMotion="user">` for framer-motion, which animates via inline styles.
+
+### Legal identity
+
+`src/lib/company.ts` is the only place the trading company is written down.
+The footer impressum, the six legal documents and the `Organization` JSON-LD
+all read from it. Unresolved fields hold a literal `[TODO: …]` string, which is
+**rendered on the page** so it cannot be forgotten — but omitted from JSON-LD,
+because a placeholder in machine-read data is worse than silence.
+
+The ДДС number is not derived from the ЕИК. `BG` + ЕИК is the format, but
+whether the company *is* VAT-registered is a fact about the company, and it
+changes what prices must include. A test asserts nobody "helpfully" derives it.
+
+`LEGAL_IS_DRAFT` in `src/lib/legal.ts` gates the six documents: while it is
+`true` each page shows a warning banner, sends `noindex`, and is excluded from
+`sitemap.xml`. Clearing it while any `[TODO:` marker remains fails a test.
+Legal slugs stay English in both locales on purpose — translating the URL would
+break the hreflang pairing that `sitemap.ts` and `alternates.languages` rely on.
 
 ## Testing
 

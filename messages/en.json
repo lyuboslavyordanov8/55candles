@@ -98,7 +98,21 @@
     "message": "Message",
     "send": "Send message",
     "success": "Message sent! We'll get back to you soon.",
-    "instagramCta": "Or find us on Instagram"
+    "instagramCta": "Or find us on Instagram",
+    "sending": "Sending…",
+    "successDetail": "We'll get back to you shortly.",
+    "errorUnconfigured": "We couldn't send your message — our email isn't set up yet. Please call or message us on Instagram and we'll reply straight away.",
+    "errorFailed": "We couldn't send your message just now. Please try again, or call or message us on Instagram.",
+    "errorRateLimited": "That's a few messages in quick succession. Please wait a minute and try again.",
+    "errorNetwork": "We couldn't reach the server. Please check your connection and try again.",
+    "errorNameTooShort": "Please enter your name.",
+    "errorNameTooLong": "That name is too long.",
+    "errorEmailRequired": "Please enter your email address.",
+    "errorEmailInvalid": "That doesn't look like an email address.",
+    "errorEmailTooLong": "That email address is too long.",
+    "errorMessageTooShort": "Please write a little more so we can help.",
+    "errorMessageTooLong": "That message is too long — please shorten it.",
+    "errorSummary": "Please check the fields above."
   },
   "notFound": {
     "title": "Page not found",
@@ -114,5 +128,246 @@
   },
   "footer": {
     "rights": "All rights reserved"
+  },
+  "legal": {
+    "eyebrow": "Legal",
+    "lastUpdatedLabel": "Last updated",
+    "draftNoticeTitle": "Draft — not yet reviewed by a lawyer",
+    "draftNoticeBody": "This document is a working draft prepared during development. It has not been reviewed by a Bulgarian lawyer and is not binding. Items marked [TODO] still need to be supplied. Do not rely on it, and do not open the shop for orders until it has been reviewed.",
+    "todoLabel": "Still to be confirmed",
+    "docs": {
+      "terms": {
+        "title": "Terms and Conditions",
+        "summary": "The rules that apply when you buy from 55candles, who you are contracting with, and what you can expect from us.",
+        "sections": [
+          {
+            "heading": "1. Who we are",
+            "body": "This website is operated by ВиреонЛабс ЕООД (VireonLabs EOOD), ЕИК 208907603, trading as 55candles. Our full identification and contact details are set out below and in the footer of every page."
+          },
+          {
+            "heading": "2. Scope",
+            "body": "These Terms apply to every order placed through this website. By placing an order you confirm you have read and accepted them. They form part of the contract between you and us, alongside the Privacy Policy, the Cookie Policy, the Right of Withdrawal and the Delivery Information."
+          },
+          {
+            "heading": "3. Products",
+            "body": "We sell decorative scented candles with hand-sculpted wax fruit. The wax fruit is decorative and is not food. Product photographs are representative; because each candle is finished by hand, small variations in colour and shape are normal and are not a defect."
+          },
+          {
+            "heading": "4. Prices",
+            "body": "[TODO: state the currency, whether prices include VAT, and the VAT rate.] All prices are shown per item and exclude delivery charges unless stated otherwise. Delivery charges are shown before you confirm your order."
+          },
+          {
+            "heading": "5. How a contract is formed",
+            "body": "Adding items to your basket and reaching the checkout is not an order. A contract is formed only when you confirm your order and we send you a written order confirmation to the email address you gave us. Until then no contract exists and you owe us nothing."
+          },
+          {
+            "heading": "6. Payment",
+            "body": "[TODO: list the accepted payment methods, including whether cash on delivery (наложен платеж) is offered and any fee for it.] We never see or store your full card details."
+          },
+          {
+            "heading": "7. Delivery",
+            "body": "Delivery areas, carriers, timescales and charges are set out in our Delivery Information, which forms part of these Terms."
+          },
+          {
+            "heading": "8. Your right to withdraw",
+            "body": "If you are a consumer you may withdraw from the contract within 14 days without giving a reason. How to do this, and the standard withdrawal form, are set out in our Right of Withdrawal and Returns page."
+          },
+          {
+            "heading": "9. Faulty or non-conforming goods",
+            "body": "You have a statutory right to goods that conform to the contract. If they do not, you may claim a repair, a replacement, a price reduction or a refund, in the order and on the conditions set by Bulgarian consumer law. This right lasts two years from delivery and is separate from, and additional to, your right of withdrawal. See our Complaints page."
+          },
+          {
+            "heading": "10. Safe use",
+            "body": "Candles are an open flame. Never leave a burning candle unattended, keep it away from children, pets and anything flammable, and follow the instructions on the product and on our Candle Care page."
+          },
+          {
+            "heading": "11. Your personal data",
+            "body": "We process your personal data as described in our Privacy Policy. Placing an order requires us to process your name, contact details and delivery address in order to perform the contract."
+          },
+          {
+            "heading": "12. Complaints and dispute resolution",
+            "body": "Please contact us first — most issues are resolved quickly. You may also complain to the Commission for Consumer Protection (Комисия за защита на потребителите, kzp.bg) and, for out-of-court settlement, to the relevant conciliation commission or the EU online dispute resolution platform."
+          },
+          {
+            "heading": "13. Applicable law",
+            "body": "These Terms are governed by Bulgarian law. Nothing in them limits the rights you have as a consumer under mandatory Bulgarian or EU law. If any provision is unenforceable, the rest continues to apply."
+          },
+          {
+            "heading": "14. Changes",
+            "body": "We may update these Terms. The version that applies to your order is the one published when you placed it, and we keep the date of the last change at the top of this page."
+          }
+        ]
+      },
+      "privacy": {
+        "title": "Privacy Policy",
+        "summary": "What personal data we handle, why, how long we keep it, and the rights you have over it.",
+        "sections": [
+          {
+            "heading": "1. Who is responsible for your data",
+            "body": "The data controller is ВиреонЛабс ЕООД, ЕИК 208907603. Our contact details are below. [TODO: confirm whether a Data Protection Officer is required and, if so, their contact details.]"
+          },
+          {
+            "heading": "2. What we collect today",
+            "body": "This website does not currently take orders and has no user accounts. If you use the contact form we handle the name, email address and message you send us, in order to answer you. We load no analytics, advertising or tracking services."
+          },
+          {
+            "heading": "3. What we will collect when the shop opens",
+            "body": "[TODO: complete before the first order can be placed.] Expected: name, delivery address, email address, telephone number, order contents and history, and payment status. Card details are handled by our payment provider and never reach our servers."
+          },
+          {
+            "heading": "4. Why we process it, and on what legal basis",
+            "body": "To perform a contract with you (Art. 6(1)(b) GDPR) for orders and delivery; to comply with legal obligations (Art. 6(1)(c)) for accounting and tax records; with your consent (Art. 6(1)(a)) for marketing messages, which you may withdraw at any time; and for our legitimate interests (Art. 6(1)(f)) in securing the site and preventing fraud."
+          },
+          {
+            "heading": "5. Who we share it with",
+            "body": "[TODO: list every processor once chosen — hosting, database, payment provider, courier, email provider — with the country each operates in.] Couriers receive the name, address and telephone number needed to deliver your parcel. We do not sell your data."
+          },
+          {
+            "heading": "6. Transfers outside the EEA",
+            "body": "[TODO: state whether any processor transfers data outside the EEA and, if so, the safeguard relied on.]"
+          },
+          {
+            "heading": "7. How long we keep it",
+            "body": "[TODO: set a retention period for each category.] Accounting records must be kept for the period required by Bulgarian tax law. Contact-form messages are kept only as long as needed to deal with your enquiry."
+          },
+          {
+            "heading": "8. Your rights",
+            "body": "You may ask us for a copy of your data, correct it, have it deleted, restrict or object to how we use it, receive it in a portable form, and withdraw any consent you gave. Write to us using the details below and we will respond within one month. You may also complain to the Commission for Personal Data Protection (Комисия за защита на личните данни, cpdp.bg)."
+          },
+          {
+            "heading": "9. Security",
+            "body": "The site is served over HTTPS with a content security policy and other protective headers. [TODO: describe access controls, encryption at rest and backup arrangements once the database exists.]"
+          },
+          {
+            "heading": "10. Automated decisions",
+            "body": "We do not carry out automated decision-making or profiling that has a legal effect on you."
+          }
+        ]
+      },
+      "cookies": {
+        "title": "Cookie Policy",
+        "summary": "What we store on your device. Today: almost nothing.",
+        "sections": [
+          {
+            "heading": "1. What cookies are",
+            "body": "Cookies and similar technologies are small files a site stores on your device, for example to remember a preference or to keep you logged in."
+          },
+          {
+            "heading": "2. What we use right now",
+            "body": "This site currently sets no analytics, advertising or tracking cookies. It loads no Google Analytics, no tag manager, no Meta pixel and no third-party tracker. Our fonts are served from our own domain, so no request is made to Google when you visit."
+          },
+          {
+            "heading": "3. Strictly necessary storage",
+            "body": "Your chosen language is part of the web address (/en or /bg) rather than a cookie. Once a shopping basket exists, keeping it between pages will require strictly necessary storage, which does not need your consent because the shop cannot work without it."
+          },
+          {
+            "heading": "4. Consent",
+            "body": "If we ever add analytics or marketing technologies, we will ask for your consent first, by category, with refusing as easy as accepting, and you will be able to change your mind at any time from this page. We will not set any non-essential cookie before you agree."
+          },
+          {
+            "heading": "5. Controlling cookies",
+            "body": "You can delete or block cookies in your browser settings. Blocking strictly necessary storage may stop parts of the shop working."
+          }
+        ]
+      },
+      "returns": {
+        "title": "Right of Withdrawal and Returns",
+        "summary": "As a consumer you can change your mind within 14 days. Here is how.",
+        "sections": [
+          {
+            "heading": "1. Your right to withdraw",
+            "body": "If you are a consumer you may withdraw from the contract within 14 days without giving any reason and without penalty. The period runs from the day you, or someone you nominated, take physical possession of the goods — for an order delivered in several parts, from the last part."
+          },
+          {
+            "heading": "2. How to withdraw",
+            "body": "Tell us clearly, before the 14 days are up, that you are withdrawing. Email or write to us using the details below — you may use the form in section 6, but you do not have to. Sending the goods back with a clear note also counts. Simply refusing delivery is not a reliable way to withdraw, so please tell us as well."
+          },
+          {
+            "heading": "3. Sending the goods back",
+            "body": "Send the goods back without undue delay and within 14 days of telling us you withdraw. [TODO: state who pays the cost of return — you may require the consumer to bear it, but only if this page says so before they order. If it does not, you must pay it.]"
+          },
+          {
+            "heading": "4. Refunds",
+            "body": "We refund all payments we received from you, including the standard delivery charge, within 14 days of your withdrawal. We may wait until we have the goods back, or proof that you sent them. We refund using the same means of payment you used, unless you agree otherwise, and it costs you nothing. If you chose a more expensive delivery option than our cheapest standard one, we refund only the standard amount."
+          },
+          {
+            "heading": "5. Condition of the goods, and exceptions",
+            "body": "You may examine the goods as you would in a shop, but you are liable for any reduction in value caused by handling beyond that. A candle that has been burned cannot normally be returned under this right. [TODO: confirm with a lawyer whether any statutory exception applies to your products — for example sealed goods unsuitable for return on hygiene grounds, or goods made to the consumer's specification.]"
+          },
+          {
+            "heading": "6. Standard withdrawal form",
+            "body": "To ВиреонЛабс ЕООД: I hereby give notice that I withdraw from my contract of sale of the following goods — [describe the goods]. Ordered on [date] / received on [date]. Name of consumer: [name]. Address of consumer: [address]. Signature (only if sent on paper): [signature]. Date: [date]."
+          },
+          {
+            "heading": "7. This is not your only right",
+            "body": "The right of withdrawal is separate from your statutory rights if the goods are faulty or do not match their description. Those last two years — see our Complaints page."
+          }
+        ]
+      },
+      "complaints": {
+        "title": "Complaints and Faulty Goods",
+        "summary": "What to do if something arrives damaged, faulty, or not as described.",
+        "sections": [
+          {
+            "heading": "1. Your statutory rights",
+            "body": "Goods must match their description and be of satisfactory quality. If they do not conform to the contract you have a claim for two years from delivery, at no cost to you. This is a legal right and is in addition to your 14-day right of withdrawal."
+          },
+          {
+            "heading": "2. What you can ask for",
+            "body": "First, a repair or a replacement, whichever you prefer, unless it is impossible or disproportionate. If that is not carried out within a reasonable time and without significant inconvenience to you, you may then ask for a price reduction or cancel the contract and get your money back."
+          },
+          {
+            "heading": "3. How to make a claim",
+            "body": "Contact us using the details below with your order number, what is wrong, and photographs if the item arrived damaged. Please keep the packaging until the claim is settled, as the courier may need to inspect it."
+          },
+          {
+            "heading": "4. Our response",
+            "body": "[TODO: confirm the response time you commit to.] We will acknowledge your claim in writing, tell you whether we accept it, and if we do, how and by when we will resolve it. We keep a register of claims as required by Bulgarian consumer law."
+          },
+          {
+            "heading": "5. Damage in transit",
+            "body": "Please check your parcel on delivery. If it is visibly damaged, note this with the courier before signing, and tell us the same day. This makes a claim against the carrier far easier, though it does not affect your rights against us."
+          },
+          {
+            "heading": "6. If we cannot agree",
+            "body": "You may refer the matter to the Commission for Consumer Protection (Комисия за защита на потребителите, kzp.bg), to the relevant conciliation commission for an out-of-court settlement, or to the EU online dispute resolution platform."
+          }
+        ]
+      },
+      "delivery": {
+        "title": "Delivery Information",
+        "summary": "Where we ship, how long it takes, and what it costs.",
+        "sections": [
+          {
+            "heading": "1. Where we deliver",
+            "body": "[TODO: confirm whether you ship only within Bulgaria, or to the EU as well. Shipping outside Bulgaria changes your VAT and consumer-law obligations.]"
+          },
+          {
+            "heading": "2. Carriers",
+            "body": "[TODO: confirm the courier(s) — Econt, Speedy, or both — and whether delivery to an office or automated parcel locker is offered as well as to an address.]"
+          },
+          {
+            "heading": "3. Dispatch and delivery times",
+            "body": "[TODO: state how long you take to dispatch, and the courier's delivery time. Give a total, since that is what the customer experiences, and note that these are estimates and not guaranteed.]"
+          },
+          {
+            "heading": "4. Delivery charges",
+            "body": "[TODO: state the charge, how it is calculated, and any free-delivery threshold. Charges depend on parcel weight, so every product needs a weight before this can be answered.] The exact charge is always shown before you confirm your order."
+          },
+          {
+            "heading": "5. Cash on delivery",
+            "body": "[TODO: confirm whether наложен платеж is offered, any fee, and who pays it.]"
+          },
+          {
+            "heading": "6. On arrival",
+            "body": "Please check your parcel before signing. If the outer packaging is damaged, record it with the courier and contact us the same day. Our candles are packed for transit, but glass is fragile and we would rather replace an item than argue about it."
+          },
+          {
+            "heading": "7. Failed delivery",
+            "body": "[TODO: state how long the courier holds an undelivered parcel, and what happens to the delivery charge if a parcel is returned to us undelivered.]"
+          }
+        ]
+      }
+    }
   }
 }

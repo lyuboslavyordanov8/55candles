@@ -7,6 +7,7 @@ import { getMessages } from 'next-intl/server'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import MotionProvider from '@/components/providers/MotionProvider'
+import { OrganizationJsonLd } from '@/components/seo/JsonLd'
 import { isLocale, locales } from '@/i18n/locales'
 import { pickClientMessages } from '@/i18n/client-namespaces'
 import { siteUrl, isSiteUrlConfigured } from '@/lib/site'
@@ -111,6 +112,9 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} className={`${montserrat.variable} ${playfair.variable}`}>
       <body className="bg-cream-base text-charcoal font-sans antialiased">
+        {/* Identifies the trader to search engines (AUDIT.md S-12). */}
+        <OrganizationJsonLd locale={locale} />
+
         <NextIntlClientProvider messages={messages}>
           <MotionProvider>
             <a

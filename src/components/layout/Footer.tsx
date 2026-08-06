@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { useTranslations, useLocale } from 'next-intl'
 import LanguageSwitcher from './LanguageSwitcher'
+import Impressum from '@/components/legal/Impressum'
+import { LEGAL_DOCS, legalPath } from '@/lib/legal'
 import { navLinks } from './nav-links'
 
 // Server Component: nothing here is interactive. The only client-side piece is
@@ -8,6 +10,7 @@ import { navLinks } from './nav-links'
 export default function Footer() {
   const t = useTranslations('nav')
   const tf = useTranslations('footer')
+  const tl = useTranslations('legal')
   const locale = useLocale()
 
   const links = navLinks(locale, t)
@@ -53,10 +56,33 @@ export default function Footer() {
         {/* Divider */}
         <div className="w-full max-w-md h-px bg-border" />
 
-        {/* Copyright */}
-        <p className="text-xs text-ink-ghost text-center">
-          © {new Date().getFullYear()} 55candles. {tf('rights')}.
-        </p>
+        {/*
+          Legal documents must be reachable from every page (AUDIT.md B-15), so
+          they live here rather than in the main nav.
+        */}
+        <nav
+          aria-label={locale === 'bg' ? 'Правни документи' : 'Legal'}
+          className="flex flex-wrap justify-center gap-x-6 gap-y-3"
+        >
+          {LEGAL_DOCS.map((doc) => (
+            <Link
+              key={doc.slug}
+              href={legalPath(locale, doc.slug)}
+              className="text-xs tracking-widest uppercase text-ink-ghost hover:text-charcoal transition-colors duration-200"
+            >
+              {tl(`docs.${doc.key}.title`)}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Copyright + trader identification (AUDIT.md B-16) */}
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-xs text-ink-ghost text-center">
+            © {new Date().getFullYear()} 55candles. {tf('rights')}.
+          </p>
+
+          <Impressum locale={locale} />
+        </div>
       </div>
     </footer>
   )
