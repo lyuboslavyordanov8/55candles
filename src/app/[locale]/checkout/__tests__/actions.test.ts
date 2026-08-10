@@ -98,16 +98,17 @@ describe('submitCheckout', () => {
 
   it('prices a real order from the shipped tables', async () => {
     // No fixtures: the configured 19.99 price and placeholder rate card, i.e.
-    // what the owner will actually see. 2 × 19.99 = 39.98; 1150 g → 5.99.
+    // what the owner will actually see. 2 × 19.99 = 39.98;
+    // 2 × 250 g + 150 g carton = 650 g → 4.99.
     const state = await submitCheckout(IDLE, formData())
 
     expect(state.status).toBe('readyToPay')
     expect(state.summary).toEqual({
       goodsMinor: 3998,
-      shippingMinor: 599,
+      shippingMinor: 499,
       codFeeMinor: null,
-      totalMinor: 4597,
-      weightGrams: 1150,
+      totalMinor: 4497,
+      weightGrams: 650,
     })
   })
 

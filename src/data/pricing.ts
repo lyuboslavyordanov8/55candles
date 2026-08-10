@@ -4,20 +4,18 @@ import { products } from './products'
 /**
  * Price and packed weight per product (AUDIT.md B-03, Q-11, Q-12).
  *
- * **The prices here are the owner's real figure; the weights are placeholders.**
- * On 2026-08-06 the owner set every candle to 19,99 EUR in order to exercise the
- * order flow end to end. No weight was supplied, and `calculateTotal` refuses to
- * price an order without one, so `PLACEHOLDER_WEIGHT_GRAMS` below stands in.
+ * **Both figures in this table are now the owner's real numbers.** 19,99 EUR
+ * per candle (2026-08-06) and 250 g per finished candle (2026-08-10), so
+ * `PRICING_IS_PROVISIONAL` is `false`.
  *
- * That is why `PRICING_IS_PROVISIONAL` exists. While it is `true` the site says
- * so on the product page and at checkout, exactly as `LEGAL_IS_DRAFT` does for
- * the legal pages. Clear the flag when the weights are real — a test fails if
- * you clear it while the placeholder is still in use, so it cannot be forgotten.
+ * The courier tariffs are a separate table and are *still* placeholders, so
+ * checkout continues to show its "delivery cost is illustrative" notice — that
+ * banner is gated on `PRICING_IS_PROVISIONAL || TARIFFS_ARE_PLACEHOLDER`.
  *
- * To finish this table:
+ * To extend this table:
  *
  * ```ts
- * cherry: { price: eur(19.99), packedWeightGrams: 520 },
+ * cherry: { price: eur(19.99), packedWeightGrams: 250 },
  * ```
  *
  * - `price` — what the customer pays, **VAT inclusive** (Q-13: consumer-facing
@@ -45,29 +43,45 @@ export interface ProductPricing {
 export const UNIFORM_PRICE: Money = eur(19.99)
 
 /**
- * Stand-in packed weight (Q-12 unanswered).
+ * Weight of one finished candle, owner-supplied on 2026-08-10 (Q-12 answered).
  *
- * 500 g is a plausible boxed 180–200 ml glass candle, chosen so shipping bands
- * behave realistically during testing. It is **not measured**, and every gram
- * of error is money lost on every parcel, so it must not survive to launch.
+ * This is the whole candle — wax and jar — as it leaves the workshop. It is
+ * the *item* weight, not the parcel weight: `billableWeight()` adds
+ * `PACKAGING_WEIGHT_GRAMS` for the outer carton on top, so a single-candle
+ * order bills 250 + 150 = 400 g.
+ *
+ * Uniform across all six scents. Give a scent its own figure here if that
+ * stops being true.
+ */
+export const CANDLE_WEIGHT_GRAMS = 250
+
+/**
+ * Retained so the test that guards against stand-in weights has something to
+ * compare against. Nothing in `pricing` uses it any more; if a new product is
+ * added with this value, `provisionallyWeighedSlugs()` will catch it.
  */
 export const PLACEHOLDER_WEIGHT_GRAMS = 500
 
 /**
  * True while any figure in this table is a stand-in rather than a real
  * measurement. Drives the visible notices; see the module comment.
+ *
+ * Now false: both the price and the weight are the owner's real figures.
+ * Note this does *not* clear the checkout notice on its own — that is gated on
+ * `PRICING_IS_PROVISIONAL || TARIFFS_ARE_PLACEHOLDER`, and the courier rate
+ * cards are still placeholders (Q-22).
  */
-export const PRICING_IS_PROVISIONAL = true
+export const PRICING_IS_PROVISIONAL = false
 
 export const pricing: Partial<Record<string, ProductPricing>> = {
-  cherry: { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
-  orange: { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
-  strawberry: { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
-  vanilla: { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
-  'espresso-martini': { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
+  cherry: { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
+  orange: { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
+  strawberry: { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
+  vanilla: { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
+  'espresso-martini': { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
   // Priced like the rest, but still unpurchasable: it is out of season, and
   // `isPurchasable` checks that independently of pricing.
-  'winter-wonderland': { price: UNIFORM_PRICE, packedWeightGrams: PLACEHOLDER_WEIGHT_GRAMS },
+  'winter-wonderland': { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
 }
 
 /** Referenced so the `eur` import documents the intended authoring style. */

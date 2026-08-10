@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import {
+  CANDLE_WEIGHT_GRAMS,
   getPricing,
   isCatalogueFullyPriced,
   isPurchasable,
@@ -38,12 +39,21 @@ describe('pricing table', () => {
     expect(UNIFORM_PRICE.currency).toBe('EUR')
   })
 
-  it('flags itself as provisional while the weights are placeholders (Q-12)', () => {
-    // The guard that matters: this flag drives the visible notice on the product
-    // page and at checkout. Clearing it while a stand-in weight is still in the
-    // table would present a made-up shipping cost as a real one.
-    expect(provisionallyWeighedSlugs().length).toBeGreaterThan(0)
-    expect(PRICING_IS_PROVISIONAL).toBe(true)
+  it('carries no stand-in weights, and says so (Q-12 answered)', () => {
+    // The guard that matters: this flag drives the visible notice on the
+    // product page and at checkout. The two must agree in both directions —
+    // claiming real figures while a stand-in is in the table would present a
+    // made-up shipping cost as a real one, and leaving the flag set once the
+    // figures are real cries wolf.
+    expect(provisionallyWeighedSlugs()).toEqual([])
+    expect(PRICING_IS_PROVISIONAL).toBe(false)
+  })
+
+  it('weighs every product at the owner-supplied 250 g', () => {
+    for (const product of products) {
+      expect(pricing[product.slug]?.packedWeightGrams, product.slug).toBe(CANDLE_WEIGHT_GRAMS)
+    }
+    expect(CANDLE_WEIGHT_GRAMS).toBe(250)
   })
 
   it('documents the authoring style in integer minor units', () => {
@@ -84,9 +94,17 @@ describe('isPurchasable', () => {
     expect(getPricing('does-not-exist')).toBeUndefined()
   })
 
-  it('uses the same stand-in weight everywhere, so shipping bands are uniform', () => {
+  it('uses one weight everywhere, so shipping bands are uniform', () => {
     for (const product of products) {
-      expect(getPricing(product.slug)?.packedWeightGrams).toBe(PLACEHOLDER_WEIGHT_GRAMS)
+      expect(getPricing(product.slug)?.packedWeightGrams).toBe(CANDLE_WEIGHT_GRAMS)
+    }
+  })
+
+  it('no longer ships the stand-in weight anywhere', () => {
+    // PLACEHOLDER_WEIGHT_GRAMS is kept only as a sentinel for
+    // provisionallyWeighedSlugs(); nothing in the table should equal it.
+    for (const product of products) {
+      expect(getPricing(product.slug)?.packedWeightGrams).not.toBe(PLACEHOLDER_WEIGHT_GRAMS)
     }
   })
 })

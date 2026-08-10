@@ -78,18 +78,19 @@ describe('calculateTotal', () => {
 
   it('prices a real order from the shipped tables, end to end', () => {
     // No fixtures: the actual configured price and rate card, which is what the
-    // customer will be quoted. 19.99 × 2 = 39.98 goods; 1150 g picks the
-    // second placeholder band at 5.99; merchant absorbs the COD fee.
+    // customer will be quoted. 19.99 × 2 = 39.98 goods; 2 × 250 g candle plus
+    // the 150 g carton is 650 g, which picks the first placeholder band at
+    // 4.99; merchant absorbs the COD fee.
     const result = calculateTotal([{ slug: 'cherry', quantity: 2 }], DELIVERY, 'cod')
 
     expect(result.status).toBe('ok')
     if (result.status !== 'ok') return
 
     expect(result.goods.amountMinor).toBe(3998)
-    expect(result.weightGrams).toBe(1150)
-    expect(result.shipping.amountMinor).toBe(599)
+    expect(result.weightGrams).toBe(650)
+    expect(result.shipping.amountMinor).toBe(499)
     expect(result.codFee).toBeNull()
-    expect(result.total.amountMinor).toBe(4597)
+    expect(result.total.amountMinor).toBe(4497)
   })
 
   it('totals goods, weight and shipping once everything is configured', () => {
