@@ -29,7 +29,13 @@ export default function Hero({ locale }: Props) {
   const [lead, lastWord] = splitLastWord(t('headline'))
 
   return (
-    <section className="relative h-screen min-h-[600px] overflow-hidden">
+    // `bg-charcoal` is a fallback, not decoration. The hero is h-screen and
+    // its text is near-white, so if the background image fails to load the
+    // gradient alone renders over the cream body — pale grey behind pale text
+    // — and the entire first viewport reads as blank. That is exactly what a
+    // 0-byte hero.jpg produced. A solid dark base keeps the copy legible
+    // whatever happens to the image.
+    <section className="relative h-screen min-h-[600px] overflow-hidden bg-charcoal">
 
       {/* Background image — the LCP element, hence priority */}
       <Image

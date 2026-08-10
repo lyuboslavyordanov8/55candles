@@ -2,6 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
+import { buildSecurityHeaders } from './src/lib/security-headers'
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
@@ -13,58 +14,29 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 
 const isDev = process.env.NODE_ENV === 'development'
 
-// Baseline CSP.
-//
-// This is the *static* form, which is what lets the product pages stay
-// statically rendered. The stricter nonce-based CSP that Next documents
-// requires dynamic rendering on every request, so this is a deliberate
-// trade: we keep SSG and accept 'unsafe-inline'.
-//
-// 'unsafe-inline' in script-src is required by Next's inline bootstrap and
-// flight-data scripts; in style-src it is required by framer-motion, which
-// animates via inline styles. Dev additionally needs 'unsafe-eval' (React
-// Refresh) and websocket connect-src (HMR).
-//
-// TODO(AUDIT.md Phase 3): Stripe needs script-src https://js.stripe.com,
-// frame-src https://js.stripe.com https://hooks.stripe.com and connect-src
-// https://api.stripe.com. Add them in the same commit as the Stripe client.
-const csp = [
-  `default-src 'self'`,
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
-  `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: blob:`,
-  `font-src 'self' data:`,
-  `connect-src 'self'${isDev ? ' ws: wss:' : ''}`,
-  `object-src 'none'`,
-  `base-uri 'self'`,
-  `form-action 'self'`,
-  `frame-ancestors 'none'`,
-  `upgrade-insecure-requests`,
-].join('; ')
-
-const securityHeaders = [
-  { key: 'Content-Security-Policy', value: csp },
-  // Browsers ignore HSTS over plain http, so this is inert on localhost.
-  {
-    key: 'Strict-Transport-Security',
-    value: 'max-age=63072000; includeSubDomains; preload',
-  },
-  { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // Redundant with frame-ancestors above, kept for older browsers.
-  { key: 'X-Frame-Options', value: 'DENY' },
-  // TODO(AUDIT.md Phase 3): `payment=()` disables the Payment Request API,
-  // which Stripe needs for Apple Pay / Google Pay. Relax to
-  // `payment=(self "https://js.stripe.com")` when wallets are enabled.
-  {
-    key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), payment=()',
-  },
-]
+// The CSP and the rest of the security headers live in
+// src/lib/security-headers.ts so the dev/prod difference can be unit tested —
+// see src/lib/__tests__/security-headers.test.ts.
+const securityHeaders = buildSecurityHeaders(isDev)
 
 const nextConfig: NextConfig = {
   // Do not advertise the framework version.
   poweredByHeader: false,
+
+  // Next blocks cross-origin requests to dev-only assets by default, so
+  // opening the dev server from a phone on the same network 403s every chunk,
+  // React never hydrates, and the page renders as frozen SSR markup — which,
+  // because entrance animations start at opacity 0, looks like a blank page.
+  //
+  // These are host patterns, NOT CIDR ranges: `192.168.0.0/16` is silently
+  // treated as a hostname and matches nothing.
+  //
+  // Note that curl cannot detect this — Next only blocks requests carrying a
+  // cross-origin `Origin` header, which browsers send and curl does not.
+  // Verify with a real browser.
+  //
+  // Development only; no effect on a production build.
+  allowedDevOrigins: ['192.168.1.*', '192.168.0.*', '10.0.0.*', '172.16.0.*'],
 
   turbopack: {
     root: projectRoot,

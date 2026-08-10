@@ -112,6 +112,20 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} className={`${montserrat.variable} ${playfair.variable}`}>
       <body className="bg-cream-base text-charcoal font-sans antialiased">
+        {/*
+          Reveal server-renders its children at `opacity: 0` and framer-motion
+          animates them in on the client. That means every animated section —
+          27 elements on the homepage — is invisible until JS executes, so a
+          browser with JS disabled sees an entirely blank page.
+
+          This restores them. `!important` is required to beat the inline
+          style framer-motion emits, and `transform: none` undoes the paired
+          translate/scale offsets.
+        */}
+        <noscript>
+          <style>{`[style*="opacity:0"]{opacity:1!important;transform:none!important}`}</style>
+        </noscript>
+
         {/* Identifies the trader to search engines (AUDIT.md S-12). */}
         <OrganizationJsonLd locale={locale} />
 
