@@ -95,7 +95,7 @@ export default function ContactContent() {
   }
 
   return (
-    <div className="min-h-screen pt-32 pb-24 bg-cream-base">
+    <div className="min-h-screen pt-36 pb-24 bg-cream-base">
       <div className="max-w-5xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-start">
 
         {/* Left — contact info */}

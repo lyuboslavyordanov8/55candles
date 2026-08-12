@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { products, getProductBySlug } from '../products'
+import { products, getProductBySlug, HOMEPAGE_PRODUCT_SLUGS, homepageProducts } from '../products'
 
 describe('products', () => {
   it('has exactly 6 products', () => {
@@ -33,7 +33,7 @@ describe('products', () => {
 
   it('getProductBySlug returns the matching product', () => {
     const cherry = getProductBySlug('cherry')
-    expect(cherry?.name).toBe('Cherry')
+    expect(cherry?.name).toBe('Electric Cherry')
   })
 
   it('getProductBySlug returns undefined for unknown slug', () => {
@@ -44,5 +44,38 @@ describe('products', () => {
     for (const p of products) {
       expect(p.slug).toBe(p.scent)
     }
+  })
+
+  describe('homepage selection', () => {
+    it('resolves every slug to a real product', () => {
+      expect(() => homepageProducts()).not.toThrow()
+      expect(homepageProducts()).toHaveLength(HOMEPAGE_PRODUCT_SLUGS.length)
+    })
+
+    it('preserves the configured order', () => {
+      expect(homepageProducts().map((p) => p.slug)).toEqual([...HOMEPAGE_PRODUCT_SLUGS])
+    })
+
+    it('shows no out-of-season candle', () => {
+      for (const p of homepageProducts()) {
+        expect(p.seasonal === null || p.seasonal.active).toBe(true)
+      }
+    })
+
+    // The grid is three across, so five is the count the "fifth card alone on
+    // the second row" layout was built for. Changing it is fine — but it is a
+    // layout decision, not a data one, so make it deliberately.
+    it('holds five candles', () => {
+      expect(HOMEPAGE_PRODUCT_SLUGS).toHaveLength(5)
+    })
+
+    it('gives every homepage card a rating to show', () => {
+      for (const p of homepageProducts()) {
+        expect(typeof p.rating, `${p.slug} has no rating`).toBe('number')
+        expect(typeof p.reviewCount, `${p.slug} has no review count`).toBe('number')
+        expect(p.rating!).toBeGreaterThan(0)
+        expect(p.rating!).toBeLessThanOrEqual(5)
+      }
+    })
   })
 })

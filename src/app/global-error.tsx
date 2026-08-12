@@ -24,9 +24,21 @@ export default function GlobalError({
         <title>Error — 55candles</title>
 
         <main className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-          <span className="text-lg font-semibold tracking-[0.3em] uppercase text-charcoal mb-16">
-            55CANDLES
-          </span>
+          {/*
+            A plain <img>, not next/image and not the shared Logo component.
+            This boundary catches failures in the root layout itself, so it
+            depends on nothing but React and global CSS — see the note at the
+            top of the file. An <img> to a static file in public/ holds that
+            line; the image component does not.
+          */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/logo-ink.png"
+            alt="55° candles"
+            width={161}
+            height={20}
+            className="mb-16"
+          />
 
           <h1 className="text-3xl md:text-4xl font-normal text-charcoal mb-3">
             Нещо се обърка

@@ -61,7 +61,7 @@ export function OrganizationJsonLd({ locale }: { locale: string }) {
         alternateName:
           locale === 'bg' ? company.legalNameLatin : company.legalName,
         url: absoluteUrl(`/${locale}`),
-        logo: absoluteUrl('/images/hero.jpg'),
+        logo: absoluteUrl('/images/hero.webp'),
         // taxID doubles as the company registration number in schema.org's
         // vocabulary; there is no dedicated ЕИК field.
         taxID: company.eik,

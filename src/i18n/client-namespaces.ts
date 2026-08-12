@@ -26,7 +26,7 @@ import type { Locale } from './locales'
  * `useTranslations` will throw `MISSING_MESSAGE` at runtime.
  * `src/i18n/__tests__/client-namespaces.test.ts` scans for that mistake.
  */
-export const CLIENT_NAMESPACES = ['contact', 'notFound', 'error', 'checkout'] as const
+export const CLIENT_NAMESPACES = ['contact', 'notFound', 'error', 'checkout', 'cart'] as const
 
 type Messages = Record<string, unknown>
 

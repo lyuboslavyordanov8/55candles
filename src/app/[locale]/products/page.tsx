@@ -28,7 +28,7 @@ function ProductsContent({ locale }: { locale: string }) {
   const seasonalCount = products.filter(p => p.seasonal !== null).length
 
   return (
-    <div className="pt-32 pb-24 px-6 bg-cream-base min-h-screen">
+    <div className="pt-36 pb-24 px-6 bg-cream-base min-h-screen">
       <div className="max-w-6xl mx-auto">
 
         {/* Header */}

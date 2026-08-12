@@ -89,7 +89,7 @@ export default function OurStoryPage() {
   const t = useTranslations('ourStory')
 
   return (
-    <div className="min-h-screen pt-32 pb-28 bg-cream-base">
+    <div className="min-h-screen pt-36 pb-28 bg-cream-base">
 
       {/* HERO */}
       <Reveal
@@ -122,8 +122,8 @@ export default function OurStoryPage() {
             className="relative aspect-[4/5] rounded-sm overflow-hidden border border-border bg-cream-surface"
           >
             <Image
-              src="/images/story.jpg"
-              alt="Hand-sculpted wax fruit on a 55candles candle"
+              src="/images/story.webp"
+              alt="Painted illustration of strawberries and leaves from the Strawberry Cake candle artwork"
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"

@@ -75,7 +75,7 @@ function LegalDocument({ locale, slug }: { locale: string; slug: LegalSlug }) {
   const sections = t.raw('sections') as Section[]
 
   return (
-    <div className="pt-32 pb-28 bg-cream-base min-h-screen">
+    <div className="pt-36 pb-28 bg-cream-base min-h-screen">
       <BreadcrumbJsonLd
         items={[
           { href: `/${locale}`, name: tn('home') },

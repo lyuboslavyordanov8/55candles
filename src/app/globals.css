@@ -1,4 +1,16 @@
-@import "tailwindcss";
+/*
+ * `source(none)` turns off Tailwind v4's automatic source detection, and the
+ * `@source` line below puts back the one directory we actually want scanned.
+ *
+ * Without it, v4 also scans the markdown in docs/, and the class names quoted
+ * in old design documents get compiled into the stylesheet as if they were
+ * live code. That is how `bg-black/40` and `bg-black/90` — rules no component
+ * has referenced since that redesign — were still being shipped to every
+ * visitor. Dead weight at best, and a black that the palette had supposedly
+ * removed at worst.
+ */
+@import "tailwindcss" source(none);
+@source "../";
 @config "../../tailwind.config.ts";
 
 * {

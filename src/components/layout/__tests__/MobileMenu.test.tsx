@@ -2,18 +2,20 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
+import { CartProvider } from '@/components/cart/CartProvider'
 import messages from '../../../../messages/en.json'
 import Navbar from '../Navbar'
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en',
 }))
+vi.mock('next/image', () => ({
+  default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
+}))
 
 function renderNavbar() {
   return render(
-    <NextIntlClientProvider locale="en" messages={messages}>
-      <Navbar />
-    </NextIntlClientProvider>
+    <NextIntlClientProvider locale="en" messages={messages}><CartProvider><Navbar /></CartProvider></NextIntlClientProvider>
   )
 }
 

@@ -3,11 +3,12 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { getProductBySlug, products } from '@/data/products'
+import { getProductBySlug, productImages, products } from '@/data/products'
 import ProductCard from '@/components/products/ProductCard'
+import ProductGallery from '@/components/products/ProductGallery'
 import Price from '@/components/commerce/Price'
+import AddToCartButton from '@/components/cart/AddToCartButton'
 import { isPurchasable } from '@/data/pricing'
-import { checkoutHref } from '@/lib/cart-params'
 import { locales } from '@/i18n/locales'
 import type { Product } from '@/types/product'
 
@@ -57,13 +58,16 @@ function ProductDetailContent({
 }) {
   const t = useTranslations('product')
   const tNav = useTranslations('nav')
+  const tCollection = useTranslations('collection')
 
   const related = products
     .filter((p) => p.slug !== product.slug)
     .slice(0, 3)
 
+  const galleryImages = productImages(product)
+
   return (
-    <div className="pt-32 pb-24 px-6 bg-cream-base min-h-screen">
+    <div className="pt-36 pb-24 px-6 bg-cream-base min-h-screen">
       <div className="max-w-5xl mx-auto">
 
         {/* Back */}
@@ -77,17 +81,17 @@ function ProductDetailContent({
         {/* MAIN */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 mb-24">
 
-          {/* Image */}
-          <div className="relative aspect-square rounded-sm overflow-hidden border border-border bg-cream-surface">
-            <Image
-              src={product.imagePath}
-              alt={product.name}
-              fill
-              priority
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-cover"
-            />
-          </div>
+          {/* Images */}
+          <ProductGallery
+            images={galleryImages}
+            alt={tCollection('imageAlt', { name: product.name })}
+            // Translated here, one per photo — see the prop's comment for why
+            // this is not a template the gallery interpolates itself.
+            imageLabels={galleryImages.map((_, i) =>
+              tCollection('photoOf', { index: i + 1, total: galleryImages.length })
+            )}
+            priority
+          />
 
           {/* Content */}
           <div className="flex flex-col justify-center gap-6">
@@ -142,19 +146,20 @@ function ProductDetailContent({
             </div>
 
             {/*
-              CTA. There is no cart yet (B-05), so this goes straight to
-              checkout with a one-item URL cart rather than pretending to add
-              to a basket that does not exist. Unpurchasable products keep the
-              disabled button — an out-of-season or unpriced product must not
-              lead to a checkout that will refuse it.
+              CTA. This now adds to the real cart rather than jumping straight
+              to checkout with a one-item URL — the shopper can carry on
+              browsing, and the drawer is where they commit.
+
+              Unpurchasable products keep the disabled button: an out-of-season
+              or unpriced product must not reach a checkout that will refuse it.
             */}
             {isPurchasable(product.slug) ? (
-              <Link
-                href={checkoutHref(locale, product.slug)}
-                className="mt-6 w-full py-4 text-sm font-medium rounded-sm bg-charcoal text-cream-base tracking-widest uppercase text-center transition-opacity duration-200 hover:opacity-80"
-              >
-                {t('orderNow')}
-              </Link>
+              <AddToCartButton
+                slug={product.slug}
+                productName={product.name}
+                variant="primary"
+                className="mt-6"
+              />
             ) : (
               <button
                 disabled

@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
+import { CartProvider } from '@/components/cart/CartProvider'
 import messages from '../../../../messages/en.json'
 import HomePage from '../page'
+import { homeBanner } from '@/content/home-banner'
+import { HOMEPAGE_PRODUCT_SLUGS } from '@/data/products'
 
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
@@ -15,33 +18,59 @@ async function renderPage() {
   const jsx = await HomePage({ params: Promise.resolve({ locale: 'en' }) })
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      {jsx}
+      <CartProvider>
+        {jsx}
+      </CartProvider>
     </NextIntlClientProvider>
   )
 }
 
 describe('HomePage', () => {
-  // The hero italicises the final word, so the headline is split across an <em>.
-  // Query by accessible name, which concatenates the heading's descendants.
-  it('renders hero headline', async () => {
+  // Asserted against the content file rather than a copied string: the point of
+  // that file is that the banner can be reworded without touching code, and a
+  // hardcoded expectation here would make that a two-file change.
+  it('renders the banner heading from the content file', async () => {
     await renderPage()
-    expect(
-      screen.getByRole('heading', { name: "Candles you'll want to eat." })
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: homeBanner.heading.en })).toBeInTheDocument()
   })
 
-  it('renders scent collection title', async () => {
+  it('points the banner CTA at the configured link', async () => {
     await renderPage()
-    expect(screen.getAllByText('The Scent Collection').length).toBeGreaterThan(0)
+    const cta = screen.getByRole('link', { name: homeBanner.ctaLabel.en })
+    expect(cta).toHaveAttribute('href', `/en${homeBanner.ctaHref}`)
   })
 
-  it('renders candle care section title', async () => {
+  it('renders every section heading in order', async () => {
     await renderPage()
-    expect(screen.getByText('How to love your candle')).toBeInTheDocument()
+    const headings = screen
+      .getAllByRole('heading', { level: 2 })
+      .map((h) => h.textContent)
+
+    // Order is the page's rhythm, not an accident — the backgrounds alternate
+    // around it. Adding a section means deciding where it goes, so this list
+    // is meant to be edited deliberately rather than loosened.
+    expect(headings).toEqual([
+      'Products',
+      messages.storyTeaser.headline,
+      messages.discover.title,
+      'Candle care',
+      'What people say about us',
+    ])
   })
 
-  it('renders story teaser headline', async () => {
+  it('renders one card per homepage product, in the configured order', async () => {
     await renderPage()
-    expect(screen.getByText("We make candles that look too good to burn.")).toBeInTheDocument()
+
+    const cardHrefs = screen
+      .getAllByRole('link')
+      .map((a) => a.getAttribute('href') ?? '')
+      .filter((href) => /^\/en\/products\/[a-z-]+$/.test(href))
+
+    expect(cardHrefs).toEqual(HOMEPAGE_PRODUCT_SLUGS.map((slug) => `/en/products/${slug}`))
+  })
+
+  it('does not show the out-of-season candle on the homepage', async () => {
+    await renderPage()
+    expect(screen.queryByText('Winter Wonderland')).not.toBeInTheDocument()
   })
 })

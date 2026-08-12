@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { products } from '@/data/products'
+import { homeBanner } from '@/content/home-banner'
 
 /**
  * Every local image referenced from code must exist AND be non-empty.
@@ -22,8 +23,14 @@ function assetPath(webPath: string): string {
   return join(publicDir, webPath.replace(/^\//, ''))
 }
 
-/** Local image paths hardcoded in components, which no data test would reach. */
-const componentImages = ['/images/hero.jpg', '/images/story.jpg']
+/**
+ * Local image paths hardcoded in components, which no data test would reach.
+ *
+ * The homepage banner is not hardcoded — it comes from
+ * `src/content/home-banner.ts` — so it is pulled from there instead of being
+ * repeated here. Point that file at a new banner and this test follows it.
+ */
+const componentImages = [homeBanner.image, '/images/story.webp', '/images/logo-ink.png']
 
 function collectSourceFiles(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -42,6 +49,8 @@ describe('image assets', () => {
   const productImages = [
     ...products.map((p) => p.imagePath),
     ...products.map((p) => p.hoverImagePath).filter((p): p is string => Boolean(p)),
+    // Gallery photos beyond the primary image.
+    ...products.flatMap((p) => p.extraImages ?? []),
   ]
 
   const referenced = [...new Set([...productImages, ...componentImages])]

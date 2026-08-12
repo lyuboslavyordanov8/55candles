@@ -1,4 +1,7 @@
 {
+  "announcement": {
+    "text": "Natural candles for cool people"
+  },
   "nav": {
     "home": "Home",
     "products": "Products",
@@ -7,7 +10,15 @@
     "contact": "Contact",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "menuLabel": "Main menu"
+    "menuLabel": "Main menu",
+    "cart": "Cart"
+  },
+  "search": {
+    "open": "Search",
+    "close": "Close search",
+    "placeholder": "Search a scent…",
+    "empty": "No candles found. Try another word.",
+    "resultCount": "{count, plural, =0 {No results} one {# result} other {# results}}"
   },
   "hero": {
     "headline": "Candles you'll want to eat.",
@@ -20,24 +31,44 @@
     "fruit": "Hand-sculpted wax fruit"
   },
   "collection": {
-    "title": "The Scent Collection",
+    "title": "Products",
     "learnMore": "Learn more",
     "seasonal": "Seasonal",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "subtitle": "Five scents, each poured and painted by hand in Sofia.",
+    "viewAll": "View all candles",
+    "imageAlt": "The {name} candle in its tin, against a painted illustration",
+    "ratingLabel": "{rating} out of 5 stars, {count} reviews",
+    "badge": {
+      "new": "New",
+      "bestseller": "Bestseller"
+    },
+    "photoOf": "Photo {index} of {total}"
+  },
+  "discover": {
+    "title": "Discover our world",
+    "scents": "Our scents",
+    "story": "Our story",
+    "care": "Candle care",
+    "contact": "Get in touch"
   },
   "storyTeaser": {
-    "headline": "We make candles that look too good to burn.",
-    "body": "Started in a small kitchen with too much wax and a serious fruit obsession. Today every candle is still handcrafted, with the same obsessive attention to detail.",
-    "cta": "Our story"
+    "headline": "Our story",
+    "body": "Hello! I am Radina, the person behind 55 candles — a small brand born out of my love for scents, colours and the little things that make a home nicer. At 55 candles I make candles that are more than a pleasant smell. Each one has its own character, colour and story, from the scent to the illustration on the label.",
+    "cta": "Read more",
+    "imageAlt": "Painted illustration of strawberries and leaves from the Strawberry Cake candle artwork",
+    "body2": "My idea is a simple one: to make scents you want to light not only for a special occasion, but simply because you are at home. Because sometimes the occasion is dinner. Sometimes it is a new book. And sometimes you just want the room to smell — and look — a little nicer."
   },
   "testimonials": {
-    "title": "Loved by candle people",
+    "title": "What people say about us",
     "1name": "Anna M.",
     "1text": "The cherry one looks so real I almost tried to eat it — and the scent is absolutely gorgeous.",
     "2name": "Sofia K.",
     "2text": "Bought four as gifts. Everyone was obsessed. Already placed my second order.",
     "3name": "Martin D.",
-    "3text": "Finally a candle that's actually eco-friendly and smells incredible. The espresso martini one is unreal."
+    "3text": "Finally a candle that's actually eco-friendly and smells incredible. The espresso martini one is unreal.",
+    "_todo": "TODO: replace with real reviews — the three below are placeholders and must not go live. Publishing invented testimonials is a consumer-protection breach, not just bad copy.",
+    "starsLabel": "5 out of 5 stars"
   },
   "ctaBanner": {
     "headline": "Ready to find your scent?",
@@ -45,16 +76,16 @@
     "cta": "Shop all candles"
   },
   "candleCareSection": {
-    "title": "How to love your candle",
-    "tip1Title": "First burn",
-    "tip1Body": "Let it burn 2–3 hours so the wax melts fully to the edges.",
-    "tip2Title": "Trim the wick",
-    "tip2Body": "Trim to 5mm before each re-light for a clean, even flame.",
-    "tip3Title": "Max 3 hours",
-    "tip3Body": "Don't burn more than 3 hours at a time.",
-    "tip4Title": "Cool first",
-    "tip4Body": "Let it reach room temperature before lighting again.",
-    "cta": "Full care guide"
+    "title": "Candle care",
+    "tip1Title": "Trim the wick",
+    "tip1Body": "Take it down to about 5 mm before every burn — it keeps the flame steady and soot-free.",
+    "tip2Title": "The first burn",
+    "tip2Body": "Let it burn until the wax pool reaches the edge of the tin. It saves the candle from tunnelling for good.",
+    "tip3Title": "Four hours at most",
+    "tip3Body": "Longer than that overheats the tin and burns through the fragrance faster.",
+    "tip4Title": "Away from draughts",
+    "tip4Body": "And out of reach of children and pets. Never leave a burning candle unattended.",
+    "cta": "Full guide"
   },
   "product": {
     "scentNotes": "Scent notes",
@@ -129,7 +160,9 @@
     "home": "Back to home"
   },
   "footer": {
-    "rights": "All rights reserved"
+    "rights": "All rights reserved",
+    "followUs": "Find us on social media",
+    "signOff": "More than candles"
   },
   "legal": {
     "eyebrow": "Legal",
@@ -491,5 +524,24 @@
       "total": "Total",
       "weight": "Parcel weight: {grams} g, including packaging."
     }
+  },
+  "cart": {
+    "title": "Cart",
+    "open": "Open cart",
+    "openWithCount": "{count, plural, one {Cart, # item} other {Cart, # items}}",
+    "close": "Close cart",
+    "add": "Add",
+    "added": "Added",
+    "addNamed": "Add {name} to cart",
+    "addedNamed": "{name} added to cart",
+    "removeNamed": "Remove {name} from cart",
+    "increaseNamed": "Increase quantity of {name}",
+    "decreaseNamed": "Decrease quantity of {name}",
+    "empty": "Your cart is empty.",
+    "browse": "Browse the candles",
+    "subtotal": "Subtotal",
+    "checkout": "Go to checkout",
+    "deliveryNote": "Delivery is calculated at the next step.",
+    "priceOnRequest": "Price on request"
   }
 }

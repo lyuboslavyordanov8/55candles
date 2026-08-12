@@ -10,7 +10,7 @@ export default function LocaleNotFound() {
   const locale = useLocale()
 
   return (
-    <div className="min-h-screen pt-32 pb-24 px-6 bg-cream-base flex items-start justify-center">
+    <div className="min-h-screen pt-36 pb-24 px-6 bg-cream-base flex items-start justify-center">
       <div className="max-w-xl text-center">
         <p className="text-xs tracking-[0.35em] uppercase text-ink-ghost mb-6">404</p>
 

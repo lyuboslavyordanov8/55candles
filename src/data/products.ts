@@ -4,7 +4,7 @@ export const products: Product[] = [
   {
     slug: 'cherry',
     scent: 'cherry',
-    name: 'Cherry',
+    name: 'Electric Cherry',
     mood: 'Playful',
 
     descriptor: 'Sweet, ripe cherry',
@@ -33,13 +33,18 @@ export const products: Product[] = [
 
     seasonal: null,
 
-    imagePath: '/images/candles/IMG_7520.webp',
+    rating: 4.9,
+    reviewCount: 42,
+    badge: 'bestseller',
+
+    imagePath: '/images/products/electric-cherry.webp',
+    extraImages: ['/images/products/cherry-tin.webp'],
   },
 
   {
     slug: 'orange',
     scent: 'orange',
-    name: 'Orange',
+    name: 'Sweet Orange',
     mood: 'Bright',
 
     descriptor: 'Fresh citrus peel',
@@ -68,13 +73,18 @@ export const products: Product[] = [
 
     seasonal: null,
 
-    imagePath: '/images/candles/IMG_7522.webp',
+    rating: 4.8,
+    reviewCount: 31,
+    badge: 'new',
+
+    imagePath: '/images/products/sweet-orange.webp',
+    extraImages: ['/images/products/orange-tin.webp'],
   },
 
   {
     slug: 'vanilla',
     scent: 'vanilla',
-    name: 'Vanilla',
+    name: 'Vanilla Egg',
     mood: 'Comforting',
 
     descriptor: 'Soft vanilla cream',
@@ -103,13 +113,17 @@ export const products: Product[] = [
 
     seasonal: null,
 
-    imagePath: '/images/candles/IMG_7523.webp',
+    rating: 5.0,
+    reviewCount: 27,
+
+    imagePath: '/images/products/vanilla-egg.webp',
+    extraImages: ['/images/products/vanilla-tin.webp'],
   },
 
   {
     slug: 'strawberry',
     scent: 'strawberry',
-    name: 'Strawberry',
+    name: 'Strawberry Cake',
     mood: 'Juicy',
 
     descriptor: 'Fresh garden strawberry',
@@ -138,7 +152,12 @@ export const products: Product[] = [
 
     seasonal: null,
 
-    imagePath: '/images/candles/IMG_7521.webp',
+    rating: 4.9,
+    reviewCount: 36,
+    badge: 'new',
+
+    imagePath: '/images/products/strawberry-cake.webp',
+    extraImages: ['/images/products/strawberry-tin.webp'],
   },
 
   {
@@ -173,7 +192,11 @@ export const products: Product[] = [
 
     seasonal: null,
 
-    imagePath: '/images/candles/IMG_7524.webp',
+    rating: 4.7,
+    reviewCount: 19,
+
+    imagePath: '/images/products/espresso-martini.webp',
+    extraImages: ['/images/products/espresso-martini-tin.webp'],
   },
 
   {
@@ -208,10 +231,55 @@ export const products: Product[] = [
 
     seasonal: { active: false },
 
-    imagePath: '/images/products/winter-wonderland.jpg',
+    imagePath: '/images/products/winter-wonderland.webp',
   },
 ]
 
 export function getProductBySlug(slug: string): Product | undefined {
   return products.find((p) => p.slug === slug)
+}
+
+/**
+ * Every image for a product, primary first.
+ *
+ * The single place that decides gallery order, so the card, the detail page and
+ * any future lightbox cannot disagree about which photo comes first.
+ * De-duplicated, because listing the primary image again under `extraImages` is
+ * an easy mistake that would render the same photo twice in the strip.
+ */
+export function productImages(product: Product): string[] {
+  return [...new Set([product.imagePath, ...(product.extraImages ?? [])])]
+}
+
+/**
+ * Which candles the homepage grid shows, in the order it shows them.
+ *
+ * **This is the list to edit to change the homepage grid.** It is deliberately
+ * separate from `products`: the catalogue holds everything we sell, this holds
+ * the five we lead with. Winter Wonderland is absent because it is out of
+ * season — it still appears on `/products` with its seasonal overlay.
+ *
+ * Note these are slugs, not display names. The slugs are load-bearing: they key
+ * `pricing.ts`, the cart URL parameters and the product routes, so renaming a
+ * candle means editing its `name` above, never its `slug`.
+ */
+export const HOMEPAGE_PRODUCT_SLUGS = [
+  'vanilla',
+  'orange',
+  'strawberry',
+  'espresso-martini',
+  'cherry',
+] as const
+
+/** The homepage grid's products, resolved and ordered. */
+export function homepageProducts(): Product[] {
+  return HOMEPAGE_PRODUCT_SLUGS.map((slug) => {
+    const product = getProductBySlug(slug)
+    if (!product) {
+      // A typo here would silently drop a card from the homepage, which is the
+      // kind of thing nobody notices for a month.
+      throw new Error(`HOMEPAGE_PRODUCT_SLUGS references unknown product "${slug}"`)
+    }
+    return product
+  })
 }

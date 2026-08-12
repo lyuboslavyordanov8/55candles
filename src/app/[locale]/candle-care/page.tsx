@@ -68,7 +68,7 @@ export default function CandleCarePage() {
   const t = useTranslations('candleCarePage')
 
   return (
-    <div className="pt-32 pb-28 bg-cream-base min-h-screen">
+    <div className="pt-36 pb-28 bg-cream-base min-h-screen">
 
       {/* HEADER */}
       <div className="max-w-3xl mx-auto px-6 text-center mb-20">

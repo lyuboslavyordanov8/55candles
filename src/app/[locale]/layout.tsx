@@ -1,31 +1,20 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { Montserrat, Playfair_Display } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import { CartProvider } from '@/components/cart/CartProvider'
+import CartDrawer from '@/components/cart/CartDrawer'
 import MotionProvider from '@/components/providers/MotionProvider'
 import { OrganizationJsonLd } from '@/components/seo/JsonLd'
+import { fontVariables } from '@/fonts'
 import { isLocale, locales } from '@/i18n/locales'
 import { pickClientMessages } from '@/i18n/client-namespaces'
 import { siteUrl, isSiteUrlConfigured } from '@/lib/site'
 
 import '../globals.css'
-
-const montserrat = Montserrat({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-montserrat',
-  display: 'swap',
-})
-
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  style: ['normal', 'italic'],
-  variable: '--font-playfair',
-  display: 'swap',
-})
 
 const descriptions: Record<string, string> = {
   en: 'Eco-friendly, non-toxic candles with hand-sculpted wax fruit. No nasties, ever.',
@@ -71,13 +60,13 @@ export async function generateMetadata({
       url: `/${locale}`,
       title: '55candles',
       description,
-      images: [{ url: '/images/hero.jpg', width: 1200, height: 630, alt: '55candles' }],
+      images: [{ url: '/images/hero.webp', width: 1200, height: 630, alt: '55candles' }],
     },
     twitter: {
       card: 'summary_large_image',
       title: '55candles',
       description,
-      images: ['/images/hero.jpg'],
+      images: ['/images/hero.webp'],
     },
     // Keep previews and local builds out of the index until a real domain is
     // configured (AUDIT.md Q-06).
@@ -110,8 +99,8 @@ export default async function LocaleLayout({
   const messages = pickClientMessages(await getMessages())
 
   return (
-    <html lang={locale} className={`${montserrat.variable} ${playfair.variable}`}>
-      <body className="bg-cream-base text-charcoal font-sans antialiased">
+    <html lang={locale} className={fontVariables}>
+      <body className="bg-paper-white text-ink-primary font-sans antialiased">
         {/*
           Reveal server-renders its children at `opacity: 0` and framer-motion
           animates them in on the client. That means every animated section —
@@ -138,9 +127,18 @@ export default async function LocaleLayout({
               {skipToContent[locale] ?? skipToContent.en}
             </a>
 
-            <Navbar />
-            <main id="main">{children}</main>
-            <Footer />
+            {/*
+              The cart is browser state (localStorage), so the provider has to
+              sit above the header — which shows the count — and the pages that
+              add to it. The drawer is mounted once here rather than per page,
+              so opening it never depends on which route you are on.
+            */}
+            <CartProvider>
+              <Navbar />
+              <main id="main">{children}</main>
+              <Footer />
+              <CartDrawer />
+            </CartProvider>
           </MotionProvider>
         </NextIntlClientProvider>
       </body>

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
+import { CartProvider } from '@/components/cart/CartProvider'
 import { notFound } from 'next/navigation'
 import messages from '../../../../../../messages/en.json'
 import ProductDetailPage from '../page'
@@ -23,7 +24,9 @@ async function renderPage(slug = 'cherry') {
   const jsx = await ProductDetailPage({ params: Promise.resolve({ locale: 'en', slug }) })
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      {jsx}
+      <CartProvider>
+        {jsx}
+      </CartProvider>
     </NextIntlClientProvider>
   )
 }
@@ -49,12 +52,28 @@ describe('ProductDetailPage', () => {
     expect(container.querySelector('[data-price="1999"]')).toBeInTheDocument()
   })
 
-  it('links a purchasable product straight to checkout with a one-item cart', async () => {
-    // There is no cart yet (B-05), so the CTA carries the item in the URL.
+  // The CTA used to jump straight to checkout with a one-item URL cart,
+  // because there was no cart. There is now, so it adds to it and leaves the
+  // shopper where they are.
+  it('adds a purchasable product to the cart rather than leaving the page', async () => {
     await renderPage('cherry')
 
-    const cta = screen.getByRole('link', { name: /order now/i })
-    expect(cta).toHaveAttribute('href', '/en/checkout?items=cherry%3A1')
+    const cta = screen.getByRole('button', { name: /add electric cherry to cart/i })
+    expect(cta).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /order now/i })).not.toBeInTheDocument()
+  })
+
+  it('shows every photo the product has, with a picker', async () => {
+    await renderPage('cherry')
+
+    // Electric Cherry has the illustration plus a photo of the tin.
+    expect(screen.getByRole('tab', { name: /photo 1 of 2/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /photo 2 of 2/i })).toBeInTheDocument()
+  })
+
+  it('omits the picker for a product with a single photo', async () => {
+    await renderPage('winter-wonderland')
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
   })
 
   it('keeps an out-of-season product unbuyable, priced or not', async () => {

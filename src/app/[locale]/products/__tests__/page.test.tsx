@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
+import { CartProvider } from '@/components/cart/CartProvider'
 import messages from '../../../../../messages/en.json'
 import ProductsPage from '../page'
 
@@ -15,7 +16,9 @@ async function renderPage() {
   const jsx = await ProductsPage({ params: Promise.resolve({ locale: 'en' }) })
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      {jsx}
+      <CartProvider>
+        {jsx}
+      </CartProvider>
     </NextIntlClientProvider>
   )
 }
@@ -23,12 +26,19 @@ async function renderPage() {
 describe('ProductsPage', () => {
   it('renders section title', async () => {
     await renderPage()
-    expect(screen.getByRole('heading', { name: /the scent collection/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /products/i })).toBeInTheDocument()
   })
 
-  it('renders a learn more link for every product', async () => {
+  // The card itself is the link now — there is no separate "learn more"
+  // control, so count the cards by where they point.
+  it('renders a card linking to every product', async () => {
     await renderPage()
-    const links = screen.getAllByRole('link', { name: /learn more/i })
-    expect(links).toHaveLength(6)
+
+    const cardHrefs = screen
+      .getAllByRole('link')
+      .map((a) => a.getAttribute('href') ?? '')
+      .filter((href) => /^\/en\/products\/[a-z-]+$/.test(href))
+
+    expect(cardHrefs).toHaveLength(6)
   })
 })

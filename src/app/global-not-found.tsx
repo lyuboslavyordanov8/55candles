@@ -7,15 +7,11 @@
 //
 // There is no locale to read here, so the copy is deliberately bilingual.
 import type { Metadata } from 'next'
-import { Montserrat } from 'next/font/google'
+
+import Logo from '@/components/layout/Logo'
+import { montserrat } from '@/fonts'
 
 import './globals.css'
-
-const montserrat = Montserrat({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-montserrat',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: '404 — 55candles',
@@ -25,11 +21,9 @@ export const metadata: Metadata = {
 export default function GlobalNotFound() {
   return (
     <html lang="en" className={montserrat.variable}>
-      <body className="bg-cream-base text-charcoal font-sans antialiased">
+      <body className="bg-paper-white text-ink-primary font-sans antialiased">
         <main className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-          <span className="text-lg font-semibold tracking-[0.3em] uppercase text-charcoal mb-16">
-            55CANDLES
-          </span>
+          <Logo className="mb-16 h-5 w-auto" />
 
           <p className="text-xs tracking-[0.35em] uppercase text-ink-ghost mb-6">404</p>
 

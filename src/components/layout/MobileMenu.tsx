@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import MaterialIcon from '@/components/icons/MaterialIcon'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import type { NavLink } from './nav-links'
 
@@ -18,27 +19,20 @@ interface Props {
     close: string
     menu: string
   }
-  /**
-   * Burger bar colour. The navbar goes transparent over the homepage hero, so
-   * the bars have to invert with it — but `isHome`/`scrolled` live in the
-   * server shell, which passes the resolved class down.
-   */
-  barClassName: string
 }
 
 /**
- * The mobile menu — dialog semantics, focus trap and open/close state.
+ * The menu panel — dialog semantics, focus trap and open/close state.
  *
- * Split out of `Navbar` so the burger and the overlay are the only part of the
+ * Named "mobile" for historical reasons: it is now the only navigation at every
+ * breakpoint, since the redesign moved the wordmark to the centre of the bar
+ * and there is no room for a row of links beside it.
+ *
+ * Split out of `Navbar` so the button and the overlay are the only part of the
  * header that ships to the client (AUDIT.md S-14). The nav links are computed
  * on the server and handed over as plain data.
  */
-export default function MobileMenu({
-  links,
-  languageSwitcher,
-  labels,
-  barClassName,
-}: Props) {
+export default function MobileMenu({ links, languageSwitcher, labels }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const pathname = usePathname()
 
@@ -54,14 +48,12 @@ export default function MobileMenu({
     <>
       <button
         onClick={() => setMenuOpen(true)}
-        className="md:hidden flex flex-col gap-1.5 p-1"
+        className="p-1 text-ink-primary transition-opacity duration-200 hover:opacity-60"
         aria-label={labels.open}
         aria-expanded={menuOpen}
         aria-controls={MENU_ID}
       >
-        <span className={barClassName} />
-        <span className={barClassName} />
-        <span className={barClassName} />
+        <MaterialIcon name="menu" className="h-5 w-5" />
       </button>
 
       <AnimatePresence>
@@ -76,15 +68,15 @@ export default function MobileMenu({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-cream-base flex flex-col p-8"
+            className="fixed inset-0 z-[60] bg-paper-white flex flex-col p-8"
           >
             {/* Close */}
             <button
               onClick={closeMenu}
               aria-label={labels.close}
-              className="self-end text-2xl text-charcoal mb-10"
+              className="self-end mb-10 p-1 text-ink-primary transition-opacity duration-200 hover:opacity-60"
             >
-              <span aria-hidden="true">✕</span>
+              <MaterialIcon name="close" className="h-6 w-6" />
             </button>
 
             {/* Links */}
@@ -99,7 +91,7 @@ export default function MobileMenu({
                   <Link
                     href={link.href}
                     onClick={closeMenu}
-                    className="text-2xl font-semibold tracking-widest uppercase text-ink-secondary hover:text-charcoal transition-colors duration-200"
+                    className="text-2xl font-semibold tracking-widest uppercase text-ink-secondary hover:text-ink-primary transition-colors duration-200"
                   >
                     {link.label}
                   </Link>
