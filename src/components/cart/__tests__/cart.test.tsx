@@ -225,4 +225,61 @@ describe('cart', () => {
 
     expect(await screen.findByRole('button', { name: /open cart/i })).toBeInTheDocument()
   })
+
+  /**
+   * Regression: closing the drawer left the page permanently unscrollable.
+   *
+   * The drawer locked body scroll in its own effect while `useFocusTrap` was
+   * already doing the same thing. Both saved "the previous value" and both
+   * restored it, but the trap's effect was registered first, so it read the
+   * real value ('') and the drawer read what the trap had just written
+   * ('hidden'). React tears effects down in registration order, so the trap
+   * restored '' and the drawer immediately put 'hidden' back. The page then
+   * could not be scrolled again until a full reload.
+   */
+  describe('body scroll lock', () => {
+    beforeEach(() => {
+      document.body.style.overflow = ''
+      document.body.style.paddingRight = ''
+    })
+
+    it('locks page scroll while the drawer is open', async () => {
+      const user = userEvent.setup()
+      renderShop()
+      await user.click(addCherry())
+      await user.click(openCart())
+
+      await waitFor(() => expect(document.body.style.overflow).toBe('hidden'))
+    })
+
+    it('restores page scroll after the drawer closes', async () => {
+      const user = userEvent.setup()
+      renderShop()
+      await user.click(addCherry())
+      await user.click(openCart())
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
+
+      await user.keyboard('{Escape}')
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      // The assertion that was failing: 'hidden' here means the shopper is
+      // stuck on whatever part of the page they were looking at.
+      await waitFor(() => expect(document.body.style.overflow).not.toBe('hidden'))
+    })
+
+    it('survives being opened and closed repeatedly', async () => {
+      const user = userEvent.setup()
+      renderShop()
+      await user.click(addCherry())
+
+      for (let i = 0; i < 3; i++) {
+        await user.click(openCart())
+        await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
+        await user.keyboard('{Escape}')
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      }
+
+      await waitFor(() => expect(document.body.style.overflow).not.toBe('hidden'))
+    })
+  })
 })

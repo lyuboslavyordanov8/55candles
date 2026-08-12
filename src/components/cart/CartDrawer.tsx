@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useEffect } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
 import MaterialIcon from '@/components/icons/MaterialIcon'
@@ -39,18 +38,20 @@ export default function CartDrawer() {
   const locale = useLocale()
   const { lines, isOpen, closeCart, setQuantity, remove, count } = useCart()
 
+  /**
+   * Also locks body scroll while open — a drawer that leaves the page
+   * scrollable behind it lets a phone user scroll the grid instead of the cart
+   * and think the cart is stuck.
+   *
+   * That lock used to be duplicated here in a second effect, and the two fought
+   * each other. Both saved "the previous value" and restored it on cleanup, but
+   * this component's effect ran *after* the hook's, so it captured the
+   * `hidden` the hook had just written rather than the real prior value. React
+   * tears effects down in registration order, so the hook restored `''` and
+   * this one immediately put `hidden` back: the page stayed unscrollable until
+   * a reload. The hook is the single owner now. Do not re-add a local lock.
+   */
   const panelRef = useFocusTrap<HTMLDivElement>(isOpen, closeCart)
-
-  // A drawer that leaves the page scrollable behind it lets a phone user scroll
-  // the grid instead of the cart and think the cart is stuck.
-  useEffect(() => {
-    if (!isOpen) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previous
-    }
-  }, [isOpen])
 
   const items = lines
     .map((line) => {
