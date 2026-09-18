@@ -53,10 +53,10 @@
     "contact": "Get in touch"
   },
   "storyTeaser": {
-    "headline": "Our story",
-    "body": "Hello! I am Radina, the person behind 55 candles — a small brand born out of my love for scents, colours and the little things that make a home nicer. At 55 candles I make candles that are more than a pleasant smell. Each one has its own character, colour and story, from the scent to the illustration on the label.",
+    "headline": "Not a dessert.\nNot a cocktail.\nJust a damn good candle.",
+    "body": "55 Candles brings together natural plant wax, fine fragrances and a little handmade magic in one simple tin. Made with care, served with mood, and ready to turn an ordinary day into something a little more special.",
     "cta": "Read more",
-    "imageAlt": "Painted illustration of strawberries and leaves from the Strawberry Cake candle artwork",
+    "imageAlt": "An Espresso Martini candle beside a takeaway coffee and a laptop on a walnut chair, with a tweed coat draped over its back",
     "body2": "My idea is a simple one: to make scents you want to light not only for a special occasion, but simply because you are at home. Because sometimes the occasion is dinner. Sometimes it is a new book. And sometimes you just want the room to smell — and look — a little nicer."
   },
   "testimonials": {
@@ -415,7 +415,7 @@
     "breadcrumbHome": "Home",
     "title": "Checkout",
     "intro": "Tell us where the parcel should go and how you would like to pay.",
-    "notLiveYet": "This checkout is not live yet. Orders cannot be placed and no payment is taken: there is nowhere to store an order, and card payment is not connected. The form below is complete and validates everything for real — but nothing you enter is saved or sent.",
+    "notLiveYet": "This checkout is not live yet. Orders cannot be placed: there is nowhere to store one. The form below is complete and validates everything for real — but nothing you enter is saved or sent.",
     "unpricedCount": "{count, plural, one {# product is still unpriced.} other {# products are still unpriced.}}",
     "shippingNotConfigured": "Delivery prices are not set yet, so no shipping cost can be shown. They come from the courier merchant contracts.",
     "recipient": "Recipient",
@@ -425,10 +425,9 @@
     "submit": "Continue to payment",
     "submitting": "Checking…",
     "officeLookupPending": "Type the office name or number for now. A searchable list will appear here once the courier accounts are connected.",
-    "cardNotConfigured": "Card payment is not connected yet, so only cash on delivery is offered.",
     "field": {
       "recipientName": "Full name",
-      "phone": "Phone number",
+      "phone": "Mobile number",
       "email": "Email address",
       "courier": "Courier",
       "method": "Where should we deliver?",
@@ -452,6 +451,28 @@
       "office": "Collect it from a courier branch. Usually the cheapest option.",
       "locker": "Collect it from an automated locker, any time of day."
     },
+    "office": {
+      "cityLabel": "City or post code",
+      "cityPlaceholder": "Start typing, e.g. Sofia or 1000",
+      "searching": "Searching…",
+      "cityResults": "{count, plural, one {# city found. Choose it below.} other {# cities found. Choose one below.}}",
+      "noCities": "No city with a collection point matches that. Check the spelling, or type the post code instead.",
+      "changeCity": "Change city",
+      "choose": "Choose one…",
+      "hours": "Open {hours}.",
+      "lookupFailed": "We couldn't reach the courier just now, so please type the office name or number instead.",
+      "retry": "Try the list again",
+      "demoData": "These offices come from the courier's test system, so some of them are not real places. Development only — a customer never sees this.",
+      "confirmed": "You'll collect your parcel from:",
+      "label": {
+        "office": "Which office?",
+        "locker": "Which parcel locker?"
+      },
+      "none": {
+        "office": "The courier has no office in {city}. Choose another city, or have it delivered to your address.",
+        "locker": "The courier has no parcel locker in {city}. Try a courier office instead."
+      }
+    },
     "paymentMethod": {
       "card": "Card",
       "cod": "Cash on delivery"
@@ -466,10 +487,12 @@
         "tooLong": "That name is too long."
       },
       "phone": {
-        "required": "A phone number is needed — the courier may have to call.",
-        "invalid": "That doesn't look like a phone number.",
-        "tooShort": "That number looks too short.",
-        "tooLong": "That number looks too long."
+        "required": "A mobile number is needed — that is where the courier's delivery SMS goes.",
+        "invalid": "That doesn't look like a Bulgarian number. Try 0888 123 456 or +359 888 123 456.",
+        "notBulgarian": "Please give a Bulgarian number — we only deliver inside Bulgaria.",
+        "notMobile": "The courier notifies you by SMS, so a mobile number is needed — one starting 087, 088 or 089.",
+        "tooShort": "A Bulgarian mobile number has nine digits after the zero, like 0888 123 456.",
+        "tooLong": "That is a digit too many — a Bulgarian mobile number looks like 0888 123 456."
       },
       "email": {
         "invalid": "That doesn't look like an email address.",
@@ -494,7 +517,8 @@
       },
       "officeId": {
         "required": "Please say which office or locker you'll collect from.",
-        "tooLong": "That is too long."
+        "tooLong": "That is too long.",
+        "unknown": "The courier doesn't recognise that office — it may have closed. Please choose another."
       },
       "note": {
         "tooLong": "Please shorten the note."

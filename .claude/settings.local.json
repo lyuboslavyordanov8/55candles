@@ -12,7 +12,13 @@
       "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"layout responsive animation\" --stack nextjs)",
       "Bash(npx tsc:*)",
       "Bash(npx jest:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(bash:*)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:d[k] for k in ['scripts','dependencies','devDependencies'] if k in d}, indent=2\\)\\)\")",
+      "Bash(node -e ':*)",
+      "WebFetch(domain:artemis-home.eu)",
+      "WebFetch(domain:nortal.com)",
+      "Bash(npx next:*)"
     ]
   }
 }

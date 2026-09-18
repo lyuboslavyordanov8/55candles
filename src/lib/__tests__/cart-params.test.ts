@@ -4,6 +4,7 @@ import {
   MAX_LINES,
   MAX_QUANTITY_PER_LINE,
   parseCartParam,
+  sameBasket,
   toCartParam,
 } from '../cart-params'
 
@@ -90,5 +91,43 @@ describe('toCartParam / checkoutHref', () => {
 
   it('encodes the quantity it is given', () => {
     expect(checkoutHref('en', 'vanilla', 3)).toContain('vanilla%3A3')
+  })
+})
+
+describe('sameBasket', () => {
+  const two = [{ slug: 'cherry', quantity: 2 }]
+
+  it('recognises the same order however the lines are ordered', () => {
+    expect(
+      sameBasket(
+        [
+          { slug: 'cherry', quantity: 2 },
+          { slug: 'vanilla', quantity: 1 },
+        ],
+        [
+          { slug: 'vanilla', quantity: 1 },
+          { slug: 'cherry', quantity: 2 },
+        ]
+      )
+    ).toBe(true)
+  })
+
+  it('notices a changed quantity, which is the case it exists for', () => {
+    // A summary priced for two candles, shown above a basket holding one, is a
+    // wrong number wearing the authority of a confirmed one.
+    expect(sameBasket(two, [{ slug: 'cherry', quantity: 1 }])).toBe(false)
+  })
+
+  it('notices an added or removed line', () => {
+    expect(sameBasket(two, [...two, { slug: 'vanilla', quantity: 1 }])).toBe(false)
+    expect(sameBasket(two, [])).toBe(false)
+  })
+
+  it('notices a swapped product at the same quantity', () => {
+    expect(sameBasket(two, [{ slug: 'vanilla', quantity: 2 }])).toBe(false)
+  })
+
+  it('treats two empty baskets as the same', () => {
+    expect(sameBasket([], [])).toBe(true)
   })
 })

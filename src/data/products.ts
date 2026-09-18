@@ -38,7 +38,6 @@ export const products: Product[] = [
     badge: 'bestseller',
 
     imagePath: '/images/products/electric-cherry.webp',
-    extraImages: ['/images/products/cherry-tin.webp'],
   },
 
   {
@@ -78,7 +77,6 @@ export const products: Product[] = [
     badge: 'new',
 
     imagePath: '/images/products/sweet-orange.webp',
-    extraImages: ['/images/products/orange-tin.webp'],
   },
 
   {
@@ -117,7 +115,6 @@ export const products: Product[] = [
     reviewCount: 27,
 
     imagePath: '/images/products/vanilla-egg.webp',
-    extraImages: ['/images/products/vanilla-tin.webp'],
   },
 
   {
@@ -157,7 +154,6 @@ export const products: Product[] = [
     badge: 'new',
 
     imagePath: '/images/products/strawberry-cake.webp',
-    extraImages: ['/images/products/strawberry-tin.webp'],
   },
 
   {
@@ -196,7 +192,6 @@ export const products: Product[] = [
     reviewCount: 19,
 
     imagePath: '/images/products/espresso-martini.webp',
-    extraImages: ['/images/products/espresso-martini-tin.webp'],
   },
 
   {

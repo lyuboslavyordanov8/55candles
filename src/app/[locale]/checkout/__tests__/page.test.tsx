@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import messages from '../../../../../messages/en.json'
+import { CartProvider } from '@/components/cart/CartProvider'
 import CheckoutPage from '../page'
 
 // The action is a server function; the page's own rendering is what is under
@@ -12,6 +13,10 @@ vi.mock('../actions', () => ({
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en/checkout',
+  // The basket editor rewrites `?items=` through the router. Nothing here
+  // asserts on that — `BasketEditor.test.tsx` does — but without the mock the
+  // page cannot render at all.
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND')
   }),
@@ -23,9 +28,11 @@ async function renderPage(items?: string) {
     searchParams: Promise.resolve(items === undefined ? {} : { items }),
   })
 
+  // `CartProvider` because the basket editor mirrors its edits into the stored
+  // cart, so the header badge cannot disagree with this page.
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      {jsx}
+      <CartProvider>{jsx}</CartProvider>
     </NextIntlClientProvider>
   )
 }
@@ -83,6 +90,30 @@ describe('CheckoutPage', () => {
 
     expect(screen.getByLabelText(/full name/i)).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /cash on delivery/i })).toBeInTheDocument()
+  })
+
+  it('searches real offices with no configuration, and says nothing about test data', async () => {
+    // The default state of this repository, and the point of the credential-free
+    // lookup: real offices out of the box (AUDIT.md Q-22). Proves the wiring from
+    // `econtEnvironment()` through to the picker; the picker's own behaviour is
+    // `OfficePicker.test.tsx`.
+    await renderPage('cherry:1')
+
+    expect(screen.getByLabelText(/city or post code/i)).toBeInTheDocument()
+    expect(screen.queryByText(/test system/i)).not.toBeInTheDocument()
+  })
+
+  it('warns that the offices are test records on the demo environment', async () => {
+    vi.stubEnv('ECONT_ENV', 'demo')
+
+    try {
+      await renderPage('cherry:1')
+
+      expect(screen.getByLabelText(/city or post code/i)).toBeInTheDocument()
+      expect(screen.getByText(/test system/i)).toBeInTheDocument()
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('ignores an unknown slug rather than erroring', async () => {

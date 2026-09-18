@@ -1,49 +1,44 @@
-import type { Courier, DeliveryMethod } from '../shipping'
+import 'server-only'
+
+import type { Courier } from '../shipping'
+import { createEcontClient } from './econt'
+import type { CourierClient, LookupResult } from './types'
 
 /**
- * Courier office / locker lookup (AUDIT.md Q-22, Q-25).
+ * Courier client resolution (AUDIT.md Q-22, Q-25).
  *
- * Both Econt and Speedy expose a nomenclature API — cities, offices, lockers —
- * behind merchant credentials. Neither is called yet, because there are no
- * credentials (Q-22). What exists here is the *interface* the checkout depends
- * on, plus a `status: 'unconfigured'` result the UI renders honestly.
+ * `server-only`: this module reads credentials, so importing it from a Client
+ * Component is a build error rather than a password in the browser bundle. The
+ * picker imports its *types* from `./types`, which carries no such marker.
  *
- * Why an interface rather than two bespoke integrations: the checkout should
- * not know which courier it is talking to. When credentials arrive, implement
- * `EcontClient` / `SpeedyClient` against this contract and the delivery form
- * does not change.
+ * The checkout never constructs a client itself. It asks `courierClient()` and
+ * gets either a working one or one that answers `unconfigured` to everything —
+ * so the only place that knows whether a courier is wired up is here.
  *
- * Credentials belong in environment variables, never in code — see
- * `.env.example`.
+ * Credentials come from a signed merchant contract and belong in environment
+ * variables — see `.env.example`.
  */
 
-export interface CourierCity {
-  id: string
-  name: string
-  postCode: string
-}
+export type { CourierCity, CourierClient, CourierOffice, LookupResult } from './types'
 
-export interface CourierOffice {
-  id: string
-  courier: Courier
-  /** `office` or `locker` — a locker is an unstaffed office in both APIs. */
-  kind: Extract<DeliveryMethod, 'office' | 'locker'>
-  name: string
-  address: string
-  cityId: string
-  /** Free-text opening hours as the courier reports them, if provided. */
-  hours?: string
-}
+/**
+ * Which Econt nomenclature to read.
+ *
+ * `production` is the default and needs no configuration, because the office
+ * nomenclature is public — see the header of `econt.ts`. Credentials buy
+ * waybills, not the office list.
+ *
+ * `demo` exists for exercising the flow against the same dataset the demo
+ * `LabelService` will accept once waybills are built. It is a worse dataset in
+ * every other respect: 586 offices to production's 632, **2** lockers in the
+ * whole country against 43, and an office literally named `testtest`. Hence
+ * opt-in only, and never in production.
+ */
+export type CourierEnvironment = 'production' | 'demo'
 
-export type LookupResult<T> =
-  | { status: 'ok'; data: T }
-  | { status: 'unconfigured'; courier: Courier }
-  | { status: 'failed'; courier: Courier; reason: string }
-
-export interface CourierClient {
-  readonly courier: Courier
-  searchCities(query: string): Promise<LookupResult<CourierCity[]>>
-  officesIn(cityId: string): Promise<LookupResult<CourierOffice[]>>
+const ECONT_BASE_URL: Record<CourierEnvironment, string> = {
+  production: 'https://ee.econt.com/services',
+  demo: 'https://demo.econt.com/ee/services',
 }
 
 /** Environment variable names, one place, so the checks cannot drift. */
@@ -52,6 +47,12 @@ const CREDENTIAL_VARS: Record<Courier, readonly string[]> = {
   speedy: ['SPEEDY_USERNAME', 'SPEEDY_PASSWORD'],
 }
 
+/**
+ * Whether a courier's *waybill* credentials are present.
+ *
+ * Not a question about the office picker, which needs none. This gates label
+ * creation, COD and tracking — see AUDIT.md Phase 4.
+ */
 export function isCourierConfigured(courier: Courier): boolean {
   return CREDENTIAL_VARS[courier].every((name) => Boolean(process.env[name]))
 }
@@ -61,6 +62,32 @@ export function missingCourierCredentials(): string[] {
   return Object.values(CREDENTIAL_VARS)
     .flat()
     .filter((name) => !process.env[name])
+}
+
+/**
+ * The Econt nomenclature in force. Never `null`: the office list is public, so
+ * there is always a real one to read.
+ *
+ * Reads `process.env` on every call rather than at module load, so a test can
+ * set the variables and so a platform that injects them late still works.
+ */
+export function econtEnvironment(): CourierEnvironment {
+  if (process.env.ECONT_ENV === 'demo') {
+    if (process.env.NODE_ENV === 'production') {
+      // Loud, because the alternative is a live checkout quietly offering
+      // offices that do not exist. Falling back to the real list is safe here —
+      // it needs no credentials — so the picker keeps working.
+      console.error(
+        'ECONT_ENV=demo is ignored in production: the demo nomenclature ' +
+          'contains test offices. Using the real office list instead.'
+      )
+      return 'production'
+    }
+
+    return 'demo'
+  }
+
+  return 'production'
 }
 
 /**
@@ -79,16 +106,57 @@ function unconfiguredClient(courier: Courier): CourierClient {
     courier,
     searchCities: result,
     officesIn: result,
+    findOffice: result,
   }
+}
+
+/**
+ * Clients are cached per environment because each holds the office-list cache.
+ * A fresh client per request would re-download 1.7 MB every lookup.
+ */
+const clients = new Map<string, CourierClient>()
+
+function econtClient(): CourierClient {
+  const environment = econtEnvironment()
+
+  const key = `econt:${environment}`
+  const existing = clients.get(key)
+  if (existing) return existing
+
+  const created = createEcontClient({
+    baseUrl: process.env.ECONT_BASE_URL ?? ECONT_BASE_URL[environment],
+  })
+
+  clients.set(key, created)
+
+  return created
 }
 
 /**
  * Client for a courier.
  *
- * Returns the unconfigured client until credentials exist. When they do, this
- * is the one place to swap in the real implementation.
+ * Speedy is still the unconfigured stub: its API needs credentials issued by
+ * hand (`api@speedy.bg`), with no public demo environment, so there is nothing
+ * to build against yet. `/location/site`, `/location/office` and `/calculate`
+ * are the endpoints it will need — see AUDIT.md Phase 4.
  */
 export function courierClient(courier: Courier): CourierClient {
-  // [TODO: Q-22 — return EcontClient / SpeedyClient once credentials exist.]
-  return unconfiguredClient(courier)
+  // [TODO: Q-22 — return a SpeedyClient once test credentials exist.]
+  return courier === 'econt' ? econtClient() : unconfiguredClient('speedy')
+}
+
+/**
+ * Couriers whose office list we can actually show.
+ *
+ * The checkout page passes this to the delivery form so the picker appears only
+ * where it works, and the free-text fallback appears everywhere else.
+ *
+ * Econt is unconditional because its nomenclature is public. Speedy is absent
+ * because its client is a stub — and note this is *not* `isCourierConfigured`:
+ * Speedy credentials can be present while it still cannot answer, and offering
+ * an empty picker on the strength of an environment variable would be the lie
+ * this whole module avoids.
+ */
+export function couriersWithOfficeLookup(): Courier[] {
+  return ['econt']
 }

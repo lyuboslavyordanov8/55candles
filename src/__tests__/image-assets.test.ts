@@ -30,7 +30,20 @@ function assetPath(webPath: string): string {
  * `src/content/home-banner.ts` — so it is pulled from there instead of being
  * repeated here. Point that file at a new banner and this test follows it.
  */
-const componentImages = [homeBanner.image, '/images/story.webp', '/images/logo-ink.png']
+const componentImages = [
+  homeBanner.image,
+  '/images/story-chair-closeup.webp',
+  '/images/collection-group.webp',
+  '/images/care-tools.webp',
+  '/images/contact-telephone.webp',
+  '/images/logo-ink.png',
+  // The couriers' own logos, on the checkout's courier choice. A missing one
+  // would drop a customer back to reading two words in a language they may not
+  // read — see `CourierMark`.
+  '/images/couriers/econt-blue-bg.svg',
+  '/images/couriers/econt-blue-en.svg',
+  '/images/couriers/speedy.webp',
+]
 
 function collectSourceFiles(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

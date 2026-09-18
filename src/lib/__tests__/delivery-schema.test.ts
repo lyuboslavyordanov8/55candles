@@ -60,14 +60,35 @@ describe('validateDelivery', () => {
   })
 
   describe('phone', () => {
-    it('counts digits, so spacing cannot pad a short number into passing', () => {
-      expect(validateDelivery({ ...VALID_OFFICE, phone: '1 2 3' }).errors.phone).toBe('tooShort')
-    })
+    // The rules themselves are `phone.test.ts`. What matters here is that the
+    // schema applies them, and that the value it hands on is the canonical one.
 
     it('accepts the separators people actually type', () => {
-      for (const phone of ['+359887115957', '0887 115 957', '(02) 123-4567']) {
+      for (const phone of ['+359887115957', '0887 115 957', '(0887) 115-957']) {
         expect(validateDelivery({ ...VALID_OFFICE, phone }).errors.phone).toBeUndefined()
       }
+    })
+
+    it('stores one canonical form, whatever was typed', () => {
+      // So the waybill, the SMS gateway and any later "same customer?" question
+      // all see the same string.
+      for (const phone of ['0887 115 957', '+359 887 115 957', '00359887115957']) {
+        expect(validateDelivery({ ...VALID_OFFICE, phone }).value.phone).toBe('+359887115957')
+      }
+    })
+
+    it('rejects a number the courier could never send an SMS to', () => {
+      // The whole point of the field: this is how the customer is told the
+      // parcel has arrived.
+      expect(validateDelivery({ ...VALID_OFFICE, phone: '02 123 4567' }).errors.phone).toBe(
+        'notMobile'
+      )
+      expect(validateDelivery({ ...VALID_OFFICE, phone: '0887 115 95' }).errors.phone).toBe(
+        'tooShort'
+      )
+      expect(validateDelivery({ ...VALID_OFFICE, phone: '+44 7700 900123' }).errors.phone).toBe(
+        'notBulgarian'
+      )
     })
 
     it('rejects letters as malformed, not as too short', () => {
@@ -124,6 +145,57 @@ describe('validateDelivery', () => {
       expect(fieldsFor('door')).not.toContain('officeId')
       expect(fieldsFor('office')).toContain('officeId')
       expect(fieldsFor('locker')).toContain('officeId')
+    })
+  })
+
+  describe('the office snapshot', () => {
+    it('is optional, since the fallback field cannot produce one', () => {
+      // A customer who typed an office code into the free-text field has no name
+      // or address to send, and rejecting the order for that would be absurd.
+      const result = validateDelivery(VALID_OFFICE)
+
+      expect(result.valid).toBe(true)
+      expect(result.value.officeName).toBe('')
+      expect(result.value.officeAddress).toBe('')
+    })
+
+    it('carries the picker values through, trimmed', () => {
+      const result = validateDelivery({
+        ...VALID_OFFICE,
+        officeName: '  София Гладстон  ',
+        officeAddress: ' ул. Цар Самуил №3 ',
+      })
+
+      expect(result.value.officeName).toBe('София Гладстон')
+      expect(result.value.officeAddress).toBe('ул. Цар Самуил №3')
+    })
+
+    it('truncates rather than rejecting an over-long value', () => {
+      // These are the courier's own strings, echoed back by the picker. A length
+      // problem here is our data problem, and there is nothing the customer
+      // could edit to fix it — so losing the order over it would be the wrong
+      // trade. The id, which is what the waybill needs, is unaffected.
+      const result = validateDelivery({
+        ...VALID_OFFICE,
+        officeName: 'н'.repeat(LIMITS.officeName.max + 50),
+        officeAddress: 'а'.repeat(LIMITS.officeAddress.max + 50),
+      })
+
+      expect(result.valid).toBe(true)
+      expect(result.errors).toEqual({})
+      expect(result.value.officeName).toHaveLength(LIMITS.officeName.max)
+      expect(result.value.officeAddress).toHaveLength(LIMITS.officeAddress.max)
+    })
+
+    it('ignores a non-string snapshot without throwing', () => {
+      const result = validateDelivery({
+        ...VALID_OFFICE,
+        officeName: { name: 'София' },
+        officeAddress: 42,
+      })
+
+      expect(result.value.officeName).toBe('')
+      expect(result.value.officeAddress).toBe('')
     })
   })
 

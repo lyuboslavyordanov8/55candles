@@ -11,7 +11,9 @@ import OrderSummary, { type OrderSummaryData } from '../OrderSummary'
  * directly tests the same thing without pretending the network happened.
  */
 
+/** Two of one candle. The single-line case is asserted separately. */
 const SUMMARY: OrderSummaryData = {
+  lines: [{ slug: 'cherry', quantity: 2, unitPriceMinor: 1999, lineTotalMinor: 3998 }],
   goodsMinor: 3998,
   shippingMinor: 599,
   codFeeMinor: null,
@@ -34,9 +36,59 @@ describe('OrderSummary', () => {
     const { container } = renderSummary()
 
     expect(screen.getByRole('heading', { name: /order summary/i })).toBeInTheDocument()
-    expect(container.querySelector('[data-amount="3998"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-line-amount="3998"]')).toBeInTheDocument()
     expect(container.querySelector('[data-amount="599"]')).toBeInTheDocument()
     expect(container.querySelector('[data-amount="4597"]')).toBeInTheDocument()
+  })
+
+  it('names every candle in the order, not just "Candles"', () => {
+    // The owner's complaint, and a real one: a customer confirming an order has
+    // to be able to see *what* they are confirming. "Candles — 39,98 €" does not
+    // say whether the second one is the cherry they wanted or a second orange.
+    const { container } = renderSummary({
+      lines: [
+        { slug: 'cherry', quantity: 2, unitPriceMinor: 1999, lineTotalMinor: 3998 },
+        { slug: 'orange', quantity: 1, unitPriceMinor: 1999, lineTotalMinor: 1999 },
+      ],
+      goodsMinor: 5997,
+      totalMinor: 6596,
+    })
+
+    expect(screen.getByText(/Electric Cherry/)).toBeInTheDocument()
+    expect(screen.getByText(/Sweet Orange/)).toBeInTheDocument()
+    // The count beside each, so a line total cannot read as a unit price.
+    expect(screen.getByText(/2 × €19.99/)).toBeInTheDocument()
+    expect(container.querySelector('[data-line-amount="1999"]')).toBeInTheDocument()
+  })
+
+  it('subtotals the goods once there is more than one line to subtotal', () => {
+    const { container } = renderSummary({
+      lines: [
+        { slug: 'cherry', quantity: 1, unitPriceMinor: 1999, lineTotalMinor: 1999 },
+        { slug: 'orange', quantity: 1, unitPriceMinor: 1999, lineTotalMinor: 1999 },
+      ],
+    })
+
+    expect(screen.getByText(/^Candles$/)).toBeInTheDocument()
+    expect(container.querySelector('[data-amount="3998"]')).toBeInTheDocument()
+  })
+
+  it('does not restate a single line as a subtotal', () => {
+    // With one line the goods row repeats the number directly above it, which
+    // reads as a second charge for the same candle.
+    renderSummary()
+
+    expect(screen.queryByText(/^Candles$/)).not.toBeInTheDocument()
+  })
+
+  it('falls back to the slug if a line names a product no longer in the catalogue', () => {
+    // A stale tab, or a slug retired between page load and submit. Showing the
+    // raw slug is ugly; showing nothing at all next to a charge is worse.
+    renderSummary({
+      lines: [{ slug: 'ghost-candle', quantity: 1, unitPriceMinor: 1999, lineTotalMinor: 1999 }],
+    })
+
+    expect(screen.getByText(/ghost-candle/)).toBeInTheDocument()
   })
 
   it('omits the cash-on-delivery line when the merchant absorbs the fee', () => {

@@ -46,7 +46,9 @@ export default function ProductCard({ product, locale, priority = false }: Props
   const canBuy = isPurchasable(product.slug)
 
   // A second photo doubles as the hover state — it previews the gallery on the
-  // detail page without adding any control to the card.
+  // detail page without adding any control to the card. No candle carries one
+  // at the moment, so every card takes the static branch below; give a product
+  // `extraImages` (or `hoverImagePath`) and the swap comes back on its own.
   const images = productImages(product)
   const hoverImage = product.hoverImagePath ?? images[1]
 

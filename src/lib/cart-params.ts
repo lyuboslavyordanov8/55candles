@@ -68,6 +68,30 @@ export function toCartParam(lines: readonly CartLine[]): string {
   return lines.map((line) => `${line.slug}:${line.quantity}`).join(',')
 }
 
+/**
+ * Do these two baskets describe the same order?
+ *
+ * Exists for one job: the checkout form keeps the priced summary the server sent
+ * back, and the basket above it can be edited afterwards. Comparing the two
+ * tells the form whether the total it is holding still describes the basket the
+ * customer is looking at — a stale total presented as a confirmed one is worse
+ * than no total.
+ *
+ * Slug and quantity only; a summary carries prices and a cart has none to
+ * compare. Order-insensitive, because an edit rebuilds `items=` and need not
+ * preserve the original positions.
+ */
+export function sameBasket(
+  a: ReadonlyArray<{ slug: string; quantity: number }>,
+  b: ReadonlyArray<{ slug: string; quantity: number }>
+): boolean {
+  if (a.length !== b.length) return false
+
+  return a.every((line) =>
+    b.some((other) => other.slug === line.slug && other.quantity === line.quantity)
+  )
+}
+
 /** Checkout href for a single product, for the product page CTA. */
 export function checkoutHref(locale: string, slug: string, quantity = 1): string {
   return `/${locale}/checkout?items=${encodeURIComponent(toCartParam([{ slug, quantity }]))}`

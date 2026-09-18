@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { CartProvider } from '@/components/cart/CartProvider'
 import { notFound } from 'next/navigation'
 import messages from '../../../../../../messages/en.json'
+import { products, productImages } from '@/data/products'
 import ProductDetailPage from '../page'
 
 vi.mock('next/image', () => ({
@@ -63,12 +64,23 @@ describe('ProductDetailPage', () => {
     expect(screen.queryByRole('link', { name: /order now/i })).not.toBeInTheDocument()
   })
 
-  it('shows every photo the product has, with a picker', async () => {
-    await renderPage('cherry')
+  // Driven off the catalogue rather than hard-coded, because no candle carries
+  // a second photo at the moment — the tin shots were removed and every product
+  // is down to its one illustration. So this asserts the wiring, not a count:
+  // the gallery is handed one frame per `productImages()` entry and shows its
+  // picker only when that is more than one. Add an `extraImages` entry to any
+  // product and this test follows it without being edited. The picker's own
+  // behaviour is covered in `ProductGallery.test.tsx`, which does not depend on
+  // the catalogue and so keeps working while nothing here has two photos.
+  it('gives the gallery every photo the product has', async () => {
+    const { container } = await renderPage('cherry')
+    const photos = productImages(products.find((p) => p.slug === 'cherry')!)
 
-    // Electric Cherry has the illustration plus a photo of the tin.
-    expect(screen.getByRole('tab', { name: /photo 1 of 2/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /photo 2 of 2/i })).toBeInTheDocument()
+    for (const src of photos) {
+      expect(container.querySelector(`img[src="${src}"]`)).toBeInTheDocument()
+    }
+
+    expect(screen.queryAllByRole('tab')).toHaveLength(photos.length > 1 ? photos.length : 0)
   })
 
   it('omits the picker for a product with a single photo', async () => {
