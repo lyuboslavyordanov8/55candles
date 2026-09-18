@@ -4,13 +4,13 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { isLocale } from '@/i18n/locales'
+import BasketEditor from '@/components/commerce/BasketEditor'
 import DeliveryForm from '@/components/commerce/DeliveryForm'
 import { availablePaymentMethods, type PaymentMethod } from '@/lib/payments'
-import { isShippingConfigured, TARIFFS_ARE_PLACEHOLDER } from '@/lib/shipping'
-import { unpricedSlugs, PRICING_IS_PROVISIONAL, getPricing } from '@/data/pricing'
+import { isShippingConfigured, TARIFFS_ARE_PLACEHOLDER, type Courier } from '@/lib/shipping'
+import { couriersWithOfficeLookup, econtEnvironment } from '@/lib/couriers'
+import { unpricedSlugs, PRICING_IS_PROVISIONAL } from '@/data/pricing'
 import { parseCartParam } from '@/lib/cart-params'
-import { formatMoney, multiplyMoney } from '@/lib/money'
-import { getProductBySlug } from '@/data/products'
 import type { CartLine } from '@/lib/order-total'
 import { BreadcrumbJsonLd } from '@/components/seo/JsonLd'
 
@@ -63,6 +63,8 @@ export default async function CheckoutPage({
       paymentMethods={availablePaymentMethods()}
       shippingConfigured={isShippingConfigured()}
       unpricedCount={unpricedSlugs().length}
+      officeLookup={couriersWithOfficeLookup()}
+      officeDataIsDemo={econtEnvironment() === 'demo'}
     />
   )
 }
@@ -78,12 +80,16 @@ function CheckoutContent({
   paymentMethods,
   shippingConfigured,
   unpricedCount,
+  officeLookup,
+  officeDataIsDemo,
 }: {
   locale: string
   cart: CartLine[]
   paymentMethods: readonly PaymentMethod[]
   shippingConfigured: boolean
   unpricedCount: number
+  officeLookup: readonly Courier[]
+  officeDataIsDemo: boolean
 }) {
   const t = useTranslations('checkout')
 
@@ -134,28 +140,13 @@ function CheckoutContent({
                 {t('basket')}
               </h2>
 
-              <ul className="divide-y divide-border rounded-sm border border-border">
-                {cart.map((line) => {
-                  const product = getProductBySlug(line.slug)
-                  const entry = getPricing(line.slug)
-                  const lineTotal = entry ? multiplyMoney(entry.price, line.quantity) : null
-
-                  return (
-                    <li key={line.slug} className="flex justify-between gap-4 p-4 text-sm">
-                      <span className="text-charcoal">
-                        {product?.name ?? line.slug}
-                        <span className="text-ink-ghost"> × {line.quantity}</span>
-                      </span>
-                      <span
-                        className="text-charcoal"
-                        data-line-total={lineTotal?.amountMinor}
-                      >
-                        {lineTotal ? formatMoney(lineTotal, locale) : t('lineUnpriced')}
-                      </span>
-                    </li>
-                  )
-                })}
-              </ul>
+              {/*
+                Editable, not a read-only list: this is the last screen before an
+                order, and "I meant two" must not require the back button. It
+                rewrites `?items=` and lets this page re-render, so every price
+                below still comes from the server. See `BasketEditor`.
+              */}
+              <BasketEditor lines={cart} locale={locale} />
 
               {/*
                 No total here on purpose. Shipping depends on the delivery
@@ -171,6 +162,8 @@ function CheckoutContent({
               cart={cart}
               paymentMethods={paymentMethods}
               shippingConfigured={shippingConfigured}
+              officeLookup={officeLookup}
+              officeDataIsDemo={officeDataIsDemo}
               locale={locale}
             />
           </>

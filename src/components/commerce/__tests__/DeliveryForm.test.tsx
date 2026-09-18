@@ -1,8 +1,10 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
 import messages from '../../../../messages/en.json'
+import { PHONE_EXAMPLE } from '@/lib/phone'
+import { submitCheckout } from '@/app/[locale]/checkout/actions'
 import DeliveryForm from '../DeliveryForm'
 
 // The action is a server function; the form's own behaviour is what's under
@@ -26,11 +28,224 @@ function renderForm(props: Partial<Parameters<typeof DeliveryForm>[0]> = {}) {
 }
 
 describe('DeliveryForm', () => {
-  it('asks for the recipient and a phone number the courier can call', () => {
+  it('asks for the recipient and a mobile number the courier can reach', () => {
     renderForm()
 
     expect(screen.getByLabelText(/full name/i)).toBeRequired()
-    expect(screen.getByLabelText(/phone number/i)).toBeRequired()
+    expect(screen.getByLabelText(/mobile number/i)).toBeRequired()
+  })
+
+  describe('the phone number, which the courier notifies by SMS', () => {
+    // The rules live in `phone.ts` and are tested there. What matters here is
+    // that the customer hears about a bad number while they are still looking at
+    // the field, rather than after the server has priced the order.
+
+    it('shows an example of the format it wants', () => {
+      // From `phone.ts`, not the message catalogues: the same nine digits in
+      // either language, so translating it only bought a key to forget.
+      renderForm()
+
+      expect(screen.getByLabelText(/mobile number/i)).toHaveAttribute(
+        'placeholder',
+        PHONE_EXAMPLE
+      )
+    })
+
+    it('says why a landline will not do, as soon as the field is left', async () => {
+      const user = userEvent.setup()
+      renderForm()
+
+      await user.type(screen.getByLabelText(/mobile number/i), '02 123 4567')
+      await user.tab()
+
+      expect(screen.getByText(/notifies you by SMS/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/mobile number/i)).toHaveAttribute('aria-invalid', 'true')
+    })
+
+    it('points out a number that is a digit short', async () => {
+      const user = userEvent.setup()
+      renderForm()
+
+      await user.type(screen.getByLabelText(/mobile number/i), '0887 115 95')
+      await user.tab()
+
+      expect(screen.getByText(/nine digits after the zero/i)).toBeInTheDocument()
+    })
+
+    it('says nothing about a number it can dial', async () => {
+      const user = userEvent.setup()
+      renderForm()
+
+      await user.type(screen.getByLabelText(/mobile number/i), '+359 887 115 957')
+      await user.tab()
+
+      expect(screen.getByLabelText(/mobile number/i)).not.toHaveAttribute('aria-invalid')
+    })
+
+    it('does not scold an untouched field on the way past', async () => {
+      // Tabbing through the form before filling it in is not a mistake yet, and
+      // the `required` attribute already covers an empty submission.
+      const user = userEvent.setup()
+      renderForm()
+
+      await user.click(screen.getByLabelText(/mobile number/i))
+      await user.tab()
+
+      expect(screen.getByLabelText(/mobile number/i)).not.toHaveAttribute('aria-invalid')
+    })
+
+    it('takes the message away while the number is being corrected', async () => {
+      // Leaving it up would mean showing a complaint about a value that is no
+      // longer in the box.
+      const user = userEvent.setup()
+      renderForm()
+
+      const field = screen.getByLabelText(/mobile number/i)
+      await user.type(field, '0887 115 95')
+      await user.tab()
+      expect(screen.getByText(/nine digits after the zero/i)).toBeInTheDocument()
+
+      await user.type(field, '7')
+
+      expect(screen.queryByText(/nine digits after the zero/i)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('what a rejected submission does to the details already typed', () => {
+    /**
+     * React clears an uncontrolled form once its action completes. The real
+     * action guards against that by echoing the submitted values back — see
+     * `values` in `actions.ts` — and this stands in for it, deriving the echo
+     * from the FormData exactly as the real one does.
+     */
+    function echoingAction(fieldErrors: Record<string, string>) {
+      return async (_previous: unknown, data: FormData) => ({
+        status: 'invalid' as const,
+        messageKey: 'fixTheFields',
+        fieldErrors,
+        values: Object.fromEntries(
+          ['recipientName', 'phone', 'email', 'street', 'officeId', 'note', 'paymentMethod']
+            .map((field) => [field, String(data.get(field) ?? '')])
+            .filter(([, submitted]) => submitted)
+        ),
+      })
+    }
+
+    /** Everything a valid office order needs, so the submit is not blocked. */
+    async function fillIn(user: ReturnType<typeof userEvent.setup>) {
+      await user.type(screen.getByLabelText(/full name/i), 'Мария Иванова')
+      await user.type(screen.getByLabelText(/mobile number/i), '0887115957')
+      await user.type(screen.getByLabelText(/email address/i), 'maria@example.com')
+      await user.type(screen.getByLabelText(/^city$/i), 'София')
+      await user.type(screen.getByLabelText(/post code/i), '1000')
+      await user.type(screen.getByLabelText(/office or locker/i), 'ECONT-1234')
+      await user.type(screen.getByLabelText(/note for the courier/i), 'Обадете се преди доставка')
+    }
+
+    const valueOf = (label: RegExp) =>
+      (screen.getByLabelText(label) as HTMLInputElement | HTMLTextAreaElement).value
+
+    it('keeps the fields that were right when one of them is wrong', async () => {
+      // The bug this exists for: submitting with one field missing wiped the
+      // name, phone, email and note too, so the customer had to retype all of it
+      // to find out whether the one mistake was now fixed.
+      const user = userEvent.setup()
+      vi.mocked(submitCheckout).mockImplementationOnce(
+        echoingAction({ officeId: 'required' }) as typeof submitCheckout
+      )
+      renderForm()
+      await fillIn(user)
+
+      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+
+      // Gated on the rejection message, so the assertions below cannot run
+      // against a render that has not received the action's state yet. The
+      // generous timeout is for the full-suite run, where jsdom is contended.
+      expect(await screen.findByRole('alert', {}, { timeout: 5_000 })).toBeInTheDocument()
+      expect(valueOf(/full name/i)).toBe('Мария Иванова')
+      expect(valueOf(/email address/i)).toBe('maria@example.com')
+      expect(valueOf(/note for the courier/i)).toBe('Обадете се преди доставка')
+      expect(valueOf(/office or locker/i)).toBe('ECONT-1234')
+    })
+
+    it('keeps the city and post code, which the picker may have filled in', async () => {
+      const user = userEvent.setup()
+      vi.mocked(submitCheckout).mockImplementationOnce(
+        echoingAction({ officeId: 'required' }) as typeof submitCheckout
+      )
+      renderForm()
+      await fillIn(user)
+
+      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await screen.findByRole('alert', {}, { timeout: 5_000 })
+
+      expect(valueOf(/^city$/i)).toBe('София')
+      expect(valueOf(/post code/i)).toBe('1000')
+    })
+
+    it('keeps the phone number, in the form the courier will be given', async () => {
+      // Echoed back canonicalised rather than as typed, so what the customer
+      // confirms is the same string that goes on the waybill.
+      const user = userEvent.setup()
+      vi.mocked(submitCheckout).mockImplementationOnce(async (_previous, data) => ({
+        status: 'invalid' as const,
+        messageKey: 'fixTheFields',
+        fieldErrors: { officeId: 'required' },
+        values: { phone: `+359${String(data.get('phone')).replace(/\D/g, '').slice(1)}` },
+      }))
+      renderForm()
+      await fillIn(user)
+
+      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await screen.findByRole('alert', {}, { timeout: 5_000 })
+
+      expect(valueOf(/mobile number/i)).toBe('+359887115957')
+    })
+
+    it('keeps the delivery method and courier that were chosen', async () => {
+      const user = userEvent.setup()
+      vi.mocked(submitCheckout).mockImplementationOnce(
+        echoingAction({ street: 'required' }) as typeof submitCheckout
+      )
+      renderForm()
+      await user.click(screen.getByRole('radio', { name: 'Speedy' }))
+      await user.click(screen.getByRole('radio', { name: /to my address/i }))
+      await user.type(screen.getByLabelText(/full name/i), 'Мария Иванова')
+      await user.type(screen.getByLabelText(/mobile number/i), '0887115957')
+      await user.type(screen.getByLabelText(/^city$/i), 'София')
+      await user.type(screen.getByLabelText(/post code/i), '1000')
+      await user.type(screen.getByLabelText(/street/i), 'ул. Цар Самуил 3')
+
+      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await screen.findByRole('alert', {}, { timeout: 5_000 })
+
+      // Silently reverting to Econt at the door would send the parcel to the
+      // wrong courier at the price quoted for the other one.
+      expect(screen.getByRole('radio', { name: 'Speedy' })).toBeChecked()
+      expect(screen.getByRole('radio', { name: /to my address/i })).toBeChecked()
+      expect(valueOf(/street/i)).toBe('ул. Цар Самуил 3')
+    })
+
+    it('leaves a field the customer never filled in empty', async () => {
+      // The echo drops blanks, so an absent value must not become the string
+      // `undefined` in the box.
+      const user = userEvent.setup()
+      vi.mocked(submitCheckout).mockImplementationOnce(
+        echoingAction({ officeId: 'required' }) as typeof submitCheckout
+      )
+      renderForm()
+      await user.type(screen.getByLabelText(/full name/i), 'Мария Иванова')
+      await user.type(screen.getByLabelText(/mobile number/i), '0887115957')
+      await user.type(screen.getByLabelText(/^city$/i), 'София')
+      await user.type(screen.getByLabelText(/post code/i), '1000')
+      await user.type(screen.getByLabelText(/office or locker/i), 'ECONT-1234')
+
+      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await screen.findByRole('alert', {}, { timeout: 5_000 })
+
+      expect(valueOf(/email address/i)).toBe('')
+      expect(valueOf(/note for the courier/i)).toBe('')
+    })
   })
 
   it('leaves email optional, since a COD customer may not have one', () => {
@@ -42,11 +257,37 @@ describe('DeliveryForm', () => {
   it('offers both couriers and all three delivery methods', () => {
     renderForm()
 
-    expect(screen.getByRole('option', { name: 'Econt' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Speedy' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Econt' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Speedy' })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /to my address/i })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /courier office/i })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /parcel locker/i })).toBeInTheDocument()
+  })
+
+  it('labels each courier with its own logo, named for a screen reader', () => {
+    // The mark replaces the name rather than sitting beside it, so an empty
+    // `alt` would leave the radio with no accessible name at all.
+    renderForm()
+
+    expect(screen.getByRole('img', { name: 'Econt' })).toHaveAttribute(
+      'src',
+      '/images/couriers/econt-blue-en.svg'
+    )
+    expect(screen.getByRole('img', { name: 'Speedy' })).toHaveAttribute(
+      'src',
+      '/images/couriers/speedy.webp'
+    )
+  })
+
+  it('uses the Cyrillic Econt wordmark on the Bulgarian page', () => {
+    // Econt publishes ЕКОНТ and ECONT separately; the Latin mark on a Bulgarian
+    // page reads as a different company.
+    renderForm({ locale: 'bg' })
+
+    expect(screen.getByRole('img', { name: 'Econt' })).toHaveAttribute(
+      'src',
+      '/images/couriers/econt-blue-bg.svg'
+    )
   })
 
   describe('the method decides which location field is shown', () => {
@@ -83,19 +324,22 @@ describe('DeliveryForm', () => {
     })
   })
 
-  it('hides card payment while Stripe is unconfigured, and says why', () => {
+  it('offers cash on delivery alone, with no apology for the absent card option', () => {
+    // The shop takes cash on delivery by decision, not for want of a Stripe key,
+    // so there is nothing to explain and nothing to promise.
     renderForm({ paymentMethods: ['cod'] })
 
     expect(screen.getByRole('radio', { name: /cash on delivery/i })).toBeInTheDocument()
     expect(screen.queryByRole('radio', { name: /^card/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/card payment is not connected yet/i)).toBeInTheDocument()
+    expect(screen.queryByText(/card payment/i)).not.toBeInTheDocument()
   })
 
-  it('offers card when it is available', () => {
+  it('still offers card if it is ever switched on', () => {
+    // The list comes from `availablePaymentMethods()`, so the decision lives in
+    // one place rather than being hardcoded into the form.
     renderForm({ paymentMethods: ['card', 'cod'] })
 
     expect(screen.getByRole('radio', { name: /card/i })).toBeInTheDocument()
-    expect(screen.queryByText(/card payment is not connected yet/i)).not.toBeInTheDocument()
   })
 
   it('warns that delivery prices are unset rather than implying free shipping', () => {
@@ -133,5 +377,180 @@ describe('DeliveryForm', () => {
     renderForm()
 
     expect(screen.getByText(/searchable list will appear/i)).toBeInTheDocument()
+  })
+
+  describe('the office picker, where a courier can be searched', () => {
+    // The picker's own behaviour is `OfficePicker.test.tsx`. What matters here is
+    // which couriers get one, and that it and the form agree about the address.
+    const SOFIA = { id: '41', name: 'София', postCode: '1000' }
+
+    beforeEach(() => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (path: string) =>
+          new Response(
+            JSON.stringify(
+              path.includes('city=') ? { cities: [SOFIA] } : { offices: [] }
+            ),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        )
+      )
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('replaces the free-text field with a search for a courier that has one', () => {
+      renderForm({ officeLookup: ['econt'] })
+
+      expect(screen.getByLabelText(/city or post code/i)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/office or locker/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/searchable list will appear/i)).not.toBeInTheDocument()
+    })
+
+    it('keeps the free-text field for a courier that has none', async () => {
+      // Econt first, then Speedy, whose client is still a stub. One courier being
+      // connected must not imply the other is.
+      const user = userEvent.setup()
+      renderForm({ officeLookup: ['econt'] })
+
+      await user.click(screen.getByRole('radio', { name: 'Speedy' }))
+
+      expect(screen.getByLabelText(/office or locker/i)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/city or post code/i)).not.toBeInTheDocument()
+    })
+
+    it('leaves the picker in place for door delivery, which needs a street', async () => {
+      const user = userEvent.setup()
+      renderForm({ officeLookup: ['econt'] })
+
+      await user.click(screen.getByRole('radio', { name: /to my address/i }))
+
+      expect(screen.getByLabelText(/street/i)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/city or post code/i)).not.toBeInTheDocument()
+    })
+
+    it('asks for the city once, not twice', async () => {
+      // The picker's first step is a city search, so showing the form's own City
+      // and Post code fields as well asked the same question twice — and let the
+      // customer type a city that disagreed with the office they then chose.
+      renderForm({ officeLookup: ['econt'] })
+
+      expect(screen.getByLabelText(/city or post code/i)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/^city$/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/^post code$/i)).not.toBeInTheDocument()
+    })
+
+    it('asks for the city itself when there is no picker to do it', async () => {
+      // Door delivery needs an address the courier drives to, and the free-text
+      // fallback has no city search of its own.
+      const user = userEvent.setup()
+      renderForm({ officeLookup: ['econt'] })
+
+      await user.click(screen.getByRole('radio', { name: /to my address/i }))
+
+      expect(screen.getByLabelText(/^city$/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/^post code$/i)).toBeInTheDocument()
+    })
+
+    it('submits the city and post code from the courier record', async () => {
+      // A post code that disagrees with the city is one of the few things both
+      // couriers reject outright, so both are taken from the courier's own entry
+      // and travel as hidden inputs.
+      const user = userEvent.setup()
+      const { container } = renderForm({ officeLookup: ['econt'] })
+
+      await user.type(screen.getByLabelText(/city or post code/i), 'Соф')
+      await user.click(await screen.findByRole('button', { name: /София/ }))
+
+      expect(container.querySelector('input[name="city"]')).toHaveValue('София')
+      expect(container.querySelector('input[name="postCode"]')).toHaveValue('1000')
+    })
+
+    it('carries the chosen city over to the address fields for door delivery', async () => {
+      // Switching to door after picking a city should not make the customer type
+      // it again.
+      const user = userEvent.setup()
+      renderForm({ officeLookup: ['econt'] })
+
+      await user.type(screen.getByLabelText(/city or post code/i), 'Соф')
+      await user.click(await screen.findByRole('button', { name: /София/ }))
+      await user.click(screen.getByRole('radio', { name: /to my address/i }))
+
+      expect(screen.getByLabelText(/^city$/i)).toHaveValue('София')
+      expect(screen.getByLabelText(/^post code$/i)).toHaveValue('1000')
+    })
+
+    it('starts a fresh picker when the courier changes', async () => {
+      // Without the remount, an Econt office code would survive a switch to
+      // Speedy and be submitted against the wrong nomenclature.
+      const user = userEvent.setup()
+      renderForm({ officeLookup: ['econt', 'speedy'] })
+
+      await user.type(screen.getByLabelText(/city or post code/i), 'Соф')
+      await user.click(await screen.findByRole('button', { name: /София/ }))
+      expect(screen.getByRole('button', { name: /change city/i })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('radio', { name: 'Speedy' }))
+
+      expect(screen.getByLabelText(/city or post code/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /change city/i })).not.toBeInTheDocument()
+    })
+
+    it('keeps the chosen city and office when the submission comes back rejected', async () => {
+      // The reset that clears the text fields hits the picker too, and its city
+      // and office live in React state. If the DOM came back to "search for a
+      // city" while the state still held the office, the hidden `officeId` would
+      // keep submitting a choice the customer could no longer see.
+      const user = userEvent.setup()
+      const office = {
+        id: 'ECONT-1234',
+        courier: 'econt',
+        kind: 'office',
+        name: 'София Гладстон',
+        address: 'ул. Цар Самуил №3',
+        cityId: '41',
+        cityName: 'София',
+        postCode: '1000',
+      }
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (path: string) =>
+          new Response(
+            JSON.stringify(path.includes('city=') ? { cities: [SOFIA] } : { offices: [office] }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        )
+      )
+      vi.mocked(submitCheckout).mockImplementationOnce(async () => ({
+        status: 'invalid' as const,
+        messageKey: 'fixTheFields',
+        fieldErrors: { recipientName: 'tooShort' },
+      }))
+      const { container } = renderForm({ officeLookup: ['econt'] })
+
+      await user.type(screen.getByLabelText(/city or post code/i), 'Соф')
+      await user.click(await screen.findByRole('button', { name: /София/ }))
+      await user.selectOptions(await screen.findByRole('combobox'), office.id)
+      await user.type(screen.getByLabelText(/full name/i), 'Мария Иванова')
+      await user.type(screen.getByLabelText(/mobile number/i), '0887115957')
+
+      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await screen.findByRole('alert', {}, { timeout: 5_000 })
+
+      expect(screen.getByRole('button', { name: /change city/i })).toBeInTheDocument()
+      expect(screen.getByRole('combobox')).toHaveValue(office.id)
+      expect(container.querySelector('input[name="officeId"]')).toHaveValue(office.id)
+      expect(container.querySelector('input[name="city"]')).toHaveValue('София')
+      expect(container.querySelector('input[name="postCode"]')).toHaveValue('1000')
+    })
+
+    it('passes the demo-data warning down to the picker', () => {
+      renderForm({ officeLookup: ['econt'], officeDataIsDemo: true, shippingConfigured: true })
+
+      expect(screen.getByRole('note')).toHaveTextContent(/test system/i)
+    })
   })
 })

@@ -121,10 +121,13 @@ export default function OurStoryPage() {
             duration={0.6}
             className="relative aspect-[4/5] rounded-sm overflow-hidden border border-border bg-cream-surface"
           >
+            {/* Near-square photograph in a 4:5 frame — see StoryTeaser for why
+                the centre crop and the raised quality. */}
             <Image
-              src="/images/story.webp"
-              alt="Painted illustration of strawberries and leaves from the Strawberry Cake candle artwork"
+              src="/images/story-chair-closeup.webp"
+              alt="An Espresso Martini candle beside a takeaway coffee and a laptop on a walnut chair, with a tweed coat draped over its back"
               fill
+              quality={90}
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
             />

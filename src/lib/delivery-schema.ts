@@ -1,3 +1,4 @@
+import { normaliseBulgarianPhone } from './phone'
 import { COURIERS, DELIVERY_METHODS, type Courier, type DeliveryMethod } from './shipping'
 
 /**
@@ -13,16 +14,28 @@ import { COURIERS, DELIVERY_METHODS, type Courier, type DeliveryMethod } from '.
  * customers — a far worse outcome than accepting an odd-looking address a
  * human courier can still read. Only the fields a courier genuinely needs to
  * route a parcel are required.
+ *
+ * The phone number is the deliberate exception — see `phone.ts`. It has exactly
+ * one valid shape in Bulgaria, and every other shape is a customer who never
+ * gets the courier's SMS.
  */
 
 export const LIMITS = {
   name: { min: 2, max: 100 },
-  phone: { min: 6, max: 20 },
+  /** Phone has no length limit here: its own shape decides it. See `phone.ts`. */
   email: { max: 254 },
   city: { min: 2, max: 100 },
   postCode: { length: 4 },
   street: { min: 5, max: 200 },
   officeId: { max: 40 },
+  /**
+   * The office snapshot. Capped rather than validated: these are the courier's
+   * own strings, echoed back by the picker, so a length problem is our data
+   * problem and not something the customer can fix by editing a field they
+   * never filled in. Over-long values are truncated below.
+   */
+  officeName: { max: 150 },
+  officeAddress: { max: 250 },
   note: { max: 500 },
 } as const
 
@@ -32,14 +45,6 @@ export const LIMITS = {
  * validating it here saves a round trip.
  */
 const POST_CODE = /^\d{4}$/
-
-/**
- * Phone: digits, spaces, `+`, `-`, `(`, `)`. Not a strict national format —
- * the courier needs to be able to phone the recipient, and rejecting a
- * legitimately-formatted number loses the order. Counted on digits only, so
- * spacing cannot pad a too-short number into passing.
- */
-const PHONE_ALLOWED = /^[\d\s+()-]+$/
 
 const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/
 
@@ -54,8 +59,23 @@ export interface DeliveryDetails {
   postCode: string
   /** Required for `door`. Empty for office/locker. */
   street: string
-  /** Required for `office` and `locker`. Empty for door. */
+  /**
+   * Required for `office` and `locker`. Empty for door.
+   *
+   * The courier's office *code* — what goes on the waybill — not its internal
+   * primary key. See `CourierOffice.id` in `src/lib/couriers/types.ts`.
+   */
   officeId: string
+  /**
+   * Human-readable snapshot of the chosen office, filled by the picker and
+   * empty when the customer typed a code into the fallback field.
+   *
+   * Kept because an id alone is not enough: offices close, and a closed code
+   * resolves to nothing when the label is printed weeks later. `orders` has
+   * matching columns — see `src/db/schema.ts`.
+   */
+  officeName: string
+  officeAddress: string
   /** Free-text note for the courier, e.g. "phone before delivery". */
   note: string
 }
@@ -69,10 +89,6 @@ export interface ValidationResult {
   value: DeliveryDetails
 }
 
-function digitCount(value: string): number {
-  return (value.match(/\d/g) ?? []).length
-}
-
 /**
  * Validate and normalise. Trims before measuring length, so `'  '` is empty
  * rather than two characters long.
@@ -80,6 +96,9 @@ function digitCount(value: string): number {
 export function validateDelivery(input: Partial<Record<string, unknown>>): ValidationResult {
   const str = (key: string): string =>
     typeof input[key] === 'string' ? (input[key] as string).trim() : ''
+
+  /** Trimmed and capped. For our own snapshot fields, never customer input. */
+  const capped = (key: string, max: number): string => str(key).slice(0, max)
 
   const value: DeliveryDetails = {
     recipientName: str('recipientName'),
@@ -91,6 +110,8 @@ export function validateDelivery(input: Partial<Record<string, unknown>>): Valid
     postCode: str('postCode'),
     street: str('street'),
     officeId: str('officeId'),
+    officeName: capped('officeName', LIMITS.officeName.max),
+    officeAddress: capped('officeAddress', LIMITS.officeAddress.max),
     note: str('note'),
   }
 
@@ -102,18 +123,18 @@ export function validateDelivery(input: Partial<Record<string, unknown>>): Valid
     errors.recipientName = 'tooLong'
   }
 
-  // Character set is checked before length: for '0887 CALL ME' both rules fail,
-  // and "that isn't a phone number" is more use to the customer than "too
-  // short", which invites them to add more letters. Empty is reported as
-  // missing rather than malformed, which is what it is.
-  if (!value.phone) {
-    errors.phone = 'required'
-  } else if (!PHONE_ALLOWED.test(value.phone)) {
-    errors.phone = 'invalid'
-  } else if (digitCount(value.phone) < LIMITS.phone.min) {
-    errors.phone = 'tooShort'
-  } else if (value.phone.length > LIMITS.phone.max) {
-    errors.phone = 'tooLong'
+  // The strictest field in the form, and the only one where that is right: the
+  // courier's arrival SMS goes to this number, so an unreachable one means a
+  // parcel the customer is never told about. `phone.ts` explains the rules and
+  // returns a specific problem so the message can name it.
+  //
+  // The stored value is the canonical `+359…` form, not what was typed, so the
+  // waybill and any SMS gateway see one format.
+  const phone = normaliseBulgarianPhone(value.phone)
+  if (phone.ok) {
+    value.phone = phone.e164
+  } else {
+    errors.phone = phone.problem
   }
 
   // Email is optional — a COD customer collecting from an office may not have

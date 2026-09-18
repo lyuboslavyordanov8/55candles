@@ -15,13 +15,17 @@ import Reveal from '@/components/motion/Reveal'
  * four times. These tiles lead somewhere different instead: the scents, the
  * story, the care guide and contact.
  *
- * ── The images are placeholders ────────────────────────────────────────────
- * There are no dedicated lifestyle photographs for this section, so the tiles
- * reuse existing product and story imagery. They work, but three of the four
- * are the same candle-on-a-surface framing, which is exactly what a section
- * like this should avoid. Replace `image` below with four purpose-shot photos
- * — a lit candle in a room, the workshop, a hand trimming a wick, a gift being
- * opened — and this section starts doing its job.
+ * ── The images ─────────────────────────────────────────────────────────────
+ * All four are now shot for the tile they sit in, rather than borrowing a
+ * product main: the five scents together, the story photograph, the brass care
+ * tools, a telephone. Each one is a different subject and a different framing,
+ * which is the whole point — four variations on a candle-on-a-surface would
+ * make the section decorative rather than useful.
+ *
+ * Every file is stored already square, matching this frame, so `object-cover`
+ * neither crops nor rescales. Masters are the PNGs in `docs/`. Keep that
+ * property if you replace one: see the note on `care` below for what a
+ * non-square file costs here.
  */
 
 interface Tile {
@@ -31,17 +35,51 @@ interface Tile {
   href: string
   image: string
   /**
-   * Object position, because these are portrait product shots being cropped
-   * into a square: the default centre crop cuts the candle's lid off.
+   * Object position, for the square frame below. Unused at present — all four
+   * photographs are square or near enough that the default centre crop holds
+   * the subject. It earns its keep the moment one of the placeholders is
+   * swapped for a real lifestyle shot: a centre crop of a portrait photograph
+   * cuts the candle's lid off, and of a landscape one loses the subject out of
+   * the side.
    */
   position?: string
 }
 
 const TILES: readonly Tile[] = [
-  { labelKey: 'scents', href: '/products', image: '/images/products/electric-cherry.webp' },
-  { labelKey: 'story', href: '/our-story', image: '/images/story.webp' },
-  { labelKey: 'care', href: '/candle-care', image: '/images/products/vanilla-egg.webp' },
-  { labelKey: 'contact', href: '/contact', image: '/images/products/sweet-orange.webp' },
+  // The collection group shot — all five scents in one frame, which is what
+  // this tile promises. Shot to `docs/group-shot-brief.md`: square, with the
+  // group deliberately occupying the middle ~60% of frame, so it needs no
+  // `position` and must not be cropped tighter.
+  {
+    labelKey: 'scents',
+    href: '/products',
+    image: '/images/collection-group.webp',
+  },
+  // No `position`: the story photograph is near-square, so a centred square
+  // crop already holds the whole chair. It needed `62% center` while that shot
+  // was a wider landscape one.
+  { labelKey: 'story', href: '/our-story', image: '/images/story-chair-closeup.webp' },
+  // The care tools themselves — wick trimmer, snuffer, matches. Master is
+  // `docs/ChatGPT Image Sep 18, 2026, 05_16_04 PM.png`, a 3:2 landscape; the
+  // file here is already cropped square to it at 25% from the left, which keeps
+  // the whole vase and every tool. Cropped in the file rather than with
+  // `position` on purpose: `object-cover` fits a landscape image to this
+  // frame's *height*, so a third of every downloaded byte would be thrown away
+  // off the sides and the rest upscaled to cover the width. Re-crop from the
+  // master in `docs/` if you want it framed differently.
+  {
+    labelKey: 'care',
+    href: '/candle-care',
+    image: '/images/care-tools.webp',
+  },
+  // A telephone, for "get in touch". Master is
+  // `docs/ChatGPT Image Sep 18, 2026, 05_19_31 PM.png` at 1060x1024; squared
+  // off centrally here, which costs 36px of width and no subject.
+  {
+    labelKey: 'contact',
+    href: '/contact',
+    image: '/images/contact-telephone.webp',
+  },
 ]
 
 export default function DiscoverOurWorld({ locale }: { locale: string }) {
@@ -73,6 +111,11 @@ export default function DiscoverOurWorld({ locale }: { locale: string }) {
                   // screen reader read the tile twice.
                   alt=""
                   fill
+                  // 90, not the 75 default (allow-listed in `next.config.ts`):
+                  // every tile is now a detailed photograph rather than a flat
+                  // product shot — five printed labels, brass tools, a dial
+                  // face — and 75 smears exactly that kind of fine detail.
+                  quality={90}
                   sizes="(max-width: 768px) 50vw, 33vw"
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   style={tile.position ? { objectPosition: tile.position } : undefined}
