@@ -1,7 +1,8 @@
 import 'server-only'
 
+import { company, isTodo } from '../company'
 import type { Courier } from '../shipping'
-import { createEcontClient } from './econt'
+import { createEcontClient, type EcontShipFrom } from './econt'
 import type { CourierClient, LookupResult } from './types'
 
 /**
@@ -19,7 +20,15 @@ import type { CourierClient, LookupResult } from './types'
  * variables — see `.env.example`.
  */
 
-export type { CourierCity, CourierClient, CourierOffice, LookupResult } from './types'
+export type {
+  CourierCity,
+  CourierClient,
+  CourierOffice,
+  LookupResult,
+  ShipmentQuoteRequest,
+  ShipmentRate,
+} from './types'
+export type { EcontShipFrom } from './econt'
 
 /**
  * Which Econt nomenclature to read.
@@ -42,10 +51,18 @@ const ECONT_BASE_URL: Record<CourierEnvironment, string> = {
 }
 
 /** Environment variable names, one place, so the checks cannot drift. */
-const CREDENTIAL_VARS: Record<Courier, readonly string[]> = {
+const CREDENTIAL_VARS: Record<Courier, readonly [string, string]> = {
   econt: ['ECONT_USERNAME', 'ECONT_PASSWORD'],
   speedy: ['SPEEDY_USERNAME', 'SPEEDY_PASSWORD'],
 }
+
+/** Where parcels are handed over. See `econtShipFrom()`. */
+const SENDER_VARS = {
+  officeCode: 'ECONT_SENDER_OFFICE_CODE',
+  city: 'ECONT_SENDER_CITY',
+  postCode: 'ECONT_SENDER_POST_CODE',
+  street: 'ECONT_SENDER_STREET',
+} as const
 
 /**
  * Whether a courier's *waybill* credentials are present.
@@ -55,6 +72,71 @@ const CREDENTIAL_VARS: Record<Courier, readonly string[]> = {
  */
 export function isCourierConfigured(courier: Courier): boolean {
   return CREDENTIAL_VARS[courier].every((name) => Boolean(process.env[name]))
+}
+
+/** Credentials for a courier, or `null` while either half is missing. */
+function credentialsFor(courier: Courier): { username: string; password: string } | null {
+  const [userVar, passVar] = CREDENTIAL_VARS[courier]
+  const username = process.env[userVar]
+  const password = process.env[passVar]
+
+  return username && password ? { username, password } : null
+}
+
+/**
+ * Where parcels are handed over to Econt, in order of precedence:
+ *
+ * 1. `ECONT_SENDER_OFFICE_CODE` — the merchant drops parcels at that office.
+ * 2. `ECONT_SENDER_CITY` + `_POST_CODE` + `_STREET`, all three, for collection
+ *    from somewhere other than the registered seat.
+ * 3. The registered address in `src/lib/company.ts`, once the owner fills it in.
+ *
+ * `null` while none of those is available, which makes live pricing
+ * `unconfigured` rather than priced from a guess. The hand-over point changes the
+ * tariff line — office→office is cheaper than a collection — so a default here
+ * would be a wrong price, not a convenience. See the pricing note in `econt.ts`.
+ */
+export function econtShipFrom(): EcontShipFrom | null {
+  const officeCode = process.env[SENDER_VARS.officeCode]?.trim()
+  if (officeCode) return { officeCode }
+
+  const city = process.env[SENDER_VARS.city]?.trim()
+  const postCode = process.env[SENDER_VARS.postCode]?.trim()
+  const street = process.env[SENDER_VARS.street]?.trim()
+
+  if (city && postCode && street) return { city, postCode, street }
+
+  const seat = company.address
+  if (isTodo(seat.city) || isTodo(seat.postalCode) || isTodo(seat.street)) return null
+
+  return { city: seat.city, postCode: seat.postalCode, street: seat.street }
+}
+
+/**
+ * Whether this courier can quote a real price.
+ *
+ * Separate from `isCourierConfigured`, which only asks about credentials: a
+ * quote also needs to know where the parcel starts. Both are required, so both
+ * are checked in one place rather than at each call site.
+ */
+export function canQuoteLiveRates(courier: Courier): boolean {
+  if (courier !== 'econt') return false
+
+  return isCourierConfigured(courier) && econtShipFrom() !== null
+}
+
+/**
+ * What live pricing is still waiting on, for the launch checklist and the
+ * checkout's own "these rates are placeholders" notice.
+ */
+export function missingLiveRateRequirements(): string[] {
+  const missing = CREDENTIAL_VARS.econt.filter((name) => !process.env[name])
+
+  if (econtShipFrom() === null) {
+    missing.push(`${SENDER_VARS.officeCode} or the registered address in company.ts`)
+  }
+
+  return missing
 }
 
 /** Courier credentials that are still missing, for the launch checklist. */
@@ -107,12 +189,17 @@ function unconfiguredClient(courier: Courier): CourierClient {
     searchCities: result,
     officesIn: result,
     findOffice: result,
+    priceShipment: result,
   }
 }
 
 /**
  * Clients are cached per environment because each holds the office-list cache.
  * A fresh client per request would re-download 1.7 MB every lookup.
+ *
+ * Credentials and the hand-over point are *not* part of the key: the client
+ * reads them through the getters below on every quote, so a cached client cannot
+ * hold a stale password.
  */
 const clients = new Map<string, CourierClient>()
 
@@ -125,6 +212,8 @@ function econtClient(): CourierClient {
 
   const created = createEcontClient({
     baseUrl: process.env.ECONT_BASE_URL ?? ECONT_BASE_URL[environment],
+    credentials: () => credentialsFor('econt'),
+    shipFrom: econtShipFrom,
   })
 
   clients.set(key, created)

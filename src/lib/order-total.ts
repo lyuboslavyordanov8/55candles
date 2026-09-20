@@ -63,18 +63,32 @@ export type OrderTotal =
 export class CartError extends Error {}
 
 /**
- * Compute the total.
+ * The goods half of an order: what is in the basket, and what the parcel weighs.
  *
- * Returns `incomplete` rather than throwing when a price or tariff is missing,
- * because that is the *expected* state until the owner supplies the numbers,
- * and the checkout must render it as "not yet available" rather than crash.
- * Genuinely invalid input — a negative quantity, an unknown slug — throws,
- * since it can only be a bug or tampering.
+ * Split out from `calculateTotal` because pricing the delivery now means asking
+ * the courier, and the courier needs the weight — so the weight has to exist
+ * before the quote does. Pure and cheap, so the caller computing it first and
+ * `calculateTotal` computing it again costs nothing and keeps one definition of
+ * what a basket weighs.
  */
-export function calculateTotal(
-  lines: readonly CartLine[],
-  delivery: DeliveryOption
-): OrderTotal {
+export type CartPricing =
+  | { status: 'ok'; lines: PricedLine[]; goods: Money; weightGrams: number }
+  | { status: 'incomplete'; unpriced: string[] }
+
+/**
+ * A rate the courier quoted for this exact parcel.
+ *
+ * Structurally the part of `ShipmentRate` (`src/lib/couriers/types.ts`) that
+ * bears on the total. Declared here rather than imported so this module — pure
+ * arithmetic, and the one place that decides what a customer owes — keeps no
+ * dependency on the network layer.
+ */
+export interface CourierRate {
+  delivery: Money
+  codFee: Money
+}
+
+export function priceCart(lines: readonly CartLine[]): CartPricing {
   if (lines.length === 0) {
     throw new CartError('Cannot total an empty cart')
   }
@@ -107,15 +121,47 @@ export function calculateTotal(
     return { status: 'incomplete', unpriced }
   }
 
-  const goods = sumMoney(priced.map((line) => line.lineTotal))
-  const weightGrams = billableWeight(priced.map((line) => line.weightGrams))
-  const shippingQuote = quote(delivery, weightGrams, goods)
+  return {
+    status: 'ok',
+    lines: priced,
+    goods: sumMoney(priced.map((line) => line.lineTotal)),
+    weightGrams: billableWeight(priced.map((line) => line.weightGrams)),
+  }
+}
+
+/**
+ * Compute the total.
+ *
+ * Returns `incomplete` rather than throwing when a price or tariff is missing,
+ * because that is the *expected* state until the owner supplies the numbers,
+ * and the checkout must render it as "not yet available" rather than crash.
+ * Genuinely invalid input — a negative quantity, an unknown slug — throws,
+ * since it can only be a bug or tampering.
+ *
+ * `rate` is the courier's own price for this parcel, where one could be
+ * obtained. Omitted, the static card in `shipping.ts` is used — see
+ * `src/lib/shipping-rates.ts` for which happens when, and why a *failed* live
+ * quote is not allowed to reach this function at all.
+ */
+export function calculateTotal(
+  lines: readonly CartLine[],
+  delivery: DeliveryOption,
+  rate?: CourierRate
+): OrderTotal {
+  const cart = priceCart(lines)
+
+  if (cart.status === 'incomplete') {
+    return { status: 'incomplete', unpriced: cart.unpriced }
+  }
+
+  const { lines: priced, goods, weightGrams } = cart
+  const shippingQuote = quote(delivery, weightGrams, goods, rate?.delivery)
 
   if (shippingQuote.status !== 'quoted') {
     return { status: 'incomplete', unpriced: [], shippingQuote }
   }
 
-  const codFee = codFeeFor(delivery)
+  const codFee = codFeeFor(delivery, rate?.codFee)
 
   return {
     status: 'ok',

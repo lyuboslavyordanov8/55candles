@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { submitCheckout } from '../actions'
-import { courierClient } from '@/lib/couriers'
-import type { CourierOffice, LookupResult } from '@/lib/couriers/types'
+import { canQuoteLiveRates, courierClient } from '@/lib/couriers'
+import type { CourierOffice, LookupResult, ShipmentRate } from '@/lib/couriers/types'
 import { eur } from '@/lib/money'
 import { pricing } from '@/data/pricing'
 import { tariffKey, tariffs } from '@/lib/shipping'
@@ -12,7 +12,12 @@ import { tariffKey, tariffs } from '@/lib/shipping'
  * below other than the office block assume, and stating it here beats letting
  * them reach the network or depend on the ambient environment.
  */
-vi.mock('@/lib/couriers', () => ({ courierClient: vi.fn() }))
+vi.mock('@/lib/couriers', () => ({
+  courierClient: vi.fn(),
+  // No credentials and no hand-over point is the default state, so the static
+  // card prices the delivery. `shipping-rates.test.ts` covers the live path.
+  canQuoteLiveRates: vi.fn(() => false),
+}))
 
 const DELIVERY = { courier: 'econt' as const, method: 'office' as const }
 const KEY = tariffKey(DELIVERY)
@@ -66,6 +71,10 @@ function stubFindOffice(result: LookupResult<CourierOffice | null>) {
     searchCities: async () => ({ status: 'unconfigured', courier }),
     officesIn: async () => ({ status: 'unconfigured', courier }),
     findOffice,
+    // Pricing is `shipping-rates.ts`'s business and is stubbed per test where it
+    // matters; unconfigured here means the static card is used, as it is with no
+    // credentials set.
+    priceShipment: async () => ({ status: 'unconfigured', courier }),
   }))
 
   return findOffice
@@ -73,6 +82,8 @@ function stubFindOffice(result: LookupResult<CourierOffice | null>) {
 
 beforeEach(() => {
   stubFindOffice({ status: 'unconfigured', courier: 'econt' })
+  // The default world: nothing configured, so the static card prices delivery.
+  vi.mocked(canQuoteLiveRates).mockReturnValue(false)
 })
 
 afterEach(() => {
@@ -449,5 +460,88 @@ describe('submitCheckout', () => {
       expect(state.status).toBe('readyToPay')
       expect(state.collectionPoint).toBeUndefined()
     })
+  })
+})
+
+describe('submitCheckout, when the courier prices the parcel', () => {
+  /**
+   * Both halves configured: the shop believes it can get a live quote, and the
+   * client answers one. This is the state the shop runs in once the Econt
+   * contract is in place, so it is the state the interesting failures live in.
+   */
+  function stubPricing(result: LookupResult<ShipmentRate>) {
+    vi.mocked(canQuoteLiveRates).mockReturnValue(true)
+
+    vi.mocked(courierClient).mockImplementation((courier) => ({
+      courier,
+      searchCities: async () => ({ status: 'unconfigured', courier }),
+      officesIn: async () => ({ status: 'unconfigured', courier }),
+      findOffice: async () => ({ status: 'unconfigured', courier }),
+      priceShipment: async () => result,
+    }))
+  }
+
+  it('charges the courier\'s price rather than the rate card\'s', async () => {
+    stubPricing({
+      status: 'ok',
+      data: {
+        delivery: eur(3.44),
+        codFee: eur(0.3),
+        total: eur(3.74),
+        description: 'между офисите на куриера до 1 кг',
+      },
+    })
+
+    const state = await submitCheckout(IDLE, formData())
+
+    // The stand-in card's first band is 4.99; Econt said 3.44. The summary the
+    // customer reads must be the second one — and it must not be an average, a
+    // maximum, or the card's figure with the quote logged beside it.
+    expect(state.summary?.shippingMinor).toBe(344)
+    expect(state.summary?.totalMinor).toBe(state.summary!.goodsMinor + 344)
+  })
+
+  it('refuses the order when the courier cannot price it', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    stubPricing({ status: 'failed', courier: 'econt', reason: 'HTTP 517: ExInvalidParam' })
+
+    const state = await submitCheckout(IDLE, formData())
+
+    // Not `placed`, not `readyToPay`, and no summary: the only price we could
+    // have shown is the placeholder, and an order stored at a made-up price is
+    // indistinguishable from a real one. The customer is asked to try again.
+    expect(state.status).toBe('error')
+    expect(state.messageKey).toBe('deliveryRateUnavailable')
+    expect(state.summary).toBeUndefined()
+    // And the details they typed come back, so a retry is one click.
+    expect(state.values?.recipientName).toBe('Мария Иванова')
+    expect(error).toHaveBeenCalled()
+  })
+
+  it('keeps the customer\'s details out of the quote', async () => {
+    // A price depends on the office, the weight and the amount to collect. The
+    // courier gets the name and phone number when there is a parcel for it to
+    // carry — not while the customer is still deciding whether to buy.
+    let asked: unknown
+    vi.mocked(canQuoteLiveRates).mockReturnValue(true)
+    vi.mocked(courierClient).mockImplementation((courier) => ({
+      courier,
+      searchCities: async () => ({ status: 'unconfigured', courier }),
+      officesIn: async () => ({ status: 'unconfigured', courier }),
+      findOffice: async () => ({ status: 'unconfigured', courier }),
+      priceShipment: async (request) => {
+        asked = request
+        return { status: 'ok', data: { delivery: eur(3.44), codFee: eur(0.3), total: eur(3.74) } }
+      },
+    }))
+
+    await submitCheckout(IDLE, formData())
+
+    expect(Object.keys(asked as object).sort()).toEqual([
+      'codAmount',
+      'method',
+      'officeId',
+      'weightGrams',
+    ])
   })
 })

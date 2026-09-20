@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { calculateTotal, CartError } from '../order-total'
+import { calculateTotal, CartError, priceCart } from '../order-total'
 import { eur } from '../money'
-import { tariffs, tariffKey, type DeliveryOption } from '../shipping'
+import { billableWeight, tariffs, tariffKey, type DeliveryOption } from '../shipping'
 import { pricing } from '@/data/pricing'
 
 const DELIVERY: DeliveryOption = { courier: 'econt', method: 'office' }
@@ -169,5 +169,84 @@ describe('calculateTotal', () => {
     expect(() =>
       calculateTotal([{ slug: 'cherry', quantity: 1.5 }], DELIVERY)
     ).toThrow(CartError)
+  })
+})
+
+describe('priceCart', () => {
+  it('answers what the parcel weighs before there is a delivery price', () => {
+    withPricedCatalogue(() => {
+      // Split out of calculateTotal for exactly this: the courier cannot quote a
+      // price without a weight, and the weight comes from the catalogue.
+      const cart = priceCart([{ slug: 'cherry', quantity: 2 }])
+
+      expect(cart.status).toBe('ok')
+      if (cart.status !== 'ok') return
+      expect(cart.weightGrams).toBe(billableWeight([500, 500]))
+      expect(cart.goods.amountMinor).toBe(4900)
+    })
+  })
+
+  it('names the slugs it could not price, rather than guessing', () => {
+    withPricedCatalogue(() => {
+      delete pricing.cherry
+
+      const cart = priceCart([{ slug: 'cherry', quantity: 1 }])
+
+      expect(cart).toEqual({ status: 'incomplete', unpriced: ['cherry'] })
+    })
+  })
+
+  it('rejects a cart that could only come from tampering', () => {
+    expect(() => priceCart([])).toThrow(CartError)
+    expect(() => priceCart([{ slug: 'cherry', quantity: 0 }])).toThrow(CartError)
+  })
+})
+
+describe('a delivery price quoted by the courier', () => {
+  it('replaces the stand-in card in the total', () => {
+    withPricedCatalogue(() => {
+      // The card here charges 4.00; the courier says 3.44. The total must be
+      // built from the courier's figure — that is the amount the customer will be
+      // asked for at the door and the amount the courier will invoice us.
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, {
+        delivery: eur(3.44),
+        codFee: eur(0.3),
+      })
+
+      expect(result.status).toBe('ok')
+      if (result.status !== 'ok') return
+      expect(result.shipping).toEqual(eur(3.44))
+      expect(result.total.amountMinor).toBe(2450 + 344)
+    })
+  })
+
+  it('does not turn its itemised COD fee into a charge (Q-23)', () => {
+    withPricedCatalogue(() => {
+      // Econt tells us the fee; the merchant still absorbs it. If this ever
+      // returns a number, the customer is being charged something no page shows.
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, {
+        delivery: eur(3.44),
+        codFee: eur(0.3),
+      })
+
+      expect(result.status).toBe('ok')
+      if (result.status !== 'ok') return
+      expect(result.codFee).toBeNull()
+    })
+  })
+
+  it('prices a courier and method the card has no entry for', () => {
+    withPricedCatalogue(() => {
+      delete tariffs[KEY]
+
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, {
+        delivery: eur(3.44),
+        codFee: eur(0.3),
+      })
+
+      // Without the rate this is `incomplete`. With it there is nothing left for
+      // the table to be missing.
+      expect(result.status).toBe('ok')
+    })
   })
 })

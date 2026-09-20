@@ -2,7 +2,8 @@
 
 import { courierClient } from '@/lib/couriers'
 import { validateDelivery, type DeliveryDetails, type FieldErrors } from '@/lib/delivery-schema'
-import { calculateTotal, type CartLine } from '@/lib/order-total'
+import { calculateTotal, priceCart, type CartLine } from '@/lib/order-total'
+import { resolveDeliveryRate } from '@/lib/shipping-rates'
 import {
   createOrder,
   INTENT_TOKEN_MAX,
@@ -25,6 +26,10 @@ import type { DeliveryOption } from '@/lib/shipping'
  *    total can name zero.
  * 2. **Validation runs again here**, even though the form validates as you
  *    type, because the form is a convenience and this is the boundary.
+ * 3. **The delivery charge is quoted by the courier**, for this parcel, at this
+ *    moment (`src/lib/shipping-rates.ts`). If it cannot be, the submission stops
+ *    with a "try again" rather than falling back to a made-up figure — an order
+ *    stored at an invented price is indistinguishable from a real one.
  *
  * The order *is* persisted now (Q-34, B-01): a valid submission writes it, its
  * lines and its first status event, and the customer is given the order number.
@@ -172,20 +177,55 @@ export async function submitCheckout(
     method: delivery.value.method,
   }
 
-  let total
+  // Two steps because the delivery price now comes from the courier, and the
+  // courier needs to know what the parcel weighs. `priceCart` answers that from
+  // the catalogue; `calculateTotal` then puts the quoted rate into the total.
+  let cart
   try {
-    total = calculateTotal(lines, option)
+    cart = priceCart(lines)
   } catch {
     // CartError — a quantity or slug that could only come from tampering.
     return { status: 'error', values, messageKey: 'cartUnreadable' }
   }
 
-  if (total.status === 'incomplete') {
+  if (cart.status === 'incomplete') {
     return {
       status: 'unconfigured',
       values,
-      unpriced: total.unpriced,
-      messageKey: total.unpriced.length > 0 ? 'notPricedYet' : 'deliveryNotPricedYet',
+      unpriced: cart.unpriced,
+      messageKey: 'notPricedYet',
+    }
+  }
+
+  const rate = await resolveDeliveryRate({
+    delivery: delivery.value,
+    weightGrams: cart.weightGrams,
+    goods: cart.goods,
+  })
+
+  if (rate.source === 'unavailable') {
+    // The courier is the only thing that knows this parcel's price, and it did
+    // not answer. Nothing is stored and no total is shown: the alternative is an
+    // order priced from the placeholder card, which would look identical to a
+    // real one. Logged with the reason in `resolveDeliveryRate`.
+    return { status: 'error', values, messageKey: 'deliveryRateUnavailable' }
+  }
+
+  let total
+  try {
+    total = calculateTotal(lines, option, rate.source === 'courier' ? rate.rate : undefined)
+  } catch {
+    return { status: 'error', values, messageKey: 'cartUnreadable' }
+  }
+
+  if (total.status === 'incomplete') {
+    // Not an unpriced slug — `priceCart` above has already ruled that out — so
+    // it is the delivery: no rate card for this courier and method, or a parcel
+    // too heavy for the locker the customer chose.
+    return {
+      status: 'unconfigured',
+      values,
+      messageKey: 'deliveryNotPricedYet',
     }
   }
 
@@ -238,6 +278,10 @@ export async function submitCheckout(
       officeVerified: office.verified,
       paymentMethod: PAYMENT_METHOD,
       total,
+      rateSource: rate.source,
+      ...(rate.source === 'courier' && rate.rate.description
+        ? { rateDescription: rate.rate.description }
+        : {}),
     })
   } catch (error) {
     // The order was not stored, so nothing may suggest it was. Logged with the

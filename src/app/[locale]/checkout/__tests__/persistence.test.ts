@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { submitCheckout } from '../actions'
-import { courierClient } from '@/lib/couriers'
-import type { CourierOffice, LookupResult } from '@/lib/couriers/types'
+import { canQuoteLiveRates, courierClient } from '@/lib/couriers'
+import type { CourierOffice, LookupResult, ShipmentRate } from '@/lib/couriers/types'
 import { createOrder, isOrderStorageReady } from '@/lib/orders'
 
 /**
@@ -19,7 +19,12 @@ import { createOrder, isOrderStorageReady } from '@/lib/orders'
  * those assertions exact. The module's own logic (idempotency, order numbers,
  * the item snapshot) is tested in `src/lib/__tests__/orders.test.ts`.
  */
-vi.mock('@/lib/couriers', () => ({ courierClient: vi.fn() }))
+vi.mock('@/lib/couriers', () => ({
+  courierClient: vi.fn(),
+  // No credentials and no hand-over point is the default state, so the static
+  // card prices the delivery. `shipping-rates.test.ts` covers the live path.
+  canQuoteLiveRates: vi.fn(() => false),
+}))
 
 vi.mock('@/lib/orders', () => ({
   INTENT_TOKEN_MAX: 100,
@@ -76,6 +81,7 @@ function stubFindOffice(result: LookupResult<CourierOffice | null>) {
     searchCities: async () => ({ status: 'unconfigured', courier }),
     officesIn: async () => ({ status: 'unconfigured', courier }),
     findOffice: async () => result,
+    priceShipment: async () => ({ status: 'unconfigured', courier }),
   }))
 }
 
@@ -93,6 +99,10 @@ function stubCreateOrder(overrides: Partial<Awaited<ReturnType<typeof createOrde
 
 beforeEach(() => {
   vi.mocked(isOrderStorageReady).mockReturnValue(true)
+  // Stated per test rather than left over from the previous one: `clearAllMocks`
+  // clears calls, not implementations, so a stale `true` here would quietly send
+  // a later test down the live-pricing path.
+  vi.mocked(canQuoteLiveRates).mockReturnValue(false)
   stubFindOffice({ status: 'unconfigured', courier: 'econt' })
   stubCreateOrder()
 })
@@ -274,5 +284,74 @@ describe('submitCheckout, once orders can be stored', () => {
     const state = await submitCheckout(IDLE, formData())
 
     expect(state.messageKey).toBe('orderPlacedCod')
+  })
+})
+
+describe('recording where the delivery price came from', () => {
+  /**
+   * Months after the fact, the only way to know whether an order's shipping
+   * figure was the courier's own or a stand-in is to have written it down at the
+   * time. These assertions are about that record, not about the arithmetic.
+   */
+  function stubPricing(result: LookupResult<ShipmentRate>) {
+    vi.mocked(canQuoteLiveRates).mockReturnValue(true)
+
+    vi.mocked(courierClient).mockImplementation((courier) => ({
+      courier,
+      searchCities: async () => ({ status: 'unconfigured', courier }),
+      officesIn: async () => ({ status: 'unconfigured', courier }),
+      findOffice: async () => ({ status: 'unconfigured', courier }),
+      priceShipment: async () => result,
+    }))
+  }
+
+  it('marks an order the courier priced, and names the tariff line', async () => {
+    stubPricing({
+      status: 'ok',
+      data: {
+        delivery: { amountMinor: 344, currency: 'EUR' },
+        codFee: { amountMinor: 30, currency: 'EUR' },
+        total: { amountMinor: 374, currency: 'EUR' },
+        description: 'между офисите на куриера до 1 кг',
+      },
+    })
+
+    await submitCheckout(IDLE, formData())
+
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rateSource: 'courier',
+        rateDescription: 'между офисите на куриера до 1 кг',
+      })
+    )
+  })
+
+  it('marks an order the stand-in card priced', async () => {
+    // The default state of a fresh clone. Stored happily — the notice on the
+    // checkout page has already told the customer the rate is illustrative — but
+    // stored as what it is.
+    vi.mocked(canQuoteLiveRates).mockReturnValue(false)
+
+    await submitCheckout(IDLE, formData())
+
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ rateSource: 'placeholder' })
+    )
+    expect(vi.mocked(createOrder).mock.calls[0][0].rateDescription).toBeUndefined()
+  })
+
+  it('stores nothing at all when the courier could not price the parcel', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    stubPricing({ status: 'failed', courier: 'econt', reason: 'HTTP 517: ExInvalidParam' })
+
+    const state = await submitCheckout(IDLE, formData())
+
+    // The database is available here, which is exactly why this matters: the row
+    // would have been written, with a placeholder figure, under an order number
+    // the customer would have been shown.
+    expect(createOrder).not.toHaveBeenCalled()
+    expect(state.status).toBe('error')
+    expect(state.order).toBeUndefined()
+    expect(error).toHaveBeenCalled()
   })
 })

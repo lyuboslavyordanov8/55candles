@@ -78,6 +78,12 @@ export interface Tariff {
  * The checkout says so visibly while this is set, and a test fails if you clear
  * it while `PLACEHOLDER_BANDS` is still referenced — the same guard pattern as
  * `LEGAL_IS_DRAFT`. Clear it when the real cards are in.
+ *
+ * The table is no longer the main way an order is priced: with credentials and a
+ * hand-over point configured, the courier quotes each parcel itself
+ * (`src/lib/shipping-rates.ts`) and nothing below is read. It remains the answer
+ * to "what happens with nothing configured at all", which is what a fresh clone
+ * is, and the checkout's notice is shown only while that is the live path.
  */
 export const TARIFFS_ARE_PLACEHOLDER = true
 
@@ -205,39 +211,55 @@ export function billableWeight(itemWeightsGrams: readonly number[]): number {
  * `orderTotal` is the goods total, used only for the free-delivery threshold.
  * The threshold is applied to goods, not to goods-plus-shipping, which would
  * be circular.
+ *
+ * `courierPrice` is a rate the courier itself quoted for this exact parcel — see
+ * `src/lib/shipping-rates.ts`. When it is supplied the table is not consulted at
+ * all, but everything around it still is: the locker weight limit is a physical
+ * fact about our packaging and the free-delivery threshold is our promotion, and
+ * neither belongs to the courier. That is the whole reason a live rate comes in
+ * as an argument rather than bypassing this function.
  */
 export function quote(
   option: DeliveryOption,
   weightGrams: number,
-  orderTotal: Money
+  orderTotal: Money,
+  courierPrice?: Money
 ): ShippingQuote {
   if (option.method === 'locker' && weightGrams > LOCKER_MAX_GRAMS) {
     return { status: 'unavailable', reason: 'tooHeavyForLocker' }
   }
 
-  const key = tariffKey(option)
-  const tariff = tariffs[key]
+  let price: Money
 
-  if (!tariff) {
-    return { status: 'unconfigured', reason: 'noTariff' }
-  }
+  if (courierPrice) {
+    price = courierPrice
+  } else {
+    const key = tariffKey(option)
+    const tariff = tariffs[key]
 
-  assertValidTariff(key, tariff)
+    if (!tariff) {
+      return { status: 'unconfigured', reason: 'noTariff' }
+    }
 
-  const band = tariff.bands.find(
-    (candidate) => candidate.upToGrams === null || weightGrams <= candidate.upToGrams
-  )
+    assertValidTariff(key, tariff)
 
-  if (!band) {
-    // Only reachable when the last band is closed and the parcel exceeds it.
-    return { status: 'unavailable', reason: 'noBandForWeight' }
+    const band = tariff.bands.find(
+      (candidate) => candidate.upToGrams === null || weightGrams <= candidate.upToGrams
+    )
+
+    if (!band) {
+      // Only reachable when the last band is closed and the parcel exceeds it.
+      return { status: 'unavailable', reason: 'noBandForWeight' }
+    }
+
+    price = band.price
   }
 
   if (FREE_DELIVERY_OVER && orderTotal.amountMinor >= FREE_DELIVERY_OVER.amountMinor) {
     return { status: 'quoted', price: money(0, orderTotal.currency), free: true }
   }
 
-  return { status: 'quoted', price: band.price, free: false }
+  return { status: 'quoted', price, free: false }
 }
 
 /**
@@ -249,11 +271,17 @@ export function quote(
  */
 export const COD_FEE_PAID_BY: 'merchant' | 'customer' = 'merchant'
 
-/** COD fee to add to the customer's total, or `null` if they do not pay it. */
-export function codFeeFor(option: DeliveryOption): Money | null {
+/**
+ * COD fee to add to the customer's total, or `null` if they do not pay it.
+ *
+ * `courierFee` is the fee the courier quoted for this parcel — Econt's scales
+ * with the amount collected, so a table constant can only ever approximate it.
+ * Supplied, it wins; absent, the table stands in.
+ */
+export function codFeeFor(option: DeliveryOption, courierFee?: Money): Money | null {
   if (COD_FEE_PAID_BY === 'merchant') return null
 
-  return tariffs[tariffKey(option)]?.codFee ?? null
+  return courierFee ?? tariffs[tariffKey(option)]?.codFee ?? null
 }
 
 /** Every courier/method pair, for rendering the picker. */

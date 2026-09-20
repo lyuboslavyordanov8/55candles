@@ -6,7 +6,8 @@ import type { Metadata } from 'next'
 import { isLocale } from '@/i18n/locales'
 import BasketEditor from '@/components/commerce/BasketEditor'
 import DeliveryForm from '@/components/commerce/DeliveryForm'
-import { isShippingConfigured, TARIFFS_ARE_PLACEHOLDER, type Courier } from '@/lib/shipping'
+import { isShippingConfigured, type Courier } from '@/lib/shipping'
+import { deliveryRatesArePlaceholders } from '@/lib/shipping-rates'
 import { couriersWithOfficeLookup, econtEnvironment } from '@/lib/couriers'
 import { unpricedSlugs, PRICING_IS_PROVISIONAL } from '@/data/pricing'
 import { parseCartParam } from '@/lib/cart-params'
@@ -73,6 +74,13 @@ export default async function CheckoutPage({
       */
       intentToken={newIntentToken()}
       shippingConfigured={isShippingConfigured()}
+      /*
+        Server-side, because it depends on courier credentials. False once the
+        courier prices each parcel itself — at which point the notice would be
+        telling the customer their delivery cost is illustrative when it is the
+        real one.
+      */
+      ratesArePlaceholders={deliveryRatesArePlaceholders()}
       unpricedCount={unpricedSlugs().length}
       officeLookup={couriersWithOfficeLookup()}
       officeDataIsDemo={econtEnvironment() === 'demo'}
@@ -90,6 +98,7 @@ function CheckoutContent({
   cart,
   intentToken,
   shippingConfigured,
+  ratesArePlaceholders,
   unpricedCount,
   officeLookup,
   officeDataIsDemo,
@@ -98,6 +107,7 @@ function CheckoutContent({
   cart: CartLine[]
   intentToken: string
   shippingConfigured: boolean
+  ratesArePlaceholders: boolean
   unpricedCount: number
   officeLookup: readonly Courier[]
   officeDataIsDemo: boolean
@@ -141,7 +151,7 @@ function CheckoutContent({
           </p>
         )}
 
-        {TARIFFS_ARE_PLACEHOLDER && (
+        {ratesArePlaceholders && (
           <p role="note" className="rounded-sm border border-clay/40 bg-cream-surface p-4 text-xs leading-relaxed text-ink-secondary">
             {t('provisionalRates')}
           </p>

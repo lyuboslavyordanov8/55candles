@@ -1,3 +1,4 @@
+import type { Money } from '../money'
 import type { Courier, DeliveryMethod } from '../shipping'
 
 /**
@@ -67,6 +68,59 @@ export type LookupResult<T> =
   | { status: 'unconfigured'; courier: Courier }
   | { status: 'failed'; courier: Courier; reason: string }
 
+/**
+ * A parcel to be priced.
+ *
+ * Deliberately carries **no personal data**: no name, no phone, no house number.
+ * A price depends on the destination settlement, the weight and the amount to
+ * collect, and nothing else — verified against Econt on 2026-09-20, where a
+ * quote with no `receiverClient` at all returns the same figure as one with it.
+ * So the customer's details are sent to the courier when a waybill is created
+ * and there is a parcel to deliver, not while they are still deciding.
+ */
+export interface ShipmentQuoteRequest {
+  method: DeliveryMethod
+  /** The office code for `office`/`locker` — a `CourierOffice.id`. */
+  officeId?: string
+  /**
+   * Destination for `door`. `street` is whatever the customer typed, passed
+   * through as the courier's `fullAddress`: Bulgarian addresses are written many
+   * valid ways and the courier's own parser handles them (`ж.к. Младост, бл. 5,
+   * вх. А` prices fine). `city` and `postCode` are both required — a post code
+   * alone is ambiguous, and Econt refuses it with "повече от едно населени места".
+   */
+  address?: { city: string; postCode: string; street: string }
+  weightGrams: number
+  /**
+   * What the courier will collect on delivery (наложен платеж), so that its COD
+   * fee comes back as part of the answer. `null` for no collection.
+   */
+  codAmount: Money | null
+}
+
+/**
+ * What a courier will charge for one parcel.
+ *
+ * Split, not a single number, because the two halves are *ours* to allocate
+ * differently: the delivery charge is passed to the customer and the COD fee is
+ * absorbed by the merchant (`COD_FEE_PAID_BY`). A lump sum would force one
+ * policy on both.
+ */
+export interface ShipmentRate {
+  /** Carrying the parcel: the courier service plus any surcharge on it. */
+  delivery: Money
+  /** The courier's fee for collecting наложен платеж. Zero when none applies. */
+  codFee: Money
+  /** Everything the courier reported for this parcel. `delivery + codFee`. */
+  total: Money
+  /**
+   * The courier's own wording for the service it priced — e.g. "Куриерска услуга
+   * - между офисите на куриера до 1 кг". Kept for the order record and the log:
+   * it is the evidence of *which* tariff line produced this number.
+   */
+  description?: string
+}
+
 export interface CourierClient {
   readonly courier: Courier
 
@@ -88,4 +142,15 @@ export interface CourierClient {
    * `failed` lookup, which means we do not know.
    */
   findOffice(id: string): Promise<LookupResult<CourierOffice | null>>
+
+  /**
+   * What this parcel actually costs, from the courier's own tariff.
+   *
+   * `unconfigured` means the courier cannot price anything yet — no contract
+   * credentials, or no hand-over point configured — and the caller falls back to
+   * the static card. `failed` means we asked and did not get an answer we can
+   * trust, which is *not* a licence to invent a number: see
+   * `src/lib/shipping-rates.ts`.
+   */
+  priceShipment(request: ShipmentQuoteRequest): Promise<LookupResult<ShipmentRate>>
 }

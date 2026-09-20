@@ -192,12 +192,13 @@ guessed.
 |---|---|---|
 | B-12 money model | Done | `src/lib/money.ts` — integer minor units, currency-checked arithmetic, `Intl` formatting |
 | B-03 prices | **Machinery only — table empty** | `src/data/pricing.ts`. Price *and* packed weight per slug; a test fails if either is invented |
-| Q-25 delivery methods | Done; rates are placeholders | `src/lib/shipping.ts` — 2 couriers × 3 methods, weight-banded tariffs. All 6 cards now carry `PLACEHOLDER_BANDS` so the flow is walkable; the real cards are still owed (Q-22) |
+| Q-25 delivery methods | Done; the card is now only a fallback | `src/lib/shipping.ts` — 2 couriers × 3 methods, weight-banded tariffs. All 6 cards carry `PLACEHOLDER_BANDS`, and with Econt credentials set they are never read: the courier prices each parcel (row below) |
 | Q-21 payment methods | **Settled: наложен платеж only** | `src/lib/payments.ts`. Decided 2026-09-20; the card path has been removed rather than left dormant |
 | Q-22 couriers at launch | **Settled: Еконт only, Спиди "очаквайте скоро"** | `BOOKABLE_COURIERS` in `src/lib/shipping.ts`. Decided 2026-09-20. Speedy keeps its place in the type, the enum and the tariff table; the checkout greys it out and `validateDelivery` returns `courier: 'unavailable'`, so a hand-built POST cannot store an order nobody can label. One flag flips it back when the contract exists |
+| Q-22 delivery prices | **Live from Econt, with no silent fallback** | `src/lib/shipping-rates.ts` decides; `econt.ts` asks `LabelService.createLabel` in `mode: 'calculate'`. Needs credentials **and** a hand-over point (`ECONT_SENDER_OFFICE_CODE`, or the registered seat in `company.ts`) — the same 0.4 kg parcel was 3.44 EUR office-to-office and 4.55 EUR collected from an address, so there is no default. Nothing configured → the stand-in card, with the notice on the page. Configured but the quote failed → the order stops; substituting the card there would store an order at a price nobody can honour, indistinguishable from a real one. The quote carries no customer name or phone. `rateSource` on the creation event records which it was |
 | Delivery form | Done | `/[locale]/checkout` + `DeliveryForm`. Fields switch on method; `useActionState` per the Next 16 forms guide |
 | Order totals | Done | `src/lib/order-total.ts` — re-priced server-side, shipping and COD fee as separate line items |
-| Courier office lookup | **Interface only** | `src/lib/couriers/` returns `unconfigured` until credentials exist (Q-22) |
+| Courier office lookup | Done, and needs no credentials | `src/lib/couriers/` — Econt's nomenclature is public, so the picker shows the real 632 production offices out of the box. Speedy is still a stub that answers `unconfigured` |
 | Q-20 card payments | **Closed by decision — not happening** | No provider, no keys, no webhook, no `paid` status. Reversing it is new work, not configuration |
 
 **Money is never a float.** `0.1 + 0.2` is `0.30000000000000004`, and a shop that sums prices as floats eventually
@@ -224,7 +225,7 @@ order is not a settled one (B-14), and НАП receipt rules for courier-collecte
 been two competing sources of price that win or lose depending on which the caller reads.
 
 **What is still missing, and from whom:** price and packed weight per product (Q-11/Q-12, owner — the price landed in
-Phase 1b, the weight has not); Econt and Speedy rate cards and API credentials (Q-22, merchant contracts);
+Phase 1b, the weight has not); Econt API credentials plus a hand-over point (Q-22 — these now buy *real* delivery prices, not just waybills; no rate cards need transcribing);
 free-delivery threshold (Q-24); who bears the COD fee (Q-23 — currently modelled as the merchant, the safer default).
 Card payments are no longer on the list: Q-20 is closed, there will be none. Order storage has since landed (Q-34/B-01): checkout writes the order and returns its
 number. The checkout page stays `noindex` while the rates are placeholders, the legal pages are drafts and nothing can
@@ -514,7 +515,7 @@ These cannot be determined from the code. **Nothing below has been guessed.**
 
 - ~~**Q-20** Stripe account country and default currency~~ — **ANSWERED 2026-09-20: no card payments at all.**
 - ~~**Q-21** Card *and* COD from day one, or COD first?~~ — **ANSWERED: наложен платеж only, indefinitely.**
-- **Q-22** Do you have Speedy and/or Econt merchant contracts yet, and API credentials for their test environments?
+- **Q-22** Do you have Speedy and/or Econt merchant contracts yet, and API credentials for their test environments? Econt's are now the one thing standing between the checkout and real delivery prices — `ECONT_USERNAME`, `ECONT_PASSWORD` and `ECONT_SENDER_OFFICE_CODE`. Until they are set the checkout charges the stand-in card and says so.
 - **Q-23** Who absorbs the COD fee — you or the customer? It must be shown as a line item before the customer confirms.
 - **Q-24** Free-shipping threshold, if any?
 - **Q-25** Do you want to offer address-to-door, office pickup, and APS (автомат), or a subset?

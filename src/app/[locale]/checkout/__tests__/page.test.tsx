@@ -65,6 +65,31 @@ describe('CheckoutPage', () => {
     expect(screen.getByText(/does not affect the candle prices/i)).toBeInTheDocument()
   })
 
+  it('stops calling the rates illustrative once Econt prices them', async () => {
+    // The other half of the notice above, and the half that is easy to forget:
+    // once the courier quotes each parcel, telling the customer their delivery
+    // cost is a placeholder is false in the opposite direction. Credentials plus
+    // a hand-over point are what flips it, so both are set here.
+    const saved = { ...process.env }
+    process.env.ECONT_USERNAME = 'iasp-dev'
+    process.env.ECONT_PASSWORD = '1Asp-dev'
+    process.env.ECONT_SENDER_OFFICE_CODE = '1120'
+
+    try {
+      await renderPage('cherry:1')
+
+      expect(screen.queryByText(/delivery rates are placeholders/i)).not.toBeInTheDocument()
+      // The order flow is still not live for its own reasons — no confirmation
+      // email, draft legal pages — so that notice stays.
+      expect(screen.getByText(/not live yet/i)).toBeInTheDocument()
+    } finally {
+      for (const key of Object.keys(process.env)) {
+        if (!(key in saved)) delete process.env[key]
+      }
+      Object.assign(process.env, saved)
+    }
+  })
+
   it('shows an empty basket and a way out, rather than a dead form', async () => {
     await renderPage()
 

@@ -56,6 +56,16 @@ export interface OrderDraft {
   /** True when a courier confirmed the office code, rather than us echoing it. */
   officeVerified?: boolean
   /**
+   * Where the delivery charge came from: `'courier'` when the courier priced this
+   * parcel from its contracted tariff, `'placeholder'` when the stand-in card in
+   * `shipping.ts` did. Recorded on the creation event, because months later the
+   * only way to know whether an order's shipping figure was real is to have
+   * written it down. See `src/lib/shipping-rates.ts`.
+   */
+  rateSource?: 'courier' | 'placeholder'
+  /** The courier's own name for the tariff line it quoted, where it quoted one. */
+  rateDescription?: string
+  /**
    * How the order is to be paid. Only `'cod'` exists today, and it is still passed
    * in rather than assumed here: the caller records what the customer agreed to,
    * and a second method must not silently inherit COD's status and fee.
@@ -243,6 +253,10 @@ export async function createOrder(draft: OrderDraft): Promise<PlacedOrder> {
           // on trust because the courier could not be reached. Read this before
           // printing a waybill.
           officeVerified: draft.officeVerified ?? false,
+          // Whether the shipping figure above is the courier's own price or the
+          // stand-in card's.
+          rateSource: draft.rateSource ?? 'placeholder',
+          ...(draft.rateDescription ? { rateTariff: draft.rateDescription } : {}),
         },
       }),
     ])

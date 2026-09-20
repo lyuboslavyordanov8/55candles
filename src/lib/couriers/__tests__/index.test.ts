@@ -1,10 +1,14 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
+import { company } from '../../company'
 import {
+  canQuoteLiveRates,
   courierClient,
   couriersWithOfficeLookup,
   econtEnvironment,
+  econtShipFrom,
   isCourierConfigured,
   missingCourierCredentials,
+  missingLiveRateRequirements,
 } from '..'
 
 /**
@@ -205,5 +209,113 @@ describe('the launch checklist', () => {
 
     expect(isCourierConfigured('econt')).toBe(false)
     expect(missingCourierCredentials()).toContain('ECONT_USERNAME')
+  })
+})
+
+describe('the hand-over point', () => {
+  it('is unset out of the box, so nothing can be priced from a guess', () => {
+    // The registered seat in `company.ts` is still `[TODO: …]`, and the same
+    // parcel costs a different amount posted from an office than collected from
+    // an address — so "no sender configured" has to mean "cannot quote", not a
+    // default.
+    expect(econtShipFrom()).toBeNull()
+    expect(canQuoteLiveRates('econt')).toBe(false)
+  })
+
+  it('uses the office the merchant drops parcels at, when one is named', () => {
+    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
+
+    expect(econtShipFrom()).toEqual({ officeCode: '1120' })
+  })
+
+  it('prefers that office over a collection address, rather than merging them', () => {
+    // A parcel leaves from one place. Sending both would let Econt pick.
+    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
+    vi.stubEnv('ECONT_SENDER_CITY', 'София')
+    vi.stubEnv('ECONT_SENDER_POST_CODE', '1000')
+    vi.stubEnv('ECONT_SENDER_STREET', 'бул. Витоша 10')
+
+    expect(econtShipFrom()).toEqual({ officeCode: '1120' })
+  })
+
+  it('takes a collection address only when all three parts are there', () => {
+    vi.stubEnv('ECONT_SENDER_CITY', 'София')
+    vi.stubEnv('ECONT_SENDER_POST_CODE', '1000')
+
+    // Two thirds of an address is not an address, and Econt would reject it.
+    expect(econtShipFrom()).toBeNull()
+
+    vi.stubEnv('ECONT_SENDER_STREET', 'бул. Витоша 10')
+
+    expect(econtShipFrom()).toEqual({
+      city: 'София',
+      postCode: '1000',
+      street: 'бул. Витоша 10',
+    })
+  })
+
+  it('falls back to the registered seat once the owner fills it in', () => {
+    // Mutating the constant is the only way to model "the owner answered", and
+    // it is restored below. The point is that filling in the impressum is enough
+    // — a home business hands parcels over where it is registered.
+    const seat = company.address as unknown as Record<string, string>
+    const before = { ...seat }
+
+    Object.assign(seat, { street: 'ул. Пример 1', city: 'София', postalCode: '1000' })
+
+    try {
+      expect(econtShipFrom()).toEqual({
+        city: 'София',
+        postCode: '1000',
+        street: 'ул. Пример 1',
+      })
+    } finally {
+      Object.assign(seat, before)
+    }
+  })
+})
+
+describe('whether a courier can quote a real price', () => {
+  it('needs both credentials and a hand-over point', () => {
+    vi.stubEnv('ECONT_USERNAME', 'merchant')
+    vi.stubEnv('ECONT_PASSWORD', 'secret')
+
+    // Credentials alone buy an authenticated call for a parcel posted from
+    // nowhere.
+    expect(canQuoteLiveRates('econt')).toBe(false)
+    expect(missingLiveRateRequirements()).toEqual([
+      'ECONT_SENDER_OFFICE_CODE or the registered address in company.ts',
+    ])
+
+    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
+
+    expect(canQuoteLiveRates('econt')).toBe(true)
+    expect(missingLiveRateRequirements()).toEqual([])
+  })
+
+  it('names the credentials that are missing while the sender is set', () => {
+    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
+
+    expect(missingLiveRateRequirements()).toEqual(['ECONT_USERNAME', 'ECONT_PASSWORD'])
+  })
+
+  it('is false for Speedy however much is configured', () => {
+    // Its client is a stub, so there is nothing to ask.
+    vi.stubEnv('SPEEDY_USERNAME', 'merchant')
+    vi.stubEnv('SPEEDY_PASSWORD', 'secret')
+    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
+
+    expect(canQuoteLiveRates('speedy')).toBe(false)
+  })
+})
+
+describe('the Speedy stub', () => {
+  it('answers unconfigured when asked for a price, rather than a number', async () => {
+    expect(await courierClient('speedy').priceShipment({
+      method: 'office',
+      officeId: '1012',
+      weightGrams: 550,
+      codAmount: null,
+    })).toEqual({ status: 'unconfigured', courier: 'speedy' })
   })
 })

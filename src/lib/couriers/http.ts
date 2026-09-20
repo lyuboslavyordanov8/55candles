@@ -35,9 +35,43 @@ const DEFAULT_TIMEOUT_MS = 8_000
 const DEFAULT_ATTEMPTS = 3
 const BASE_BACKOFF_MS = 200
 
+/**
+ * Econt reports *application* errors as HTTP 517 with an `ExInvalidParam` body —
+ * an unknown office code, a city it cannot match, a wrong password. Verified
+ * 2026-09-20 against the live service.
+ *
+ * It is in the 5xx range and is nevertheless permanent, so retrying it triples
+ * the latency of an error the customer is already waiting on and sends the same
+ * rejected request twice more.
+ */
+const APPLICATION_ERROR_STATUS = 517
+
 /** Status codes where the same request might succeed if sent again. */
 function isRetryable(status: number): boolean {
+  if (status === APPLICATION_ERROR_STATUS) return false
+
   return status === 429 || status >= 500
+}
+
+/** How much of an error body goes into the reason. Enough to name the cause. */
+const REASON_BODY_MAX = 300
+
+/**
+ * `HTTP 517` on its own is unactionable — every courier rejection looks
+ * identical in the log. The body says which field it objected to, so a short
+ * prefix of it travels with the status.
+ *
+ * Errors are swallowed: we are already on the failure path, and a body that
+ * cannot be read must not replace a useful status with an exception.
+ */
+async function describe(response: Response): Promise<string> {
+  try {
+    const body = (await response.text()).replace(/\s+/g, ' ').trim()
+
+    return body ? `HTTP ${response.status}: ${body.slice(0, REASON_BODY_MAX)}` : `HTTP ${response.status}`
+  } catch {
+    return `HTTP ${response.status}`
+  }
 }
 
 function backoffMs(attempt: number): number {
@@ -93,7 +127,7 @@ export async function postJson<T>({
       })
 
       if (!response.ok) {
-        lastReason = `HTTP ${response.status}`
+        lastReason = await describe(response)
 
         if (isRetryable(response.status) && attempt < attempts) {
           await sleep(backoffMs(attempt))

@@ -4,6 +4,7 @@ import {
   allDeliveryOptions,
   assertValidTariff,
   billableWeight,
+  codFeeFor,
   COURIERS,
   DELIVERY_METHODS,
   isShippingConfigured,
@@ -14,6 +15,7 @@ import {
   TariffError,
   tariffs,
   TARIFFS_ARE_PLACEHOLDER,
+  type DeliveryOption,
   type Tariff,
 } from '../shipping'
 
@@ -173,5 +175,66 @@ describe('quote', () => {
         })
       })
     })
+  })
+})
+
+describe('a price the courier quoted', () => {
+  const option: DeliveryOption = { courier: 'econt', method: 'office' }
+
+  it('is used exactly as given, in place of the rate card', () => {
+    // The card is a stand-in for a contract that is not signed yet. Once Econt
+    // prices the parcel itself, its figure is the one the customer is charged —
+    // rounding it towards a band, or averaging the two, would invent a third
+    // number that neither we nor the courier can honour.
+    const installed = tariffs[tariffKey(option)]
+    tariffs[tariffKey(option)] = SAMPLE
+
+    try {
+      expect(quote(option, 500, eur(10), eur(3.44))).toEqual({
+        status: 'quoted',
+        price: eur(3.44),
+        free: false,
+      })
+    } finally {
+      tariffs[tariffKey(option)] = installed
+    }
+  })
+
+  it('prices a parcel no card covers', () => {
+    // Weight bands and configured couriers are properties of the stand-in table.
+    // A real quote has already accounted for the weight, so neither
+    // `noBandForWeight` nor `unconfigured` can apply to it.
+    const installed = tariffs[tariffKey(option)]
+    delete tariffs[tariffKey(option)]
+
+    try {
+      expect(quote(option, 50_000, eur(10), eur(9.9))).toEqual({
+        status: 'quoted',
+        price: eur(9.9),
+        free: false,
+      })
+    } finally {
+      tariffs[tariffKey(option)] = installed
+    }
+  })
+
+  it('does not get a parcel into a locker it does not fit in', () => {
+    // The limit is the locker's, not the tariff's, so a courier price cannot buy
+    // its way past it. Econt would accept the booking and the parcel would be
+    // rejected at the machine.
+    expect(quote({ courier: 'econt', method: 'locker' }, LOCKER_MAX_GRAMS + 1, eur(10), eur(3.44)))
+      .toEqual({ status: 'unavailable', reason: 'tooHeavyForLocker' })
+  })
+})
+
+describe('the наложен платеж fee', () => {
+  const option: DeliveryOption = { courier: 'econt', method: 'office' }
+
+  it('is absorbed even when the courier itemises it (Q-23)', () => {
+    // Econt quotes the fee as its own line, and we are told what it is — but who
+    // pays it is our decision, not the courier's. While COD_FEE_PAID_BY is
+    // 'merchant' the customer is charged nothing for it, and null (not zero)
+    // records that there is no such line on this order.
+    expect(codFeeFor(option, eur(0.3))).toBeNull()
   })
 })

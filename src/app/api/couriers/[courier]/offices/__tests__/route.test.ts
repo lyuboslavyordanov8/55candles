@@ -39,6 +39,7 @@ function clientReturning(result: LookupResult<never>): CourierClient {
     searchCities: answer,
     officesIn: answer,
     findOffice: answer,
+    priceShipment: answer,
   }
 }
 
@@ -48,6 +49,7 @@ function stubClient(client: Partial<CourierClient>) {
     searchCities: () => Promise.resolve({ status: 'unconfigured', courier: 'econt' }),
     officesIn: () => Promise.resolve({ status: 'unconfigured', courier: 'econt' }),
     findOffice: () => Promise.resolve({ status: 'unconfigured', courier: 'econt' }),
+    priceShipment: () => Promise.resolve({ status: 'unconfigured', courier: 'econt' }),
     ...client,
   })
 }
