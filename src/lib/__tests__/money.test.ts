@@ -13,6 +13,7 @@ import {
   toMajorUnits,
   ZERO,
 } from '../money'
+import { defaultLocale } from '@/i18n/locales'
 
 describe('money construction', () => {
   it('rejects a non-integer amount, which is how float drift enters a ledger', () => {
@@ -111,7 +112,10 @@ describe('formatting', () => {
   it('falls back to the default locale rather than throwing on a tag Intl rejects', () => {
     for (const junk of ['apple-touch-icon.png', 'site.webmanifest', '', 'null', 'x', 'bg_BG']) {
       expect(() => formatMoney(eur(24.5), junk), junk).not.toThrow()
-      expect(formatMoney(eur(24.5), junk), junk).toBe(formatMoney(eur(24.5), 'en'))
+      // Compared against `defaultLocale` rather than a language spelled out
+      // here: the guarantee is "it falls back to the default", not "it falls
+      // back to English", and the default is a decision that can change.
+      expect(formatMoney(eur(24.5), junk), junk).toBe(formatMoney(eur(24.5), defaultLocale))
     }
   })
 

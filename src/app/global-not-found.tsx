@@ -19,8 +19,9 @@ export const metadata: Metadata = {
 }
 
 export default function GlobalNotFound() {
+  // `lang` is Bulgarian, matching both `defaultLocale` and the heading below.
   return (
-    <html lang="en" className={montserrat.variable}>
+    <html lang="bg" className={montserrat.variable}>
       <body className="bg-paper-white text-ink-primary font-sans antialiased">
         <main className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
           <Logo className="mb-16 h-5 w-auto" />

@@ -19,7 +19,7 @@ export default function GlobalError({
   unstable_retry: () => void
 }) {
   return (
-    <html lang="en">
+    <html lang="bg">
       <body className="bg-cream-base text-charcoal antialiased">
         <title>Error — 55° candles</title>
 
