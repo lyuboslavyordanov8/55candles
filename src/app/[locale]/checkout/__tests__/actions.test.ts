@@ -26,7 +26,6 @@ const VALID_FIELDS: Record<string, string> = {
   city: 'София',
   postCode: '1000',
   officeId: 'ECONT-1234',
-  paymentMethod: 'cod',
   cart: JSON.stringify([{ slug: 'cherry', quantity: 2 }]),
 }
 
@@ -101,20 +100,15 @@ describe('submitCheckout', () => {
     expect(state.fieldErrors?.phone).toBe('required')
   })
 
-  it('requires a known payment method', async () => {
-    const state = await submitCheckout(IDLE, formData({ paymentMethod: 'bitcoin' }))
-
-    expect(state.status).toBe('invalid')
-    expect(state.messageKey).toBe('choosePayment')
-  })
-
-  it('refuses card payment while Stripe is unconfigured', async () => {
-    // Reachable only by a direct POST — the UI hides the option. The action is
-    // the boundary, so it must refuse rather than trust the rendered form.
+  it('ignores a payment method in the payload, because there is only one', async () => {
+    // Наложен платеж is the shop's only method, so the server names it and never
+    // reads this field. A hand-built POST asking for something else gets the same
+    // COD order rather than an error about a choice it was never offered — and,
+    // critically, not a card order.
     const state = await submitCheckout(IDLE, formData({ paymentMethod: 'card' }))
 
-    expect(state.status).toBe('unconfigured')
-    expect(state.messageKey).toBe('paymentUnavailable')
+    expect(state.status).toBe('readyToPay')
+    expect(state.values).not.toHaveProperty('paymentMethod')
   })
 
   it('reports an unpriced product rather than charging for it', async () => {
@@ -233,7 +227,6 @@ describe('submitCheckout', () => {
         recipientName: 'Мария Иванова',
         email: 'maria@example.com',
         note: 'Обадете се преди доставка',
-        paymentMethod: 'cod',
       })
     })
 

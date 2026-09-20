@@ -7,8 +7,6 @@ import {
   type DeliveryOption,
   type ShippingQuote,
 } from './shipping'
-import type { PaymentMethod } from './payments'
-
 /**
  * Order totals (AUDIT.md B-03, Q-23).
  *
@@ -21,6 +19,12 @@ import type { PaymentMethod } from './payments'
  * EU consumer law requires shipping and any COD fee to be shown as their own
  * line items before the customer confirms — a single opaque number is not
  * compliant, quite apart from being untrustworthy.
+ *
+ * There is no payment-method parameter: наложен платеж is the only method
+ * (`src/lib/payments.ts`), so the COD fee applies to every order and asking the
+ * caller which method to price would invite a total that does not match the one
+ * the order is stored with. When a second method exists, this takes the method
+ * back as an argument rather than growing a flag.
  */
 
 export interface CartLine {
@@ -42,7 +46,7 @@ export type OrderTotal =
       lines: PricedLine[]
       goods: Money
       shipping: Money
-      /** Null when the merchant absorbs it, or the method is not COD. */
+      /** Null when the merchant absorbs it (Q-23). */
       codFee: Money | null
       total: Money
       weightGrams: number
@@ -69,8 +73,7 @@ export class CartError extends Error {}
  */
 export function calculateTotal(
   lines: readonly CartLine[],
-  delivery: DeliveryOption,
-  paymentMethod: PaymentMethod
+  delivery: DeliveryOption
 ): OrderTotal {
   if (lines.length === 0) {
     throw new CartError('Cannot total an empty cart')
@@ -112,7 +115,7 @@ export function calculateTotal(
     return { status: 'incomplete', unpriced: [], shippingQuote }
   }
 
-  const codFee = paymentMethod === 'cod' ? codFeeFor(delivery) : null
+  const codFee = codFeeFor(delivery)
 
   return {
     status: 'ok',

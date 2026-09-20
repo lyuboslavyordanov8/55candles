@@ -18,7 +18,9 @@ function renderForm(props: Partial<Parameters<typeof DeliveryForm>[0]> = {}) {
     <NextIntlClientProvider locale="en" messages={messages}>
       <DeliveryForm
         cart={[{ slug: 'cherry', quantity: 1 }]}
-        paymentMethods={['cod']}
+        // Stands in for the token the page mints per render; the form only
+        // forwards it, so any stable string exercises the same path.
+        intentToken="intent-under-test"
         shippingConfigured={false}
         locale="en"
         {...props}
@@ -124,7 +126,7 @@ describe('DeliveryForm', () => {
         messageKey: 'fixTheFields',
         fieldErrors,
         values: Object.fromEntries(
-          ['recipientName', 'phone', 'email', 'street', 'officeId', 'note', 'paymentMethod']
+          ['recipientName', 'phone', 'email', 'street', 'officeId', 'note']
             .map((field) => [field, String(data.get(field) ?? '')])
             .filter(([, submitted]) => submitted)
         ),
@@ -156,7 +158,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await user.click(screen.getByRole('button', { name: /place order/i }))
 
       // Gated on the rejection message, so the assertions below cannot run
       // against a render that has not received the action's state yet. The
@@ -176,7 +178,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await user.click(screen.getByRole('button', { name: /place order/i }))
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       expect(valueOf(/^city$/i)).toBe('София')
@@ -196,7 +198,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await user.click(screen.getByRole('button', { name: /place order/i }))
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       expect(valueOf(/mobile number/i)).toBe('+359887115957')
@@ -216,7 +218,7 @@ describe('DeliveryForm', () => {
       await user.type(screen.getByLabelText(/post code/i), '1000')
       await user.type(screen.getByLabelText(/street/i), 'ул. Цар Самуил 3')
 
-      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await user.click(screen.getByRole('button', { name: /place order/i }))
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       // Silently reverting to Econt at the door would send the parcel to the
@@ -240,7 +242,7 @@ describe('DeliveryForm', () => {
       await user.type(screen.getByLabelText(/post code/i), '1000')
       await user.type(screen.getByLabelText(/office or locker/i), 'ECONT-1234')
 
-      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await user.click(screen.getByRole('button', { name: /place order/i }))
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       expect(valueOf(/email address/i)).toBe('')
@@ -324,22 +326,31 @@ describe('DeliveryForm', () => {
     })
   })
 
-  it('offers cash on delivery alone, with no apology for the absent card option', () => {
-    // The shop takes cash on delivery by decision, not for want of a Stripe key,
-    // so there is nothing to explain and nothing to promise.
-    renderForm({ paymentMethods: ['cod'] })
+  describe('how it presents payment', () => {
+    it('states cash on delivery rather than asking the customer to choose it', () => {
+      renderForm()
 
-    expect(screen.getByRole('radio', { name: /cash on delivery/i })).toBeInTheDocument()
-    expect(screen.queryByRole('radio', { name: /^card/i })).not.toBeInTheDocument()
-    expect(screen.queryByText(/card payment/i)).not.toBeInTheDocument()
-  })
+      expect(screen.getByRole('heading', { name: /payment/i })).toBeInTheDocument()
+      expect(screen.getByText(/cash on delivery/i)).toBeInTheDocument()
+      expect(screen.getByText(/pay the courier/i)).toBeInTheDocument()
+    })
 
-  it('still offers card if it is ever switched on', () => {
-    // The list comes from `availablePaymentMethods()`, so the decision lives in
-    // one place rather than being hardcoded into the form.
-    renderForm({ paymentMethods: ['card', 'cod'] })
+    it('offers no payment choice at all, and mentions no card option', () => {
+      // One method, so a radio group would be a question with one answer — and
+      // naming cards, even to say they are unavailable, would advertise something
+      // that is not coming.
+      renderForm()
 
-    expect(screen.getByRole('radio', { name: /card/i })).toBeInTheDocument()
+      expect(screen.queryByRole('radio', { name: /cash on delivery/i })).not.toBeInTheDocument()
+      expect(screen.queryByText(/card/i)).not.toBeInTheDocument()
+    })
+
+    it('sends no payment method in the payload, so the server decides', () => {
+      renderForm()
+
+      const form = screen.getByRole('button', { name: /place order/i }).closest('form')
+      expect(form?.querySelector('[name="paymentMethod"]')).toBeNull()
+    })
   })
 
   it('warns that delivery prices are unset rather than implying free shipping', () => {
@@ -537,7 +548,7 @@ describe('DeliveryForm', () => {
       await user.type(screen.getByLabelText(/full name/i), 'Мария Иванова')
       await user.type(screen.getByLabelText(/mobile number/i), '0887115957')
 
-      await user.click(screen.getByRole('button', { name: /continue to payment/i }))
+      await user.click(screen.getByRole('button', { name: /place order/i }))
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       expect(screen.getByRole('button', { name: /change city/i })).toBeInTheDocument()
@@ -551,6 +562,86 @@ describe('DeliveryForm', () => {
       renderForm({ officeLookup: ['econt'], officeDataIsDemo: true, shippingConfigured: true })
 
       expect(screen.getByRole('note')).toHaveTextContent(/test system/i)
+    })
+  })
+
+  describe('once the order is stored', () => {
+    /** Enough to get past the browser's own required-field check. */
+    async function fillIn(user: ReturnType<typeof userEvent.setup>) {
+      await user.type(screen.getByLabelText(/full name/i), 'Мария Иванова')
+      await user.type(screen.getByLabelText(/mobile number/i), '0887115957')
+      await user.type(screen.getByLabelText(/^city$/i), 'София')
+      await user.type(screen.getByLabelText(/post code/i), '1000')
+      await user.type(screen.getByLabelText(/office or locker/i), 'ECONT-1234')
+    }
+
+    function placedAction() {
+      return vi.mocked(submitCheckout).mockImplementationOnce(async () => ({
+        status: 'placed' as const,
+        order: { number: '55C-2026-000123' },
+        messageKey: 'orderPlacedCod',
+      }))
+    }
+
+    it('shows the order number, which is the only record the customer gets', async () => {
+      // No confirmation email (B-17) and no confirmation page yet, so this is it.
+      const user = userEvent.setup()
+      placedAction()
+      renderForm()
+      await fillIn(user)
+
+      await user.click(screen.getByRole('button', { name: /place order/i }))
+
+      expect(await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })).toBeInTheDocument()
+      expect(screen.getByText(/order received/i)).toBeInTheDocument()
+    })
+
+    it('announces it as news rather than as an error', async () => {
+      const user = userEvent.setup()
+      placedAction()
+      renderForm()
+      await fillIn(user)
+
+      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })
+
+      // A stored order read out as an `alert` would sound like a failure.
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(screen.getByText(/pay the courier on delivery/i)).toBeInTheDocument()
+    })
+
+    it('stops offering to submit, since this form can no longer change the order', async () => {
+      // Pressing again replays the same intent token and returns the same order,
+      // so an edited address would go nowhere while looking accepted.
+      const user = userEvent.setup()
+      placedAction()
+      renderForm()
+      await fillIn(user)
+
+      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })
+
+      expect(screen.getByRole('button', { name: /order placed/i })).toBeDisabled()
+    })
+
+    it('submits the intent token the page minted, unchanged', async () => {
+      const user = userEvent.setup()
+      let submitted: string | null = null
+      vi.mocked(submitCheckout).mockImplementationOnce(async (_previous, data) => {
+        submitted = String(data.get('intentToken'))
+        return { status: 'placed' as const, order: { number: '55C-2026-000123' } }
+      })
+      const { container } = renderForm({ intentToken: 'minted-by-the-page' })
+      await fillIn(user)
+
+      expect(container.querySelector('input[name="intentToken"]')).toHaveValue(
+        'minted-by-the-page'
+      )
+
+      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })
+
+      expect(submitted).toBe('minted-by-the-page')
     })
   })
 })

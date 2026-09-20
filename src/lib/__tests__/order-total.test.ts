@@ -43,7 +43,7 @@ function withNothingConfigured(run: () => void): void {
 describe('calculateTotal', () => {
   it('blocks the order while any line is unpriced (B-03)', () => {
     withNothingConfigured(() => {
-      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'cod')
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY)
 
       expect(result.status).toBe('incomplete')
       if (result.status === 'incomplete') {
@@ -55,7 +55,7 @@ describe('calculateTotal', () => {
   it('blocks the order when a product is priced but has no weight', () => {
     pricing.cherry = { price: eur(24.5), packedWeightGrams: 0 }
 
-    const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'cod')
+    const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY)
 
     // A priced-but-weightless product would fail at the shipping step, after
     // the customer had already filled in their address.
@@ -66,7 +66,7 @@ describe('calculateTotal', () => {
     withNothingConfigured(() => {
       pricing.cherry = { price: eur(24.5), packedWeightGrams: 500 }
 
-      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'cod')
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY)
 
       expect(result.status).toBe('incomplete')
       if (result.status === 'incomplete') {
@@ -81,7 +81,7 @@ describe('calculateTotal', () => {
     // customer will be quoted. 19.99 × 2 = 39.98 goods; 2 × 250 g candle plus
     // the 150 g carton is 650 g, which picks the first placeholder band at
     // 4.99; merchant absorbs the COD fee.
-    const result = calculateTotal([{ slug: 'cherry', quantity: 2 }], DELIVERY, 'cod')
+    const result = calculateTotal([{ slug: 'cherry', quantity: 2 }], DELIVERY)
 
     expect(result.status).toBe('ok')
     if (result.status !== 'ok') return
@@ -100,8 +100,7 @@ describe('calculateTotal', () => {
           { slug: 'cherry', quantity: 2 },
           { slug: 'vanilla', quantity: 1 },
         ],
-        DELIVERY,
-        'card'
+        DELIVERY
       )
 
       expect(result.status).toBe('ok')
@@ -118,7 +117,7 @@ describe('calculateTotal', () => {
 
   it('keeps shipping as its own line, as consumer law requires', () => {
     withPricedCatalogue(() => {
-      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'card')
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY)
 
       expect(result.status).toBe('ok')
       if (result.status !== 'ok') return
@@ -130,15 +129,19 @@ describe('calculateTotal', () => {
 
   it('adds no COD fee while the merchant absorbs it (Q-23)', () => {
     withPricedCatalogue(() => {
-      const card = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'card')
-      const cod = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, 'cod')
+      // Cash on delivery is the only method, so this fee is on every order or on
+      // none. It is currently absorbed, which must show as a null fee rather than
+      // as a zero silently folded into the total — the day the owner decides to
+      // pass it on, the customer has to see it as its own line.
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY)
 
-      expect(card.status).toBe('ok')
-      expect(cod.status).toBe('ok')
-      if (card.status !== 'ok' || cod.status !== 'ok') return
+      expect(result.status).toBe('ok')
+      if (result.status !== 'ok') return
 
-      expect(cod.codFee).toBeNull()
-      expect(cod.total.amountMinor).toBe(card.total.amountMinor)
+      expect(result.codFee).toBeNull()
+      expect(result.total.amountMinor).toBe(
+        result.goods.amountMinor + result.shipping.amountMinor
+      )
     })
   })
 
@@ -146,7 +149,7 @@ describe('calculateTotal', () => {
     withPricedCatalogue(() => {
       // A cart line carries only a slug and a quantity — there is no field a
       // tampered client could use to name its own price.
-      const result = calculateTotal([{ slug: 'cherry', quantity: 3 }], DELIVERY, 'card')
+      const result = calculateTotal([{ slug: 'cherry', quantity: 3 }], DELIVERY)
 
       expect(result.status).toBe('ok')
       if (result.status !== 'ok') return
@@ -156,15 +159,15 @@ describe('calculateTotal', () => {
   })
 
   it('throws on input that can only be a bug or tampering', () => {
-    expect(() => calculateTotal([], DELIVERY, 'card')).toThrow(CartError)
+    expect(() => calculateTotal([], DELIVERY)).toThrow(CartError)
     expect(() =>
-      calculateTotal([{ slug: 'cherry', quantity: 0 }], DELIVERY, 'card')
+      calculateTotal([{ slug: 'cherry', quantity: 0 }], DELIVERY)
     ).toThrow(CartError)
     expect(() =>
-      calculateTotal([{ slug: 'cherry', quantity: -1 }], DELIVERY, 'card')
+      calculateTotal([{ slug: 'cherry', quantity: -1 }], DELIVERY)
     ).toThrow(CartError)
     expect(() =>
-      calculateTotal([{ slug: 'cherry', quantity: 1.5 }], DELIVERY, 'card')
+      calculateTotal([{ slug: 'cherry', quantity: 1.5 }], DELIVERY)
     ).toThrow(CartError)
   })
 })

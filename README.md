@@ -161,5 +161,6 @@ deliberate trade: the stricter nonce-based CSP requires dynamic rendering on
 every request. `'unsafe-inline'` is needed by Next's inline bootstrap scripts
 and by framer-motion's inline styles.
 
-Adding Stripe will require CSP and `Permissions-Policy` changes — both are
-marked with `TODO` comments in `next.config.ts`.
+No payment provider is loaded, and none is planned: наложен платеж is the only
+payment method, so `Permissions-Policy` keeps `payment=()` and the CSP needs no
+third-party script origin. See `src/lib/payments.ts`.

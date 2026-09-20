@@ -9,7 +9,6 @@ import { COURIERS, DELIVERY_METHODS, type Courier, type DeliveryMethod } from '@
 import CourierMark from './CourierMark'
 import OfficePicker from './OfficePicker'
 import OrderSummary from './OrderSummary'
-import type { PaymentMethod } from '@/lib/payments'
 
 /**
  * Delivery and payment form (AUDIT.md Q-21, Q-25).
@@ -120,8 +119,15 @@ function Field({
 interface Props {
   /** Cart lines, serialised into the form so the action can re-price them. */
   cart: Array<{ slug: string; quantity: number }>
-  /** Methods the server can actually take payment with. */
-  paymentMethods: readonly PaymentMethod[]
+  /**
+   * Idempotency key for this attempt, minted by the page (AUDIT.md B-09).
+   *
+   * Submitted as a hidden field and *not* regenerated here: the point is that
+   * every submission of this rendered page carries the same value, so a
+   * double-click, an impatient second press or a retried request all resolve to
+   * one order rather than two parcels.
+   */
+  intentToken: string
   /** True when at least one courier rate card exists (Q-22). */
   shippingConfigured: boolean
   /**
@@ -138,7 +144,7 @@ interface Props {
 
 export default function DeliveryForm({
   cart,
-  paymentMethods,
+  intentToken,
   shippingConfigured,
   officeLookup = [],
   officeDataIsDemo = false,
@@ -178,6 +184,18 @@ export default function DeliveryForm({
    */
   const summary =
     state.summary && sameBasket(state.summary.lines, cart) ? state.summary : undefined
+
+  /** An order exists on the server. Nothing in this form can alter it now. */
+  const placed = state.status === 'placed'
+
+  /**
+   * Whether the message below reports on the order rather than on a mistake.
+   *
+   * `placed` and `readyToPay` are both news, not errors, so they are announced
+   * politely (`role="status"`) in the body colour; everything else is an `alert`
+   * in red. The two are deliberately different states — see the action.
+   */
+  const informational = placed || state.status === 'readyToPay'
 
   /** Field error text, or undefined. Codes are namespaced to avoid collisions. */
   const errorFor = (field: string): string | undefined => {
@@ -241,6 +259,7 @@ export default function DeliveryForm({
   return (
     <form action={formAction} className="space-y-8">
       <input type="hidden" name="cart" value={JSON.stringify(cart)} />
+      <input type="hidden" name="intentToken" value={intentToken} />
 
       {!shippingConfigured && (
         <p role="note" className="rounded-sm bg-cream-surface p-4 text-xs text-ink-secondary">
@@ -445,37 +464,47 @@ export default function DeliveryForm({
         </div>
       </fieldset>
 
-      <fieldset className="space-y-3">
-        <legend className="font-serif text-lg text-charcoal">{t('payment')}</legend>
-        {paymentMethods.map((option) => (
-          <label key={option} className="flex items-start gap-3 text-sm text-charcoal">
-            <input
-              type="radio"
-              name="paymentMethod"
-              value={option}
-              defaultChecked={option === (restore('paymentMethod') ?? paymentMethods[0])}
-              className="mt-1"
-            />
-            <span>
-              {t(`paymentMethod.${option}`)}
-              <span className="block text-xs text-ink-ghost">{t(`paymentHint.${option}`)}</span>
-            </span>
-          </label>
-        ))}
-        {/*
-          No note about card payment being "not connected yet". The shop takes
-          cash on delivery, by decision and not for want of a Stripe key, so
-          promising a card option would be advertising something that is not
-          coming. `availablePaymentMethods()` still drives this list, so if that
-          decision ever changes the option appears on its own.
-        */}
-      </fieldset>
+      {/*
+        Stated, not chosen — and with no input at all.
+
+        Наложен платеж is the only way to pay (`src/lib/payments.ts`), so a radio
+        group with one option would ask a question that has no second answer, and
+        a hidden field would invite the server to trust a value it already knows.
+        The action names the method itself. No apology for an absent card option
+        either: card payment is a decision, not a missing key, and hinting at one
+        would advertise something that is not coming.
+      */}
+      <section aria-labelledby="payment-heading" className="space-y-1">
+        <h2 id="payment-heading" className="font-serif text-lg text-charcoal">
+          {t('payment')}
+        </h2>
+        <p className="text-sm text-charcoal">{t('paymentMethod.cod')}</p>
+        <p className="text-xs text-ink-ghost">{t('paymentHint.cod')}</p>
+      </section>
 
       {/*
         The priced breakdown, shown only once the server has produced one — and
         only while it still describes the basket in front of the customer.
       */}
       {summary && <OrderSummary summary={summary} locale={locale} />}
+
+      {/*
+        The order number, and the only place the customer is told it — there is no
+        confirmation email yet (B-17) and no confirmation page, so this is the
+        record they have. Hence the size and the `aria-live`: a screen-reader user
+        must hear it, not have to go looking for it.
+      */}
+      {placed && state.order && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="space-y-2 rounded-sm border border-clay/40 bg-cream-surface p-6"
+        >
+          <p className="font-serif text-lg text-charcoal">{t('orderPlaced.heading')}</p>
+          <p className="text-xs text-ink-secondary">{t('orderPlaced.numberLabel')}</p>
+          <p className="font-mono text-base tracking-wide text-charcoal">{state.order.number}</p>
+        </div>
+      )}
 
       {/*
         The collection point as the courier describes it, not as the form does.
@@ -494,19 +523,26 @@ export default function DeliveryForm({
 
       {state.status !== 'idle' && state.messageKey && (
         <p
-          role={state.status === 'readyToPay' ? 'status' : 'alert'}
-          className={`text-xs ${state.status === 'readyToPay' ? 'text-ink-secondary' : 'text-red-700'}`}
+          role={informational ? 'status' : 'alert'}
+          className={`text-xs ${informational ? 'text-ink-secondary' : 'text-red-700'}`}
         >
           {t(`message.${state.messageKey}`)}
         </p>
       )}
 
+      {/*
+        Disabled once an order exists, because this form can no longer change it.
+        Pressing again would replay the same intent token and return the same
+        order — harmless, but it would look like an edit had been accepted when a
+        corrected address went nowhere. A new order needs a reloaded page, which
+        mints a new token.
+      */}
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || placed}
         className="w-full rounded-sm bg-charcoal px-6 py-3 text-xs font-medium uppercase tracking-wide text-cream-base transition-opacity duration-200 hover:opacity-80 disabled:opacity-50"
       >
-        {pending ? t('submitting') : t('submit')}
+        {pending ? t('submitting') : placed ? t('submitted') : t('submit')}
       </button>
     </form>
   )

@@ -260,7 +260,7 @@
           },
           {
             "heading": "6. Payment",
-            "body": "[TODO: list the accepted payment methods, including whether cash on delivery (наложен платеж) is offered and any fee for it.] We never see or store your full card details."
+            "body": "Payment is by cash on delivery (наложен платеж) only: you pay the courier in cash when the parcel is handed to you. We accept no card payments, so no card details are ever entered on this website. [TODO: state the cash-on-delivery fee, if any, and whether the customer or we pay it.]"
           },
           {
             "heading": "7. Delivery",
@@ -306,11 +306,11 @@
           },
           {
             "heading": "2. What we collect today",
-            "body": "This website does not currently take orders and has no user accounts. If you use the contact form we handle the name, email address and message you send us, in order to answer you. We load no analytics, advertising or tracking services."
+            "body": "This website has no user accounts. If you use the contact form we handle the name, email address and message you send us, in order to answer you. If you place an order we record the recipient name, telephone number, email address, delivery address or collection point, and what you ordered, because we cannot deliver a parcel without them. We load no analytics, advertising or tracking services."
           },
           {
             "heading": "3. What we will collect when the shop opens",
-            "body": "[TODO: complete before the first order can be placed.] Expected: name, delivery address, email address, telephone number, order contents and history, and payment status. Card details are handled by our payment provider and never reach our servers."
+            "body": "[TODO: complete before the first order can be placed.] Expected: name, delivery address, email address, telephone number, order contents and history, and whether the courier has collected and remitted the cash on delivery. We take no card payments, so no card data is collected anywhere."
           },
           {
             "heading": "4. Why we process it, and on what legal basis",
@@ -478,15 +478,16 @@
     "breadcrumbHome": "Home",
     "title": "Checkout",
     "intro": "Tell us where the parcel should go and how you would like to pay.",
-    "notLiveYet": "This checkout is not live yet. Orders cannot be placed: there is nowhere to store one. The form below is complete and validates everything for real — but nothing you enter is saved or sent.",
+    "notLiveYet": "This checkout is not live yet. An order you submit is recorded for real, but the delivery rates are still placeholders and we can't email you a confirmation yet, so please don't use it for a real order — contact us instead and we'll take it directly.",
     "unpricedCount": "{count, plural, one {# product is still unpriced.} other {# products are still unpriced.}}",
     "shippingNotConfigured": "Delivery prices are not set yet, so no shipping cost can be shown. They come from the courier merchant contracts.",
     "recipient": "Recipient",
     "delivery": "Delivery",
     "payment": "Payment",
     "optional": "(optional)",
-    "submit": "Continue to payment",
-    "submitting": "Checking…",
+    "submit": "Place order",
+    "submitted": "Order placed",
+    "submitting": "Placing your order…",
     "officeLookupPending": "Type the office name or number for now. A searchable list will appear here once the courier accounts are connected.",
     "field": {
       "recipientName": "Full name",
@@ -537,11 +538,9 @@
       }
     },
     "paymentMethod": {
-      "card": "Card",
       "cod": "Cash on delivery"
     },
     "paymentHint": {
-      "card": "Paid securely now. Your card details never reach us.",
       "cod": "Pay the courier in cash when the parcel arrives."
     },
     "error": {
@@ -589,13 +588,18 @@
     },
     "message": {
       "fixTheFields": "Please check the highlighted fields.",
-      "choosePayment": "Please choose how you'd like to pay.",
-      "paymentUnavailable": "That payment method isn't available. Please choose another.",
       "cartEmpty": "Your basket is empty.",
       "cartUnreadable": "Something went wrong reading your basket. Please start again.",
       "notPricedYet": "One or more items in your basket has no price yet, so the order can't be completed. Please contact us and we'll help directly.",
       "deliveryNotPricedYet": "We can't calculate delivery for that choice yet. Please contact us and we'll arrange it directly.",
-      "noOrderStorageYet": "Your details are valid, but orders can't be saved yet, so nothing has been placed and no payment was taken. Please contact us to order."
+      "noOrderStorageYet": "Your details are valid, but orders can't be saved yet, so nothing has been placed and no payment was taken. Please contact us to order.",
+      "orderPlacedCod": "Your order is saved and you'll pay the courier on delivery. We don't send confirmation emails yet, so please keep the number above — we'll call to confirm the parcel.",
+      "orderNotSaved": "We couldn't save your order, so nothing has been placed and no payment was taken. Please try again in a moment, or contact us and we'll take it directly.",
+      "formOutdated": "This page has been open too long. Please reload it and submit again — nothing has been placed."
+    },
+    "orderPlaced": {
+      "heading": "Order received",
+      "numberLabel": "Your order number"
     },
     "provisionalNumbers": "The prices shown are real, but the parcel weights and delivery rates are placeholders while the courier contracts are being set up. Delivery costs shown here are illustrative and are not what you would be charged.",
     "basket": "Your basket",

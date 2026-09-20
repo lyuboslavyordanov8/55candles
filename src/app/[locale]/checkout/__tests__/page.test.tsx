@@ -89,7 +89,9 @@ describe('CheckoutPage', () => {
     await renderPage('cherry:1')
 
     expect(screen.getByLabelText(/full name/i)).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /cash on delivery/i })).toBeInTheDocument()
+    // Payment is stated, not offered as a choice — cash on delivery is the only
+    // method (`src/lib/payments.ts`), so the form has no radio to click.
+    expect(screen.getByText(/cash on delivery/i)).toBeInTheDocument()
   })
 
   it('searches real offices with no configuration, and says nothing about test data', async () => {

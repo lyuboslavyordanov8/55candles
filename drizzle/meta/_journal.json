@@ -8,6 +8,20 @@
       "when": 1786368001544,
       "tag": "0000_lumpy_iceman",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789924456452,
+      "tag": "0001_jazzy_hitman",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789926869556,
+      "tag": "0002_condemned_rattler",
+      "breakpoints": true
     }
   ]
 }

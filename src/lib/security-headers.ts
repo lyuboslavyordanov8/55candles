@@ -52,9 +52,9 @@ export function buildSecurityHeaders(isDev: boolean): SecurityHeader[] {
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
     // Redundant with frame-ancestors above, kept for older browsers.
     { key: 'X-Frame-Options', value: 'DENY' },
-    // TODO(AUDIT.md Phase 3): `payment=()` disables the Payment Request API,
-    // which Stripe needs for Apple Pay / Google Pay. Relax to
-    // `payment=(self "https://js.stripe.com")` when wallets are enabled.
+    // `payment=()` disables the Payment Request API outright. Nothing to relax:
+    // наложен платеж is the only payment method, so no wallet or card script is
+    // ever loaded and the browser should refuse one if a page ever tries.
     {
       key: 'Permissions-Policy',
       value: 'camera=(), microphone=(), geolocation=(), payment=()',

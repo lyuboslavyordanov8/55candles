@@ -3,8 +3,13 @@
 import { courierClient } from '@/lib/couriers'
 import { validateDelivery, type DeliveryDetails, type FieldErrors } from '@/lib/delivery-schema'
 import { calculateTotal, type CartLine } from '@/lib/order-total'
-import { availablePaymentMethods, type PaymentMethod } from '@/lib/payments'
-import { PAYMENT_METHODS } from '@/lib/payments'
+import {
+  createOrder,
+  INTENT_TOKEN_MAX,
+  isOrderStorageReady,
+  type PlacedOrder,
+} from '@/lib/orders'
+import { PAYMENT_METHOD } from '@/lib/payments'
 import type { DeliveryOption } from '@/lib/shipping'
 
 /**
@@ -21,10 +26,15 @@ import type { DeliveryOption } from '@/lib/shipping'
  * 2. **Validation runs again here**, even though the form validates as you
  *    type, because the form is a convenience and this is the boundary.
  *
- * No order is persisted: there is no database yet (Q-34). The action therefore
- * stops at `readyToPay` and says so, rather than pretending an order exists.
- * That is the same principle as the contact form (B-20) — a visible refusal
- * beats a silent lie.
+ * The order *is* persisted now (Q-34, B-01): a valid submission writes it, its
+ * lines and its first status event, and the customer is given the order number.
+ * Nothing is collected here and nothing ever will be — наложен платеж is the only
+ * payment method (`src/lib/payments.ts`), so the courier collects on delivery and
+ * `placed` means "we have your order", never "we have your money".
+ *
+ * Where no database is configured the action still stops at `readyToPay` and says
+ * so, rather than pretending an order exists. Same principle as the contact form
+ * (B-20): a visible refusal beats a silent lie.
  */
 
 /**
@@ -35,14 +45,7 @@ import type { DeliveryOption } from '@/lib/shipping'
  * own; these are plain uncontrolled inputs, and React clears those when an
  * action completes unless it is handed something to restore them to.
  */
-export type EchoedField =
-  | 'recipientName'
-  | 'phone'
-  | 'email'
-  | 'street'
-  | 'officeId'
-  | 'note'
-  | 'paymentMethod'
+export type EchoedField = 'recipientName' | 'phone' | 'email' | 'street' | 'officeId' | 'note'
 
 /**
  * Hard ceiling on an echoed value, in characters.
@@ -57,24 +60,37 @@ const ECHO_MAX = 1_000
 export interface CheckoutState {
   status:
     | 'idle'
-    /** Everything validated and priced; payment is the next step. */
+    /** The order is stored. See `order` for its number. */
+    | 'placed'
+    /**
+     * Everything validated and priced, but nothing stored — reached only where
+     * no database is configured. Deliberately not called a success.
+     */
     | 'readyToPay'
     | 'invalid'
-    /** Prices, tariffs or a provider are not configured yet. */
+    /** Prices or courier tariffs are not configured yet (B-03, Q-22). */
     | 'unconfigured'
     | 'error'
   fieldErrors?: FieldErrors
   /**
    * What was submitted, sent straight back so the form can put it in the boxes
    * again. Present on every outcome: one wrong field must not cost the customer
-   * the other eight, and even a successful submission has no order behind it yet
-   * (Q-34), so wiping the form would lose details that are still needed.
+   * the other eight, and after a success the details are what they read back to
+   * check the parcel is going where they meant it to.
    */
   values?: Partial<Record<EchoedField, string>>
   /** Human-readable message key, resolved by the client against `checkout`. */
   messageKey?: string
   /** Slugs with no price (B-03), for a specific message. */
   unpriced?: string[]
+  /**
+   * The stored order, present only with `placed`.
+   *
+   * The number and nothing else: the row's id and its `public_token` stay on the
+   * server until there is a confirmation page to address with them, and a token
+   * that is never rendered cannot leak into a screenshot or a browser history.
+   */
+  order?: { number: string }
   /**
    * The collection point as the *courier* describes it, echoed back so the
    * customer confirms the right place before paying. Absent for door delivery,
@@ -111,29 +127,24 @@ export async function submitCheckout(
 
   const delivery = validateDelivery(raw)
 
-  const paymentMethod = String(raw.paymentMethod ?? '')
-  const isKnownMethod = (PAYMENT_METHODS as readonly string[]).includes(paymentMethod)
-
   // Attached to every return below, including the successful one. Built from the
   // validated values rather than `raw`, so what comes back is trimmed and the
   // phone number is in its canonical form.
-  const values = echo(delivery.value, paymentMethod)
+  const values = echo(delivery.value)
 
-  if (!delivery.valid || !isKnownMethod) {
+  if (!delivery.valid) {
     return {
       status: 'invalid',
       values,
       fieldErrors: delivery.errors,
-      messageKey: isKnownMethod ? 'fixTheFields' : 'choosePayment',
+      messageKey: 'fixTheFields',
     }
   }
 
-  if (!availablePaymentMethods().includes(paymentMethod as PaymentMethod)) {
-    // Card was submitted but Stripe is not configured. Reachable only by a
-    // direct POST, since the UI hides unavailable methods.
-    return { status: 'unconfigured', values, messageKey: 'paymentUnavailable' }
-  }
-
+  // The payment method is not read from the request at all. There is exactly one
+  // (наложен платеж), so the server names it; a `paymentMethod` in the payload is
+  // ignored rather than validated, because there is no second value it could
+  // legitimately ask for and no branch it could reach.
   const office = await resolveOffice(delivery.value)
 
   if (office.status === 'unknown') {
@@ -163,7 +174,7 @@ export async function submitCheckout(
 
   let total
   try {
-    total = calculateTotal(lines, option, paymentMethod as PaymentMethod)
+    total = calculateTotal(lines, option)
   } catch {
     // CartError — a quantity or slug that could only come from tampering.
     return { status: 'error', values, messageKey: 'cartUnreadable' }
@@ -178,21 +189,11 @@ export async function submitCheckout(
     }
   }
 
-  // [TODO: Q-34 — persist the order, then Q-20 — create the payment intent.]
-  //
-  // Order of operations when the database exists: write the order with status
-  // `pending` *first*, then initiate payment with its reference. An order that
-  // exists without a payment can be chased; a payment that exists without an
-  // order is money received against nothing.
-  //
-  // Write `office.snapshot` to `orders.office_name` / `office_address`, **not**
-  // the values that arrived in the form — those came from a client and a client
-  // can say anything. `resolveOffice` has already replaced them with the
-  // courier's own record wherever the courier could be reached.
-  return {
-    status: 'readyToPay',
+  // Everything below is priced and valid, so these two go on every remaining
+  // outcome — including the failures, where the customer should still be able to
+  // see what they were about to buy.
+  const priced = {
     values,
-    messageKey: 'noOrderStorageYet',
     ...(office.snapshot ? { collectionPoint: office.snapshot } : {}),
     summary: {
       lines: total.lines.map((line) => ({
@@ -208,6 +209,52 @@ export async function submitCheckout(
       weightGrams: total.weightGrams,
     },
   }
+
+  if (!isOrderStorageReady()) {
+    // No DATABASE_URL. Priced, valid, and not taken — said plainly, because the
+    // alternative is a customer who believes they have ordered.
+    return { status: 'readyToPay', ...priced, messageKey: 'noOrderStorageYet' }
+  }
+
+  const intentToken = String(raw.intentToken ?? '').trim()
+
+  if (!intentToken || intentToken.length > INTENT_TOKEN_MAX) {
+    // The page mints this token and the form replays it, so an absent one means
+    // a form that was rendered before this field existed, or a hand-built POST.
+    // Minting one here instead would be worse than refusing: it would remove the
+    // double-submit protection precisely for the request that arrived without it.
+    return { status: 'error', ...priced, messageKey: 'formOutdated' }
+  }
+
+  let placed: PlacedOrder
+  try {
+    // Written before any payment is initiated — see `src/lib/orders.ts`. The
+    // office snapshot passed here is `office.snapshot`, the courier's own record,
+    // never the name and address that arrived in the form.
+    placed = await createOrder({
+      intentToken,
+      delivery: delivery.value,
+      office: office.snapshot,
+      officeVerified: office.verified,
+      paymentMethod: PAYMENT_METHOD,
+      total,
+    })
+  } catch (error) {
+    // The order was not stored, so nothing may suggest it was. Logged with the
+    // intent token so a support request can be matched to this attempt.
+    console.error(`[checkout] Could not store the order (intent ${intentToken}):`, error)
+    return { status: 'error', ...priced, messageKey: 'orderNotSaved' }
+  }
+
+  return {
+    status: 'placed',
+    ...priced,
+    order: { number: placed.orderNumber },
+    // Confirmed, and unpaid until the courier collects — the message says both,
+    // because "your order is placed" alone would leave the customer unsure whether
+    // they still owe anything.
+    messageKey: 'orderPlacedCod',
+  }
 }
 
 /**
@@ -217,10 +264,7 @@ export async function submitCheckout(
  * form fall back to its own default, which is what "the customer left this
  * blank" should mean, and it keeps the payload to the fields actually filled in.
  */
-function echo(
-  delivery: DeliveryDetails,
-  paymentMethod: string
-): Partial<Record<EchoedField, string>> {
+function echo(delivery: DeliveryDetails): Partial<Record<EchoedField, string>> {
   const submitted: Record<EchoedField, string> = {
     recipientName: delivery.recipientName,
     phone: delivery.phone,
@@ -228,7 +272,6 @@ function echo(
     street: delivery.street,
     officeId: delivery.officeId,
     note: delivery.note,
-    paymentMethod,
   }
 
   const values: Partial<Record<EchoedField, string>> = {}
@@ -240,8 +283,18 @@ function echo(
 }
 
 type OfficeResolution =
-  /** Verified against the courier, or not applicable to this delivery method. */
-  | { status: 'ok'; snapshot?: { name: string; address: string } }
+  | {
+      /** Accepted: confirmed by the courier, taken on trust, or door delivery. */
+      status: 'ok'
+      snapshot?: { name: string; address: string }
+      /**
+       * True only when a courier confirmed the code. False when it was accepted
+       * because the courier could not be reached or has no credentials — the
+       * waybill step has to re-check those, so the distinction is recorded on the
+       * order's creation event rather than being thrown away here.
+       */
+      verified: boolean
+    }
   /** The courier answered, and has no office with that code. */
   | { status: 'unknown' }
 
@@ -267,7 +320,9 @@ type OfficeResolution =
  * discarded.
  */
 async function resolveOffice(delivery: DeliveryDetails): Promise<OfficeResolution> {
-  if (delivery.method === 'door') return { status: 'ok' }
+  // Door delivery has no office to verify; `verified` is false because nothing
+  // was, and no waybill step will look for one.
+  if (delivery.method === 'door') return { status: 'ok', verified: false }
 
   const result = await courierClient(delivery.courier).findOffice(delivery.officeId)
 
@@ -276,6 +331,7 @@ async function resolveOffice(delivery: DeliveryDetails): Promise<OfficeResolutio
     // fallback field. There is nothing to check it against.
     return {
       status: 'ok',
+      verified: false,
       snapshot: delivery.officeName
         ? { name: delivery.officeName, address: delivery.officeAddress }
         : undefined,
@@ -289,6 +345,7 @@ async function resolveOffice(delivery: DeliveryDetails): Promise<OfficeResolutio
     )
     return {
       status: 'ok',
+      verified: false,
       snapshot: delivery.officeName
         ? { name: delivery.officeName, address: delivery.officeAddress }
         : undefined,
@@ -299,6 +356,7 @@ async function resolveOffice(delivery: DeliveryDetails): Promise<OfficeResolutio
 
   return {
     status: 'ok',
+    verified: true,
     snapshot: { name: result.data.name, address: result.data.address },
   }
 }

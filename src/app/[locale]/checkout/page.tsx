@@ -6,28 +6,31 @@ import type { Metadata } from 'next'
 import { isLocale } from '@/i18n/locales'
 import BasketEditor from '@/components/commerce/BasketEditor'
 import DeliveryForm from '@/components/commerce/DeliveryForm'
-import { availablePaymentMethods, type PaymentMethod } from '@/lib/payments'
 import { isShippingConfigured, TARIFFS_ARE_PLACEHOLDER, type Courier } from '@/lib/shipping'
 import { couriersWithOfficeLookup, econtEnvironment } from '@/lib/couriers'
 import { unpricedSlugs, PRICING_IS_PROVISIONAL } from '@/data/pricing'
 import { parseCartParam } from '@/lib/cart-params'
 import type { CartLine } from '@/lib/order-total'
+import { newIntentToken } from '@/lib/orders'
 import { BreadcrumbJsonLd } from '@/components/seo/JsonLd'
 
 /**
  * Checkout (AUDIT.md Phase 4).
  *
  * The cart comes from the query string (`?items=cherry:2`) because there is no
- * database or session store yet — see `src/lib/cart-params.ts`. That makes the
- * order flow exercisable end to end while remaining honest: the URL carries
- * only slugs and quantities, and every price is re-read server-side.
+ * session store yet — see `src/lib/cart-params.ts`. That makes the order flow
+ * exercisable end to end while remaining honest: the URL carries only slugs and
+ * quantities, and every price is re-read server-side.
  *
- * `noindex` for the same reason the legal drafts are: an unfinished checkout
- * must not appear in search results.
+ * Orders themselves *are* stored (Q-34) — the action writes one and hands back its
+ * number — but the page still carries its "not live" notice and stays `noindex`,
+ * because the delivery rates are placeholders (Q-22), the legal pages are drafts
+ * and nothing can email a confirmation yet (B-17). An unfinished checkout must not
+ * appear in search results.
  *
- * Server Component. It reads what is configured on the server — payment
- * methods, tariffs, prices — and hands the form only what it needs, so no
- * credential check reaches the client bundle.
+ * Server Component. It reads what is configured on the server — tariffs, prices,
+ * courier credentials — and hands the form only what it needs, so no credential
+ * check reaches the client bundle.
  */
 
 export async function generateMetadata({
@@ -60,7 +63,15 @@ export default async function CheckoutPage({
     <CheckoutContent
       locale={locale}
       cart={parseCartParam((await searchParams).items)}
-      paymentMethods={availablePaymentMethods()}
+      /*
+        Minted per render, which is per request — this page reads `searchParams`,
+        so it is never cached and two customers can never share a token. It is
+        what makes a double-click one order (AUDIT.md B-09): the form replays this
+        value and `orders.intent_token` is unique. Changing the basket re-renders
+        the page and mints a new one, which is correct — that is a different
+        intent.
+      */
+      intentToken={newIntentToken()}
       shippingConfigured={isShippingConfigured()}
       unpricedCount={unpricedSlugs().length}
       officeLookup={couriersWithOfficeLookup()}
@@ -77,7 +88,7 @@ export default async function CheckoutPage({
 function CheckoutContent({
   locale,
   cart,
-  paymentMethods,
+  intentToken,
   shippingConfigured,
   unpricedCount,
   officeLookup,
@@ -85,7 +96,7 @@ function CheckoutContent({
 }: {
   locale: string
   cart: CartLine[]
-  paymentMethods: readonly PaymentMethod[]
+  intentToken: string
   shippingConfigured: boolean
   unpricedCount: number
   officeLookup: readonly Courier[]
@@ -160,7 +171,7 @@ function CheckoutContent({
 
             <DeliveryForm
               cart={cart}
-              paymentMethods={paymentMethods}
+              intentToken={intentToken}
               shippingConfigured={shippingConfigured}
               officeLookup={officeLookup}
               officeDataIsDemo={officeDataIsDemo}
