@@ -20,11 +20,6 @@
     "empty": "No candles found. Try another word.",
     "resultCount": "{count, plural, =0 {No results} one {# result} other {# results}}"
   },
-  "hero": {
-    "headline": "Candles you'll want to eat.",
-    "subtext": "Eco-friendly, non-toxic candles with hand-sculpted wax fruit. No nasties, ever.",
-    "cta": "Shop the collection"
-  },
   "values": {
     "eco": "Eco-friendly ingredients",
     "nonToxic": "No toxins, ever",
@@ -35,7 +30,7 @@
     "learnMore": "Learn more",
     "seasonal": "Seasonal",
     "comingSoon": "Coming soon",
-    "subtitle": "Five scents, each poured and painted by hand in Sofia.",
+    "subtitle": "Five scents. We pour them. You choose when to light them.",
     "viewAll": "View all candles",
     "imageAlt": "The {name} candle in its tin, against a painted illustration",
     "ratingLabel": "{rating} out of 5 stars, {count} reviews",
@@ -43,7 +38,9 @@
       "new": "New",
       "bestseller": "Bestseller"
     },
-    "photoOf": "Photo {index} of {total}"
+    "photoOf": "Photo {index} of {total}",
+    "scentCount": "{count, plural, one {# scent} other {# scents}}",
+    "seasonalCount": "{count, plural, one {# seasonal} other {# seasonal}}"
   },
   "discover": {
     "title": "Discover our world",
@@ -54,20 +51,18 @@
   },
   "storyTeaser": {
     "headline": "Not a dessert.\nNot a cocktail.\nJust a damn good candle.",
-    "body": "55 Candles brings together natural plant wax, fine fragrances and a little handmade magic in one simple tin. Made with care, served with mood, and ready to turn an ordinary day into something a little more special.",
+    "body": "55° candles brings together natural plant wax, fine fragrances and a little handmade magic in one simple tin. Made with care, served with mood, and ready to turn an ordinary day into something a little more special.",
     "cta": "Read more",
-    "imageAlt": "An Espresso Martini candle beside a takeaway coffee and a laptop on a walnut chair, with a tweed coat draped over its back",
-    "body2": "My idea is a simple one: to make scents you want to light not only for a special occasion, but simply because you are at home. Because sometimes the occasion is dinner. Sometimes it is a new book. And sometimes you just want the room to smell — and look — a little nicer."
+    "imageAlt": "An Espresso Martini candle beside a takeaway coffee and a laptop on a walnut chair, with a tweed coat draped over its back"
   },
   "testimonials": {
     "title": "What people say about us",
     "1name": "Anna M.",
-    "1text": "The cherry one looks so real I almost tried to eat it — and the scent is absolutely gorgeous.",
+    "1text": "It looks like a real cherry, it smells even better and yes — my first thought was to eat it.",
     "2name": "Sofia K.",
-    "2text": "Bought four as gifts. Everyone was obsessed. Already placed my second order.",
+    "2text": "I bought four as gifts. Everyone was delighted, and in the end I ordered one for myself too.",
     "3name": "Martin D.",
-    "3text": "Finally a candle that's actually eco-friendly and smells incredible. The espresso martini one is unreal.",
-    "_todo": "TODO: replace with real reviews — the three below are placeholders and must not go live. Publishing invented testimonials is a consumer-protection breach, not just bad copy.",
+    "3text": "I loved the Espresso Martini. It smells really good and looks great at home.",
     "starsLabel": "5 out of 5 stars"
   },
   "ctaBanner": {
@@ -96,24 +91,92 @@
     "addToCart": "Add to cart — coming soon",
     "relatedProducts": "You might also like",
     "orderNow": "Order now",
-    "notAvailable": "Not available yet"
+    "notAvailable": "Not available yet",
+    "ingredient": {
+      "soyWax": "Soy wax",
+      "cottonWick": "Cotton wick",
+      "fragranceOil": "Phthalate-free fragrance oil",
+      "waxDetail": "Hand-finished wax detail"
+    },
+    "copy": {
+      "cherry": {
+        "mood": "Playful",
+        "descriptor": "Sweet, ripe cherry",
+        "description": "A warm, playful cherry scent — rich and juicy, like late summer. Finished with a sculpted cherry detail that feels almost too perfect to light.",
+        "notes": {
+          "top": "Cherry, Raspberry",
+          "heart": "Rose, Jasmine",
+          "base": "Musk, Sandalwood"
+        }
+      },
+      "orange": {
+        "mood": "Bright",
+        "descriptor": "Fresh citrus peel",
+        "description": "Clean, bright citrus with a soft floral edge. Uplifting and effortless — like sunlight through an open window.",
+        "notes": {
+          "top": "Orange, Bergamot",
+          "heart": "White Tea, Neroli",
+          "base": "Cedarwood, Musk"
+        }
+      },
+      "vanilla": {
+        "mood": "Comforting",
+        "descriptor": "Soft vanilla cream",
+        "description": "Warm, smooth, and quietly indulgent. A comforting vanilla that settles into the space without ever overwhelming it.",
+        "notes": {
+          "top": "Vanilla Pod, Caramel",
+          "heart": "Tonka Bean, Amber",
+          "base": "Musk, Sandalwood"
+        }
+      },
+      "strawberry": {
+        "mood": "Juicy",
+        "descriptor": "Fresh garden strawberry",
+        "description": "Bright and juicy with a soft sweetness. Fresh-picked and vibrant, with a playful finish that lifts any space.",
+        "notes": {
+          "top": "Strawberry, Peach",
+          "heart": "Jasmine, Violet",
+          "base": "Musk, Light Wood"
+        }
+      },
+      "espresso-martini": {
+        "mood": "Deep",
+        "descriptor": "Dark espresso blend",
+        "description": "Rich espresso layered with soft vanilla and amber. Bold, smooth, and quietly indulgent — made for slower evenings.",
+        "notes": {
+          "top": "Espresso, Dark Chocolate",
+          "heart": "Vanilla, Tonka Bean",
+          "base": "Amber, Musk"
+        }
+      },
+      "winter-wonderland": {
+        "mood": "Seasonal",
+        "descriptor": "Crisp pine & spice",
+        "description": "A winter blend of pine, spice, and soft vanilla. Cool, comforting, and only here for a short time.",
+        "notes": {
+          "top": "Pine, Eucalyptus",
+          "heart": "Cinnamon, Clove",
+          "base": "Vanilla, Amber"
+        }
+      }
+    }
   },
   "ourStory": {
     "title": "Our story",
-    "intro": "55candles was born from a simple idea: candles should be honest, beautiful, and safe for your home.",
-    "edibleTitle": "Wait — is it edible?",
-    "edibleBody": "No. But we totally understand why you'd ask. The wax fruit on every candle is hand-sculpted to look almost impossibly real. It's a compliment we hear every day.",
+    "intro": "55° candles was born from a simple idea: candles should be honest, beautiful, and safe for your home.",
+    "edibleTitle": "Wait — is this edible?",
+    "edibleBody": "No. We know it looks like it. The fruit is wax, made by hand down to the last detail so that it looks almost real. Real enough that “is this edible?” is a perfectly fair question.",
     "valuesTitle": "What we stand for",
-    "value1Title": "Eco-friendly",
-    "value1Body": "Every candle uses soy wax and a cotton wick. No paraffin, no lead, no compromises.",
-    "value2Title": "Non-toxic",
-    "value2Body": "We use only phthalate-free fragrance oils. Safe for you, your family, and your pets.",
-    "value3Title": "Honest",
-    "value3Body": "No fillers, no mystery ingredients. Every component is listed on the label."
+    "value1Title": "What's inside?",
+    "value1Body": "Soy wax and a cotton wick. That's it. No paraffin, no lead, nothing you don't need.",
+    "value2Title": "A clean scent",
+    "value2Body": "Our fragrance oils are phthalate-free. Nothing complicated — just what we want in our own candles.",
+    "value3Title": "No mystery ingredients",
+    "value3Body": "Nothing hidden. Everything is written down, as it should be."
   },
   "candleCarePage": {
     "title": "Candle care",
-    "subtitle": "Simple steps to make your 55candles last longer and burn better.",
+    "subtitle": "Simple steps to make your 55° candles last longer and burn better.",
     "firstBurnTitle": "The first burn",
     "firstBurnBody": "Always burn your candle until the wax melts fully to the edges of the can — this usually takes 2 to 3 hours. Skipping this step can cause tunnelling, where wax builds up around the wick and reduces your candle's life.",
     "wickTitle": "Wick care",
@@ -173,11 +236,11 @@
     "docs": {
       "terms": {
         "title": "Terms and Conditions",
-        "summary": "The rules that apply when you buy from 55candles, who you are contracting with, and what you can expect from us.",
+        "summary": "The rules that apply when you buy from 55° candles, who you are contracting with, and what you can expect from us.",
         "sections": [
           {
             "heading": "1. Who we are",
-            "body": "This website is operated by ВиреонЛабс ЕООД (VireonLabs EOOD), ЕИК 208907603, trading as 55candles. Our full identification and contact details are set out below and in the footer of every page."
+            "body": "This website is operated by ВиреонЛабс ЕООД (VireonLabs EOOD), ЕИК 208907603, trading as 55° candles. Our full identification and contact details are set out below and in the footer of every page."
           },
           {
             "heading": "2. Scope",
@@ -411,7 +474,7 @@
   },
   "checkout": {
     "metaTitle": "Checkout",
-    "metaDescription": "Delivery and payment details for your 55candles order.",
+    "metaDescription": "Delivery and payment details for your 55° candles order.",
     "breadcrumbHome": "Home",
     "title": "Checkout",
     "intro": "Tell us where the parcel should go and how you would like to pay.",

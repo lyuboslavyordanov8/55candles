@@ -63,9 +63,19 @@ describe('ProductCard', () => {
     expect(screen.queryByText(/out of 5 stars/i)).not.toBeInTheDocument()
   })
 
+  // The badged candle is looked up rather than named: the badge belongs to
+  // whichever one the owner says is selling — it moved from Electric Cherry to
+  // Strawberry Cake — and this is a test of the card, not of that choice.
+  // `products.test.ts` is where the choice itself is pinned.
   it('shows the merchandising badge when one is set', () => {
-    renderCard()
-    expect(screen.getByText('Bestseller')).toBeInTheDocument()
+    const badged = products.find((p) => p.badge)!
+    renderCard(badged)
+    expect(screen.getByText(messages.collection.badge[badged.badge!])).toBeInTheDocument()
+  })
+
+  it('shows no badge on a candle without one', () => {
+    renderCard(cherry)
+    expect(screen.queryByText(/bestseller|new/i)).not.toBeInTheDocument()
   })
 
   it('shows out-of-season overlay when seasonal product is inactive', () => {

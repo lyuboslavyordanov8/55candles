@@ -100,6 +100,28 @@ describe('formatting', () => {
     expect(formatMoney(eur(24), 'en')).toMatch(/24\.00/)
   })
 
+  /*
+    The locale is a URL segment, so it is not always a locale. A request for a
+    missing static file routes to `app/[locale]/page.tsx` with the filename in
+    its place — the proxy skips any path with a dot — and `Intl.NumberFormat`
+    throws RangeError on a tag it cannot parse. That took the render down five
+    times per missing-icon request. The page guards the segment now; this is the
+    floor under the routes that do not.
+  */
+  it('falls back to the default locale rather than throwing on a tag Intl rejects', () => {
+    for (const junk of ['apple-touch-icon.png', 'site.webmanifest', '', 'null', 'x', 'bg_BG']) {
+      expect(() => formatMoney(eur(24.5), junk), junk).not.toThrow()
+      expect(formatMoney(eur(24.5), junk), junk).toBe(formatMoney(eur(24.5), 'en'))
+    }
+  })
+
+  // Regional and odd-cased tags are still tags — they must not be swallowed by
+  // the fallback above, or a `bg-BG` visitor silently gets English formatting.
+  it('keeps a valid tag, whatever its case or region', () => {
+    expect(formatMoney(eur(24.5), 'bg-BG')).toMatch(/24,50/)
+    expect(formatMoney(eur(24.5), 'BG')).toMatch(/24,50/)
+  })
+
   it('renders major units for Offer JSON-LD', () => {
     expect(toMajorUnits(eur(24.5))).toBe('24.50')
     expect(toMajorUnits(eur(24))).toBe('24.00')

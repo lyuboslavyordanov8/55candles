@@ -6,89 +6,145 @@ import { homeBanner, bannerText } from '@/content/home-banner'
 interface Props { locale: string }
 
 /**
- * How much taller than its natural proportions the band is drawn. 1 is
- * uncropped; above that, the sides are cropped to keep the aspect ratio.
+ * The hero's height once the photograph fills it.
+ *
+ * Kept deliberately short — the owner asked for a band the size of the hero this
+ * replaced, which was 520px, so that is the floor. A full-bleed 3:2 photograph in
+ * a band that shallow shows only part of its height: 624 of the source's 1024
+ * rows at 1280px, 522 from 1536px up, 486 at 2400px, 304 at 3840px. Showing the
+ * whole picture edge to edge at 1280px would take an 853px band, which is the
+ * height that was rejected as too tall.
+ *
+ * So the height is not a free choice: the crop window has to hold the candles, and
+ * the rows it converts to shrink as the viewport widens. `34vw` is the shallowest
+ * slope that keeps them in frame above 1536px; below that the 520px floor carries
+ * it. Measured results per width are in the anchor note below. The band also has to
+ * be deep enough to hold the words with air around them — at 1280px they are 252px
+ * of the 520px, which is the tightest it gets.
+ *
+ * The ceiling stops a zoomed-out browser reporting several thousand pixels of
+ * width from asking for a hero taller than any screen. It has a side effect worth
+ * knowing: above roughly 2235px the band stops growing while the crop keeps
+ * tightening, so the band's mid-height — where the words sit — slides down the
+ * picture onto the cushion. That is the 2560px contrast cliff in the note below the
+ * next constant.
  */
-const BAND_SCALE = 1.5
+const HERO_HEIGHT = 'xl:min-h-[clamp(520px,34vw,760px)]'
 
 /**
- * Ceiling on the band's height, in pixels.
+ * How far down the photograph is anchored inside that band, as
+ * `object-position`, in three viewport bands.
  *
- * The band is sized as a share of the viewport *width*, which is right up to a
- * point and ruinous past it: on a 2560px monitor that share is 755px, and a
- * browser zoomed out reports a viewport several thousand pixels wide and asks
- * for a band to match. The hero grew past 2000px tall. Above roughly 1424px the
- * band simply stops growing and crops a little more instead.
+ * **Measured, not chosen by eye.** A 3:2 photograph stretched edge to edge is
+ * always *width*-driven in a band this shallow: the whole width shows and only
+ * rows survive (the counts are in HERO_HEIGHT above). What has to fit in those
+ * rows is the tins, at source y 500–830.
  *
- * **The band's height is set directly, in `vw`, not via `aspect-ratio`.** That
- * is not a stylistic choice. `aspect-ratio` plus `max-height` does not merely
- * cap the height: the browser holds the ratio by shrinking the *width* to
- * match, so at a 2560px viewport the band collapsed to 1425px — 56% of the
- * window — and `left:0 right:0` became over-constrained and pinned it to the
- * left, leaving bare sand across the right of the banner. `vw` decouples the
- * two: the height follows the viewport width, and the width stays 100%.
+ * Measured share of the three tins' rows kept: 100% from 1280px to 2560px, with
+ * two dips — 99.8% around 1400px and 98% around 2500px, both the front tin's
+ * lower rim, never a label. Beyond that the window is simply too shallow to hold
+ * all three: 96% at 3200px, 92% at 3840px.
+ *
+ * These three values come from the earlier layout that put the words on the picture's
+ * bright top-left corner, where each one was the lowest crop whose subheading still
+ * cleared the dark cushion — which is why they are stepped rather than one number,
+ * and why the step lands at 1440px, the width where the Bulgarian heading stopped
+ * wrapping to a third line. Left as they are because this is the framing the owner
+ * signed off on.
+ *
+ * With the words back on the left of the bare photograph, this constant is again one
+ * of the two levers over their legibility (the other is the band's height): it decides
+ * what ends up underneath them. Whatever you change it to, re-measure — the note above
+ * the component has the numbers this crop produces and how they were taken.
+ *
+ * The bands are spelled as explicit `min-[…px]` variants, including the one that
+ * duplicates `xl`, so Tailwind emits them in ascending order regardless of how
+ * arbitrary variants sort against named breakpoints — the built CSS was checked
+ * for that order.
  */
-const BAND_MAX = '420px'
+const PHOTO_ANCHOR =
+  'object-cover min-[1280px]:object-[50%_57%] min-[1440px]:object-[50%_63%] min-[2560px]:object-[50%_67%]'
 
 /**
- * How far up the strip its dark artwork reaches, as a share of the strip's
- * height. The text clears this rather than the whole band, because the sky
- * above it is safe to sit on.
- *
- * **Measured, not estimated.** Scan the banner for the topmost pixel whose
- * contrast against `ink-primary` (#2E2521) drops below 4.5:1, across the
- * columns the centred text box covers once the crop is applied. Estimating by
- * eye gave 0.6, which would have put the button on dark green.
- *
- * There are two values because this artwork has a cliff in it. A centred window
- * up to 35% of the image stays clear down to 0.299 — only the middle hill is
- * under it — but at 40% the dark daisy leaves cut in and it jumps to 0.834.
- *
- * The text box is a fixed 672px (`max-w-2xl`), so which side of the cliff we
- * are on depends only on viewport width. Allowing for the crop, the box stops
- * covering more than 35% of the image at 1280px — which is why the breakpoint
- * below is `xl` and not something rounder. Narrower than that, the wide value
- * applies and the banner needs the tall clearance.
- */
-const HILLS_SHARE_NARROW = 0.875
-const HILLS_SHARE_WIDE = 0.4
-
-/**
- * Full-width banner with the heading, subheading and CTA centred over it.
+ * The hero: the photograph edge to edge, the words on its left at mid-height.
  *
  * **There is no content in this file.** The image, all four strings and the
  * link target come from `src/content/home-banner.ts` — edit that to change the
  * banner; this file only decides how it is arranged. That separation is the
  * whole point: swapping the banner should never mean reading layout code.
  *
- * ── Why the image is a band and not a background ───────────────────────────
- * The artwork is a wide strip — roughly 5:1 — of flat sand sky with illustrated
- * hills along the bottom. Stretched to cover the whole section it would crop to
- * a narrow slice of itself, so instead it is anchored along the bottom and the
- * section's own `bg-brand-sand` continues the sky above it. The sand token and
- * the artwork's sky differ by one step in the red channel, so the join is
- * invisible and the banner reads as one field.
+ * ── Nothing sits behind the words, and that is deliberate ──────────────────
+ * The owner asked for the words on the left of the banner at mid-height, with
+ * nothing at all behind them — no panel, no veil, no glow. This is that. Legibility
+ * is therefore a property of the *photograph*, not of this file, and it is why the
+ * left gutter, the block's width and the heading's size below are all measured
+ * against the picture rather than chosen typographically.
  *
- * ── BAND_SCALE ─────────────────────────────────────────────────────────────
- * Drawn at its natural proportions the strip is only about 20% of the viewport
- * width tall, which left the banner mostly empty sand. `BAND_SCALE` enlarges
- * it; the excess width is cropped equally from both sides, which costs the
- * daisies at the right edge and the pink shapes at the left.
+ * What the picture offers is a pale curtain down its left side; what it does not
+ * offer is anywhere for text in the lower left, where a pink cushion and a striped
+ * cloth sit. Mid-height on the left is the boundary between the two, so the numbers
+ * are good and not perfect. Measured on the rendered page at ten widths from 1280px
+ * to 3840px, sampling the real photograph under the **glyphs themselves** (a mask of
+ * the pixels the text changes, so the empty space inside a text box cannot flatter
+ * the result). Re-measure after any change to the two type sizes below — going from
+ * 40/16px to 44/18px moved the subheading's worst band from 3.9% to 9.3%:
  *
- * ── Clearance ──────────────────────────────────────────────────────────────
- * The text only has to clear the artwork's *dark* parts, not the whole band:
- * its sky is safe to sit on. `HILLS_SHARE` carries that measurement — see its
- * comment, and re-measure it whenever the banner or BAND_SCALE changes. Raising
- * BAND_SCALE without re-checking is how the button ends up on dark green.
+ *                       1280–2048px                    2560–3840px
+ *   heading    clears 3:1 everywhere          0.1% of glyph pixels under at
+ *                                             3200px, 2.3% at 3840px
+ *   subheading 0.1–9.3% of glyph pixels       36–44% under — it lands on the
+ *              under 4.5:1: its second        cushion outright and is not
+ *              line running onto the          readable there
+ *              cushion, worst at 1536px
  *
- * Both the band height and the clearance are percentages of *width*, which is
- * unusual but exactly right: percentage padding resolves against the
- * container's width, and the band's height is also a function of width, so the
- * two track each other at every viewport.
+ * The 2560px cliff is the band's height, not the anchor: from about 2235px up the
+ * band stops growing at its 760px ceiling while the crop keeps tightening, so the
+ * band's mid-height lands squarely on the cushion. The words would need to sit at
+ * roughly 40% of the band rather than 50% to clear it — a deliberate deviation from
+ * "at the middle", so it is not done here. Raising PHOTO_ANCHOR at those widths
+ * would work too and costs tin rows. The button never cares: it is solid ink with
+ * its own background.
  *
- * The header is `fixed` and about 100px tall, hence the `pt-36` — the same
- * clearance every other page uses. This is the only page whose content starts
- * at y=0, so it is the only one that has to think about it.
+ * Three treatments have been built and rejected here. Knowing which is which saves
+ * rebuilding one:
+ *
+ *  • **a veil over the whole photograph** — a flat cream scrim measured 1.0–3.2:1
+ *    and a radial fade 1.54:1; anything strong enough to work erased the picture;
+ *  • **a panel under the words** — a rounded `brand-sand` card at 88% over a blur
+ *    measured a flat 8.2:1 at every width, and was rejected on sight for looking
+ *    like a dialog box dropped on the banner. Contrast was never its problem;
+ *  • **an edgeless bloom** — one soft radial gradient of sand at 78%, no border
+ *    anywhere, measured 6.0–7.1:1 with nothing under threshold. Rejected too: the
+ *    haze over the middle of the picture was visible and unwanted.
+ *
+ * Ask before trying a fourth. The remaining levers that do not put anything on the
+ * photograph are: shorter copy (fewer glyphs reaching into the cushion), the crop in
+ * PHOTO_ANCHOR, and the photograph itself — `src/content/home-banner.ts` states what
+ * a new one has to give the words.
+ *
+ * ── Below 1280px the words move off the picture ────────────────────────────
+ * Below `xl` there is no room to lay words over the photograph at all, so the hero
+ * stacks instead — which is also the one place its text is reliably legible: the
+ * photograph whole at its own 3:2,
+ * nothing cropped, and the words below it on flat `brand-sand` where contrast is a
+ * property of two colour tokens (11.5:1 and 5.8:1). The ratio comes from
+ * `imageWidth`/`imageHeight` via a CSS variable, so a differently shaped photo
+ * needs no change here.
+ *
+ * ── Height ─────────────────────────────────────────────────────────────────
+ * See HERO_HEIGHT above.
+ *
+ * The header is `fixed` and opaque, so the photograph starts directly below it —
+ * `102px`, `120px` from `md` up, which is what `Navbar` measures (announcement
+ * bar plus a `py-5 md:py-6` row around an `h-4 md:h-5` logo). Other pages clear
+ * it with `pt-36` and let the slack be whitespace; here the slack would be a
+ * sand stripe across the top of a full-bleed picture. The exact number is the
+ * one coupling to another component in this file: if the header ever grows, its
+ * opaque white bar covers the first rows of the photograph, which is ugly but
+ * harmless — the words are centred in the band, nowhere near its top edge.
+ *
+ * The photograph deliberately does not run *under* the header: pixels behind an
+ * opaque white bar are pixels the visitor paid for and cannot see.
  *
  * Server Component. Only the entrance animations cross to the client, via
  * Reveal (AUDIT.md S-14).
@@ -103,112 +159,127 @@ export default function Hero({ locale }: Props) {
     subheading,
     ctaLabel,
     ctaHref,
-    scrimStrength,
   } = homeBanner
-
-  // Band height as a share of the viewport width, after scaling.
-  const bandRatio = (imageHeight / imageWidth) * BAND_SCALE
-
-  // Reserve the dark artwork plus 2 points of breathing room, so the last line
-  // lands on sky rather than touching the flowers. Each is capped in step with
-  // BAND_MAX — once the band stops growing, the clearance must stop too, or the
-  // hero keeps stretching for a band that is no longer getting taller.
-  //
-  // `vw`, not `%`, to match the band's own unit. Percentage padding resolves
-  // against the container width while the band resolves against the viewport,
-  // and those differ by the scrollbar — small, but it is the safety margin
-  // between the button and the dark artwork, so the two should not drift.
-  const clearance = (share: number, capPx: number) =>
-    `min(${(bandRatio * share * 100 + 2).toFixed(1)}vw, ${capPx}px)`
-
-  const bandMaxPx = parseInt(BAND_MAX, 10)
 
   return (
     <section
-      className="relative isolate overflow-hidden bg-brand-sand"
+      className="relative isolate bg-brand-sand pt-[102px] md:pt-[120px]"
       style={
         {
-          '--band-height': `min(${(bandRatio * 100).toFixed(1)}vw, ${BAND_MAX})`,
-          // Named CSS variables rather than interpolated class names: Tailwind
-          // only compiles class strings it can find in the source, so
-          // `pb-[${computed}]` would silently produce no CSS at all.
-          '--band-clearance': clearance(HILLS_SHARE_NARROW, bandMaxPx * HILLS_SHARE_NARROW + 16),
-          '--band-clearance-wide': clearance(HILLS_SHARE_WIDE, bandMaxPx * HILLS_SHARE_WIDE + 16),
+          // A named CSS variable rather than an interpolated class name:
+          // Tailwind only compiles class strings it can find in the source, so
+          // `aspect-[${imageWidth}/${imageHeight}]` would produce no CSS at all.
+          '--photo-ratio': `${imageWidth} / ${imageHeight}`,
         } as React.CSSProperties
       }
     >
       {/*
-        The band. Height comes from `vw` so it tracks the viewport width while
-        the box stays a full-width strip — see BAND_MAX for why this is not
-        `aspect-ratio`. A percentage height would be wrong too: it resolves
-        against the section's height, not its width. The image then covers this
-        box, cropping the sides.
+        The frame. At xl+ its min-height is the hero's height and the photograph
+        fills it absolutely; below xl it has no height of its own and simply
+        stacks the photograph above the words.
       */}
-      <div className="absolute inset-x-0 bottom-0 h-[var(--band-height)]">
-        <Image
-          src={image}
-          alt={bannerText(alt, locale)}
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-bottom"
-        />
-      </div>
+      <div className={`relative ${HERO_HEIGHT}`}>
+        {/*
+          The photograph. Its own ratio while stacked — so a phone sees the whole
+          picture — then absolutely filling the frame from xl up.
 
-      {scrimStrength > 0 && (
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              `linear-gradient(to bottom,` +
-              ` rgb(253 250 246 / ${scrimStrength}) 0%,` +
-              ` rgb(253 250 246 / ${scrimStrength * 0.85}) 45%,` +
-              ` rgb(253 250 246 / 0) 85%)`,
-          }}
-        />
-      )}
+          `sizes="100vw"` because it is edge to edge at every width; that makes
+          it the largest image the site ever requests, which is why `priority`
+          (it is the LCP element) and `quality={90}`, the higher of the two values
+          `next.config.ts` allows — a photograph of a dim room bands visibly
+          at 75.
+        */}
+        <div className="relative aspect-[var(--photo-ratio)] w-full xl:absolute xl:inset-0 xl:aspect-auto">
+          <Image
+            src={image}
+            alt={bannerText(alt, locale)}
+            fill
+            priority
+            quality={90}
+            sizes="100vw"
+            className={PHOTO_ANCHOR}
+          />
+        </div>
 
-      {/* Content, centred in the sand above the band. */}
-      {/*
-        `pt-36` clears the fixed header, which is about 90px tall — the same
-        allowance every other page makes. Less than that and the heading tucks
-        underneath it at wide viewports, where the band leaves little sand above
-        itself and the text sits high.
-      */}
-      <div className="relative flex min-h-[520px] items-center justify-center px-6 pt-36 pb-[var(--band-clearance)] md:min-h-[560px] lg:min-h-[600px] xl:pb-[var(--band-clearance-wide)]">
-        <div className="max-w-2xl text-center">
-          <Reveal
-            as="h1"
-            trigger="mount"
-            y={24}
-            duration={0.7}
-            className="font-serif text-4xl italic leading-[1.15] text-ink-primary sm:text-5xl lg:text-6xl"
-          >
-            {bannerText(heading, locale)}
-          </Reveal>
+        {/*
+          The words. Stacked below the photograph on a real sand panel until xl;
+          from xl up they are an overlay centred on the picture, both axes, laid
+          straight on the photograph with nothing between (see the note above the
+          component for what that costs).
 
-          <Reveal
-            as="p"
-            trigger="mount"
-            y={16}
-            delay={0.15}
-            className="mx-auto mt-6 max-w-md text-base leading-relaxed text-ink-secondary"
-          >
-            {bannerText(subheading, locale)}
-          </Reveal>
+          The overlay is `absolute inset-0` plus `flex items-center justify-center`
+          rather than a transform: the block's own height then decides where its
+          centre lands, so a reworded banner that wraps to another line stays
+          centred instead of drifting down.
 
-          <Reveal trigger="mount" y={12} delay={0.3} className="mt-9">
-            <Link
-              href={`/${locale}${ctaHref}`}
-              // px-6 rather than px-9: the owner asked for a narrower button.
-              // Only the horizontal padding moved — py-4 keeps the tap target
-              // comfortably above the 44px minimum.
-              className="inline-flex items-center justify-center rounded-full bg-ink-primary px-6 py-4 text-xs font-medium uppercase tracking-[0.18em] text-paper-white transition-colors duration-300 hover:bg-clay"
+          The vertical paddings are spelled out per side rather than as `py`:
+          Tailwind emits `p-*` before `px-*` before `pt-*`, so a bare `xl:p-10`
+          would lose to the `px-6`/`pb-14` above it — same variant weight, and the
+          base utility wins on source order.
+
+          The horizontal gutter is the opposite case, and it is why these steps are
+          `px-*` and not the `pl-*` they look like they want to be: `padding-left`
+          is emitted *before* `padding-inline` in the built sheet, so an
+          `xl:pl-16` loses to the `sm:px-10` above it and the words sat 40px from
+          the edge instead of 64px. Measured in the browser, not assumed. Keeping
+          the same property at every step makes the cascade plain breakpoint order;
+          the right half of the value is inert, since the block is left-aligned.
+
+          The gutter grows with the viewport so the words do not drift into a
+          corner on a wide monitor, and the steps are spelled as arbitrary
+          `min-[…px]` variants — including the one that duplicates `xl` — so they
+          sort ascending regardless of how arbitrary variants rank against named
+          breakpoints.
+        */}
+        <div className="relative px-6 pt-10 pb-14 text-center sm:px-10 xl:absolute xl:inset-0 xl:flex xl:items-center xl:justify-start xl:pt-10 xl:pb-10 xl:text-left min-[1280px]:px-16 min-[1920px]:px-24 min-[2560px]:px-32">
+          {/*
+            `max-w-md` (448px) is a contrast constraint, not a typographic one. With
+            the words on the left of the bare photograph, the width of this block is
+            how far right they reach — and the picture's clean pale strip runs out at
+            roughly x 400 at 1280px, where a dark vase and chair back begin. 448px
+            plus the 64px gutter lands the longest line just inside that. Widen it
+            and the ends of the lines walk onto the dark furniture.
+          */}
+          <div className="mx-auto max-w-lg xl:mx-0 xl:max-w-md">
+            <Reveal
+              as="h1"
+              trigger="mount"
+              y={24}
+              duration={0.7}
+              // 44px at xl rather than the 48px it gets on a phone's own sand
+              // panel: in this column 48px italic wraps the Bulgarian heading to
+              // four lines, and the fourth reaches below the pale strip.
+              className="font-serif text-4xl italic leading-[1.15] text-ink-primary sm:text-5xl xl:text-[2.75rem]"
             >
-              {bannerText(ctaLabel, locale)}
-            </Link>
-          </Reveal>
+              {bannerText(heading, locale)}
+            </Reveal>
+
+            <Reveal
+              as="p"
+              trigger="mount"
+              y={16}
+              delay={0.15}
+              // 18px at xl, up from 16px. It does not change what the subheading
+              // needs from the photograph: WCAG's easier 3:1 "large text" rule
+              // starts at 24px regular, so this is still 4.5:1 text.
+              className="mx-auto mt-6 max-w-md text-base leading-relaxed text-ink-secondary xl:mx-0 xl:max-w-sm xl:text-lg xl:text-ink-primary"
+            >
+              {bannerText(subheading, locale)}
+            </Reveal>
+
+            <Reveal trigger="mount" y={12} delay={0.3} className="mt-9">
+              <Link
+                href={`/${locale}${ctaHref}`}
+                // px-6 rather than px-9: the owner asked for a narrower button.
+                // Only the horizontal padding moved — py-4 keeps the tap target
+                // comfortably above the 44px minimum. Solid ink on white text, so
+                // unlike the text above it this needs nothing from the photo.
+                className="inline-flex items-center justify-center rounded-full bg-ink-primary px-6 py-4 text-xs font-medium uppercase tracking-[0.18em] text-paper-white transition-colors duration-300 hover:bg-clay"
+              >
+                {bannerText(ctaLabel, locale)}
+              </Link>
+            </Reveal>
+          </div>
         </div>
       </div>
     </section>

@@ -28,7 +28,7 @@ function Script({ data }: { data: unknown }) {
 /**
  * Identifies the trader. Uses the *legal* entity name with the brand as
  * `alternateName`, which is what B-16 requires and what lets search engines
- * connect "55candles" to ВиреонЛабс ЕООД.
+ * connect "55° candles" to ВиреонЛабс ЕООД.
  *
  * Unresolved identity fields are omitted rather than emitted as `[TODO: …]` —
  * structured data is machine-read, so a placeholder there is worse than
@@ -61,7 +61,10 @@ export function OrganizationJsonLd({ locale }: { locale: string }) {
         alternateName:
           locale === 'bg' ? company.legalNameLatin : company.legalName,
         url: absoluteUrl(`/${locale}`),
-        logo: absoluteUrl('/images/hero.webp'),
+        // The wordmark, not the banner. This field pointed at the homepage
+        // banner, which is a photograph of a table — Google shows `logo` as the
+        // organisation's mark in knowledge panels, so it has to be the mark.
+        logo: absoluteUrl('/images/logo-ink.png'),
         // taxID doubles as the company registration number in schema.org's
         // vocabulary; there is no dedicated ЕИК field.
         taxID: company.eik,

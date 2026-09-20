@@ -3,6 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
 import { getProductBySlug, productImages, products } from '@/data/products'
 import ProductCard from '@/components/products/ProductCard'
 import ProductGallery from '@/components/products/ProductGallery'
@@ -30,19 +31,23 @@ export async function generateMetadata({
 
   const path = `/products/${slug}`
 
+  // The description is the catalogue's, in the visitor's language — it used to
+  // be the English one on both locales (AUDIT.md B-22), which is also what
+  // search engines indexed for the Bulgarian pages.
+  const t = await getTranslations({ locale, namespace: 'product' })
+  const description = t(`copy.${slug}.description`)
+
   return {
-    // NOTE: product copy is English-only for both locales until the
-    // catalogue is translated (AUDIT.md B-22).
     title: product.name,
-    description: product.description,
+    description,
     alternates: {
       canonical: `/${locale}${path}`,
       languages: Object.fromEntries(locales.map((l) => [l, `/${l}${path}`])),
     },
     openGraph: {
       type: 'website',
-      title: `${product.name} — 55candles`,
-      description: product.description,
+      title: `${product.name} — 55° candles`,
+      description,
       url: `/${locale}${path}`,
       images: [{ url: product.imagePath, alt: product.name }],
     },
@@ -59,6 +64,16 @@ function ProductDetailContent({
   const t = useTranslations('product')
   const tNav = useTranslations('nav')
   const tCollection = useTranslations('collection')
+
+  /**
+   * This candle's prose, in the visitor's language.
+   *
+   * The catalogue in `src/data/products.ts` carries no prose at all — see the
+   * note on the `Product` type. Everything the shopper reads below comes from
+   * `product.copy.<slug>` in the message files, which is what makes the
+   * Bulgarian page Bulgarian (AUDIT.md B-22).
+   */
+  const copy = (field: string) => t(`copy.${product.slug}.${field}`)
 
   const related = products
     .filter((p) => p.slug !== product.slug)
@@ -103,7 +118,7 @@ function ProductDetailContent({
 
             {/* Descriptor */}
             <p className="text-sm text-ink-ghost tracking-wide">
-              {product.descriptor}
+              {copy('descriptor')}
             </p>
 
             {/* Price (AUDIT.md B-03) */}
@@ -111,7 +126,7 @@ function ProductDetailContent({
 
             {/* Description */}
             <p className="text-base text-ink-secondary leading-relaxed">
-              {product.description}
+              {copy('description')}
             </p>
 
             {/* Scent Notes */}
@@ -121,9 +136,9 @@ function ProductDetailContent({
               </p>
 
               <div className="text-sm text-ink-secondary space-y-1 leading-relaxed">
-                <p>{product.scentNotes.top}</p>
-                <p>{product.scentNotes.heart}</p>
-                <p>{product.scentNotes.base}</p>
+                <p>{copy('notes.top')}</p>
+                <p>{copy('notes.heart')}</p>
+                <p>{copy('notes.base')}</p>
               </div>
             </div>
 
@@ -134,12 +149,12 @@ function ProductDetailContent({
               </p>
 
               <ul className="flex flex-wrap gap-2 list-none p-0 m-0">
-                {product.ingredients.map((ing) => (
+                {product.ingredients.map((key) => (
                   <li
-                    key={ing}
+                    key={key}
                     className="text-xs text-ink-secondary bg-cream-surface border border-border px-3 py-1 rounded-full"
                   >
-                    {ing}
+                    {t(`ingredient.${key}`)}
                   </li>
                 ))}
               </ul>

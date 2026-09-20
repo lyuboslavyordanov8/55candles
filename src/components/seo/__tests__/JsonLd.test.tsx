@@ -33,7 +33,7 @@ describe('OrganizationJsonLd', () => {
     expect(data.legalName).toBe('ВиреонЛабс ЕООД')
     expect(data.taxID).toBe('208907603')
     // The brand must still be discoverable as the name customers search for.
-    expect(data.name).toBe('55candles')
+    expect(data.name).toBe('55° candles')
   })
 
   it('uses the transliterated name in English but keeps the Bulgarian one', () => {

@@ -1,12 +1,12 @@
 /**
- * Legal identity of the trader behind 55candles.
+ * Legal identity of the trader behind 55° candles.
  *
  * Single source of truth for the impressum (AUDIT.md B-16), the legal pages
  * (B-15) and the Organization JSON-LD (S-12). Everything a consumer-facing
  * page needs to identify who they are contracting with comes from here, so
  * there is exactly one place to correct if a detail is wrong.
  *
- * `55candles` is the trading/brand name; `ВиреонЛабс ЕООД` is the legal entity.
+ * `55° candles` is the trading/brand name; `ВиреонЛабс ЕООД` is the legal entity.
  * Bulgarian consumer law requires the *legal entity* to be identifiable, not
  * just the brand.
  *
@@ -30,8 +30,15 @@ export const company = {
   legalName: 'ВиреонЛабс ЕООД',
   /** Latin transliteration, for the English locale and structured data. */
   legalNameLatin: 'VireonLabs EOOD',
-  /** Trading name shown to customers. */
-  tradingName: '55candles',
+  /**
+   * Trading name shown to customers.
+   *
+   * The owner's spelling, degree sign and all: it appears in the legal pages,
+   * the impressum and the Organization JSON-LD, so it is the name a customer
+   * would have to recognise on a receipt or a complaint. Change it only when
+   * the owner changes how the business trades, not for typography.
+   */
+  tradingName: '55° candles',
   /** Единен идентификационен код (company registration number). */
   eik: '208907603',
 

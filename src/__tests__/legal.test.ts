@@ -115,7 +115,7 @@ describe('trader identity', () => {
   it('records the confirmed company details', () => {
     expect(company.legalName).toBe('ВиреонЛабс ЕООД')
     expect(company.eik).toBe('208907603')
-    expect(company.tradingName).toBe('55candles')
+    expect(company.tradingName).toBe('55° candles')
   })
 
   it('does not derive the VAT number from the ЕИК', () => {

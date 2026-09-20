@@ -30,6 +30,7 @@ import { products } from '@/data/products'
 export default function Navbar() {
   const t = useTranslations('nav')
   const tSearch = useTranslations('search')
+  const tProduct = useTranslations('product')
   const locale = useLocale()
 
   const links = navLinks(locale, t)
@@ -37,6 +38,11 @@ export default function Navbar() {
   // Built here rather than in the client component so the matching text — scent
   // notes, descriptors, mood — never has to cross into the browser bundle as
   // whole product objects.
+  //
+  // The matching text is the *translated* copy, so a Bulgarian visitor searching
+  // „череша“ finds the cherry candle. It came from the data before, which held
+  // English only, so on the Bulgarian site the words on screen and the words the
+  // search matched were different languages (AUDIT.md B-22).
   const searchable: SearchableProduct[] = products.map((product) => ({
     slug: product.slug,
     name: product.name,
@@ -44,11 +50,11 @@ export default function Navbar() {
     imagePath: product.imagePath,
     haystack: [
       product.name,
-      product.descriptor,
-      product.mood,
-      product.scentNotes.top,
-      product.scentNotes.heart,
-      product.scentNotes.base,
+      tProduct(`copy.${product.slug}.descriptor`),
+      tProduct(`copy.${product.slug}.mood`),
+      tProduct(`copy.${product.slug}.notes.top`),
+      tProduct(`copy.${product.slug}.notes.heart`),
+      tProduct(`copy.${product.slug}.notes.base`),
     ]
       .join(' ')
       .toLowerCase(),

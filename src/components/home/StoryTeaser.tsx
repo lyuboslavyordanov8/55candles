@@ -53,15 +53,13 @@ export default function StoryTeaser({ locale }: Props) {
           </h2>
 
           {/*
-            Two paragraphs rather than one block: as a single run of text the
-            copy reads as a wall beside the image.
+            One paragraph. There were two — the owner asked for the second one
+            ("Идеята ми е проста…") to come off, and `body2` is gone from both
+            catalogues with it. If longer copy comes back, split it again rather
+            than letting one run of text stand as a wall beside the image.
           */}
           <p className="max-w-md text-base leading-relaxed text-ink-secondary">
             {t('body')}
-          </p>
-
-          <p className="max-w-md text-base leading-relaxed text-ink-secondary">
-            {t('body2')}
           </p>
 
           <Link

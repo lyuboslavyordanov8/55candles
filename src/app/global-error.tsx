@@ -21,7 +21,7 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body className="bg-cream-base text-charcoal antialiased">
-        <title>Error — 55candles</title>
+        <title>Error — 55° candles</title>
 
         <main className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
           {/*

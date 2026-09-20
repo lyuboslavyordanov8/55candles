@@ -21,6 +21,8 @@
  * reconciliation bug waiting to happen.
  */
 
+import { defaultLocale } from '@/i18n/locales'
+
 export const CURRENCY = 'EUR' as const
 
 export type Currency = typeof CURRENCY
@@ -122,12 +124,41 @@ export function compareMoney(a: Money, b: Money): number {
 }
 
 /**
+ * The locale reaching `formatMoney` is a URL segment, so it can be anything.
+ *
+ * `[locale]` is a single dynamic segment and the proxy skips any path with a
+ * dot in it, so a request for a static file that does not exist —
+ * `/apple-touch-icon.png`, say — is routed to the homepage with
+ * `locale === 'apple-touch-icon.png'`. The locale layout calls `notFound()` for
+ * that, and the visitor does get a 404, but layouts and pages render *in
+ * parallel* in the App Router, so the page has already run: five product cards,
+ * five `Intl.NumberFormat('apple-touch-icon.png')` calls, five
+ * `RangeError: Incorrect locale information provided` in the log.
+ *
+ * `Intl` throws on any tag it cannot parse — `''`, `'null'`, `'x'`, `'bg_BG'`
+ * with an underscore — so this is not a narrow case. A price is display text
+ * and a malformed tag is a routing detail, so it falls back to the default
+ * locale rather than taking the render down. Pages guard the segment as well
+ * (see `app/[locale]/page.tsx`); this is the floor under all of them.
+ */
+function formattingLocale(locale: string): string {
+  try {
+    // Structural validation only, and the same parse `NumberFormat` does — it
+    // throws RangeError on exactly the tags that would throw there.
+    Intl.getCanonicalLocales(locale)
+    return locale
+  } catch {
+    return defaultLocale
+  }
+}
+
+/**
  * Format for display. `Intl.NumberFormat` places the symbol and chooses the
  * decimal separator per locale — Bulgarian writes `24,50 €`, English
  * `€24.50` — so neither is hardcoded.
  */
 export function formatMoney(amount: Money, locale: string): string {
-  return new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(formattingLocale(locale), {
     style: 'currency',
     currency: amount.currency,
   }).format(amount.amountMinor / MINOR_PER_MAJOR)

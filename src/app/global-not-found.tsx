@@ -14,7 +14,7 @@ import { montserrat } from '@/fonts'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: '404 — 55candles',
+  title: '404 — 55° candles',
   description: 'The page you are looking for does not exist.',
 }
 

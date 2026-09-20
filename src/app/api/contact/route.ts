@@ -89,7 +89,7 @@ export async function POST(request: Request) {
   const result = await sendEmail({
     to: process.env.CONTACT_EMAIL_TO!,
     replyTo: data.email,
-    subject: `55candles enquiry from ${data.name}`,
+    subject: `55° candles enquiry from ${data.name}`,
     text: [
       `Name:    ${data.name}`,
       `Email:   ${data.email}`,

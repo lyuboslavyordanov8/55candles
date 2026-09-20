@@ -1,41 +1,46 @@
-import type { Product } from '@/types/product'
+import type { IngredientKey, Product } from '@/types/product'
 
+/**
+ * What every candle in the range is made of, in the order it is shown.
+ *
+ * Shared because it is genuinely the same four things in every tin; a candle
+ * that ever differs should list its own array rather than this constant being
+ * edited. These are translation keys, not text — the wording lives under
+ * `product.ingredient.*` in both message catalogues.
+ */
+const STANDARD_INGREDIENTS: readonly IngredientKey[] = [
+  'soyWax',
+  'cottonWick',
+  'fragranceOil',
+  'waxDetail',
+]
+
+/**
+ * The catalogue's structural data. **The prose is not here.**
+ *
+ * Mood, descriptor, description and scent notes live in `product.copy.<slug>`
+ * in `messages/bg.json` and `messages/en.json`, because they used to be English
+ * only and Bulgarian customers were reading English product information
+ * (AUDIT.md B-22). Add a candle here and its copy there, in both languages;
+ * `src/data/__tests__/product-copy.test.ts` fails until you do.
+ */
 export const products: Product[] = [
   {
     slug: 'cherry',
     scent: 'cherry',
     name: 'Electric Cherry',
-    mood: 'Playful',
 
-    descriptor: 'Sweet, ripe cherry',
-    description:
-      'A warm, playful cherry scent — rich and juicy, like late summer. Finished with a sculpted cherry detail that feels almost too perfect to light.',
-
-    scentNotes: {
-      top: 'Cherry, Raspberry',
-      heart: 'Rose, Jasmine',
-      base: 'Musk, Sandalwood',
-    },
-
-    ingredients: [
-      'Soy wax',
-      'Cotton wick',
-      'Phthalate-free fragrance oil',
-      'Hand-finished wax detail',
-    ],
+    ingredients: STANDARD_INGREDIENTS,
 
     accentColor: '#e83a3a',
     glowColor: 'rgba(232,58,58,0.25)',
 
     emoji: '🍒',
 
-    highlight: 'Signature',
-
     seasonal: null,
 
     rating: 4.9,
     reviewCount: 42,
-    badge: 'bestseller',
 
     imagePath: '/images/products/electric-cherry.webp',
   },
@@ -44,31 +49,13 @@ export const products: Product[] = [
     slug: 'orange',
     scent: 'orange',
     name: 'Sweet Orange',
-    mood: 'Bright',
 
-    descriptor: 'Fresh citrus peel',
-    description:
-      'Clean, bright citrus with a soft floral edge. Uplifting and effortless — like sunlight through an open window.',
-
-    scentNotes: {
-      top: 'Orange, Bergamot',
-      heart: 'White Tea, Neroli',
-      base: 'Cedarwood, Musk',
-    },
-
-    ingredients: [
-      'Soy wax',
-      'Cotton wick',
-      'Phthalate-free fragrance oil',
-      'Hand-finished wax detail',
-    ],
+    ingredients: STANDARD_INGREDIENTS,
 
     accentColor: '#f07020',
     glowColor: 'rgba(240,112,32,0.25)',
 
     emoji: '🍊',
-
-    highlight: 'Just added',
 
     seasonal: null,
 
@@ -83,31 +70,13 @@ export const products: Product[] = [
     slug: 'vanilla',
     scent: 'vanilla',
     name: 'Vanilla Egg',
-    mood: 'Comforting',
 
-    descriptor: 'Soft vanilla cream',
-    description:
-      'Warm, smooth, and quietly indulgent. A comforting vanilla that settles into the space without ever overwhelming it.',
-
-    scentNotes: {
-      top: 'Vanilla Pod, Caramel',
-      heart: 'Tonka Bean, Amber',
-      base: 'Musk, Sandalwood',
-    },
-
-    ingredients: [
-      'Soy wax',
-      'Cotton wick',
-      'Phthalate-free fragrance oil',
-      'Hand-finished wax detail',
-    ],
+    ingredients: STANDARD_INGREDIENTS,
 
     accentColor: '#c8a040',
     glowColor: 'rgba(200,160,64,0.25)',
 
     emoji: '🍦',
-
-    highlight: 'Signature',
 
     seasonal: null,
 
@@ -121,37 +90,21 @@ export const products: Product[] = [
     slug: 'strawberry',
     scent: 'strawberry',
     name: 'Strawberry Cake',
-    mood: 'Juicy',
 
-    descriptor: 'Fresh garden strawberry',
-    description:
-      'Bright and juicy with a soft sweetness. Fresh-picked and vibrant, with a playful finish that lifts any space.',
-
-    scentNotes: {
-      top: 'Strawberry, Peach',
-      heart: 'Jasmine, Violet',
-      base: 'Musk, Light Wood',
-    },
-
-    ingredients: [
-      'Soy wax',
-      'Cotton wick',
-      'Phthalate-free fragrance oil',
-      'Hand-finished wax detail',
-    ],
+    ingredients: STANDARD_INGREDIENTS,
 
     accentColor: '#e8408a',
     glowColor: 'rgba(232,64,138,0.25)',
 
     emoji: '🍓',
 
-    highlight: 'Just added',
-
     seasonal: null,
 
     rating: 4.9,
     reviewCount: 36,
-    badge: 'new',
+    // The owner's call: Strawberry Cake is the one that actually sells. Only
+    // one candle carries this at a time, so Electric Cherry now has no badge.
+    badge: 'bestseller',
 
     imagePath: '/images/products/strawberry-cake.webp',
   },
@@ -160,31 +113,13 @@ export const products: Product[] = [
     slug: 'espresso-martini',
     scent: 'espresso-martini',
     name: 'Espresso Martini',
-    mood: 'Deep',
 
-    descriptor: 'Dark espresso blend',
-    description:
-      'Rich espresso layered with soft vanilla and amber. Bold, smooth, and quietly indulgent — made for slower evenings.',
-
-    scentNotes: {
-      top: 'Espresso, Dark Chocolate',
-      heart: 'Vanilla, Tonka Bean',
-      base: 'Amber, Musk',
-    },
-
-    ingredients: [
-      'Soy wax',
-      'Cotton wick',
-      'Phthalate-free fragrance oil',
-      'Hand-finished wax detail',
-    ],
+    ingredients: STANDARD_INGREDIENTS,
 
     accentColor: '#4a2a18',
     glowColor: 'rgba(74,42,24,0.25)',
 
     emoji: '🍸',
-
-    highlight: 'Evening favourite',
 
     seasonal: null,
 
@@ -198,31 +133,13 @@ export const products: Product[] = [
     slug: 'winter-wonderland',
     scent: 'winter-wonderland',
     name: 'Winter Wonderland',
-    mood: 'Seasonal',
 
-    descriptor: 'Crisp pine & spice',
-    description:
-      'A winter blend of pine, spice, and soft vanilla. Cool, comforting, and only here for a short time.',
-
-    scentNotes: {
-      top: 'Pine, Eucalyptus',
-      heart: 'Cinnamon, Clove',
-      base: 'Vanilla, Amber',
-    },
-
-    ingredients: [
-      'Soy wax',
-      'Cotton wick',
-      'Phthalate-free fragrance oil',
-      'Hand-finished wax detail',
-    ],
+    ingredients: STANDARD_INGREDIENTS,
 
     accentColor: '#7a9ab8',
     glowColor: 'rgba(122,154,184,0.25)',
 
     emoji: '❄️',
-
-    highlight: 'Limited release',
 
     seasonal: { active: false },
 

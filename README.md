@@ -1,4 +1,4 @@
-# 55candles
+# 55° candles
 
 Bilingual (BG/EN) storefront for a Bulgarian candle maker.
 

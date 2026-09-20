@@ -32,7 +32,7 @@ npm audit --omit=dev      # 0 vulnerabilities
 ```
 
 The trading company is **„ВиреонЛабс“ ЕООД, ЕИК 208907603**, trading as
-55candles. It lives in `src/lib/company.ts` — one place, used by the footer
+55° candles. It lives in `src/lib/company.ts` — one place, used by the footer
 impressum, the legal pages and the `Organization` JSON-LD.
 
 Two things to know before changing code:

@@ -10,10 +10,29 @@ describe('products', () => {
     for (const p of products) {
       expect(typeof p.slug).toBe('string')
       expect(typeof p.name).toBe('string')
-      expect(typeof p.descriptor).toBe('string')
       expect(typeof p.accentColor).toBe('string')
       expect(p.accentColor).toMatch(/^#[0-9a-fA-F]{6}$/)
     }
+  })
+
+  // The prose used to be here — descriptor, mood, description, scent notes —
+  // in English only, which is what Bulgarian visitors read (AUDIT.md B-22). It
+  // is in `product.copy.<slug>` in both catalogues now, and
+  // `product-copy.test.ts` checks it is complete. This guards the move: a
+  // well-meant `descriptor:` added back here would render nowhere.
+  it('carries no prose of its own, so the copy has one source', () => {
+    for (const p of products) {
+      for (const field of ['descriptor', 'mood', 'description', 'scentNotes', 'highlight']) {
+        expect(p, `${p.slug} has a ${field}`).not.toHaveProperty(field)
+      }
+    }
+  })
+
+  // The owner's call: Strawberry Cake is the candle that actually sells. It is
+  // a claim about the shop, so only one candle may make it.
+  it('gives the bestseller badge to Strawberry Cake alone', () => {
+    const bestsellers = products.filter((p) => p.badge === 'bestseller')
+    expect(bestsellers.map((p) => p.slug)).toEqual(['strawberry'])
   })
 
   it('carries no price of its own, so pricing has one source', () => {
