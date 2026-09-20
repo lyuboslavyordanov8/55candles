@@ -68,6 +68,14 @@ export interface Tariff {
   /**
    * Fee the *courier* charges for collecting наложен платеж, if any.
    * Who bears it is a separate decision — see `COD_FEE_PAID_BY` (Q-23).
+   *
+   * A flat amount, which Econt's real fee is not: measured against the live
+   * account on 2026-09-20 it is 3.24% of the collected sum with no cap and no
+   * floor worth naming — 0.65 EUR on a 19.99 order, 3.24 on a 100. This field
+   * cannot express that, and deliberately is not being taught to: the live quote
+   * returns the courier's own figure per parcel (`ShipmentRate.codFee`), so the
+   * only thing a percentage here would buy is a second, competing model of a fee
+   * nobody is charged while `COD_FEE_PAID_BY` is `'merchant'`.
    */
   codFee?: Money
 }
