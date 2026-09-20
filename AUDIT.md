@@ -197,6 +197,8 @@ guessed.
 | Q-22 couriers at launch | **Settled: Еконт only, Спиди "очаквайте скоро"** | `BOOKABLE_COURIERS` in `src/lib/shipping.ts`. Decided 2026-09-20. Speedy keeps its place in the type, the enum and the tariff table; the checkout greys it out and `validateDelivery` returns `courier: 'unavailable'`, so a hand-built POST cannot store an order nobody can label. One flag flips it back when the contract exists |
 | Q-22 delivery prices | **Live from Econt, with no silent fallback** | `src/lib/shipping-rates.ts` decides; `econt.ts` asks `LabelService.createLabel` in `mode: 'calculate'`. Needs credentials **and** a hand-over point (`ECONT_SENDER_OFFICE_CODE`, or the registered seat in `company.ts`) — measured on the live account 2026-09-20, the same 650 g parcel is 4.03 EUR office-to-office, 3.62 to an еконтомат and 5.32 to the door, and collection *from* an address adds ~2.55 — so there is no default. Econt's office-to-office price is flat nationwide, which is why the destination does not appear in that list. Nothing configured → the stand-in card, with the notice on the page. Configured but the quote failed → the order stops; substituting the card there would store an order at a price nobody can honour, indistinguishable from a real one. The quote carries no customer name or phone. `rateSource` on the creation event records which it was |
 | Q-23 who is billed, on the waybill | **Open — verified gap, not yet live** | Measured against the real account 2026-09-20: with the label we build today Econt bills *both* the carriage and the наложен платеж fee to the RECEIVER, while the checkout shows only the carriage and `COD_FEE_PAID_BY = 'merchant'`. And the fee is **3.24% of the collected sum, uncapped** — 0.65 EUR on a 19.99 order, 3.24 on a 100 — not the flat 0.60 the stand-in card assumes, so whoever ends up bearing it bears a percentage of revenue rather than a rounding error. The customer would hand over 0.65 EUR more at the office than the page said — an undisclosed charge at delivery. Nobody is affected yet because no waybill is created (Phase 4); `mode: 'calculate'` only prices. The fix is one field: `paymentReceiverAmount` set to the quoted carriage, which returns `SHARE+`/`SHARE-` lines and leaves `senderDueAmount` at the fee — verified, it expresses exactly the split the code already assumes. Do this in the same commit as label creation |
+| Q-24 free delivery | **Settled: free from 3 candles, merchant-paid** | `FREE_DELIVERY_FROM_ITEMS = 3` in `src/lib/shipping.ts`. Decided 2026-09-20. Counted in **candles, not lines**, and judged on the goods *before* any promo discount, so a code cannot take back carriage the basket had already earned. `FREE_DELIVERY_OVER` stays `null` — no threshold by order value. A qualifying basket still needs a real courier price to exist: the customer is charged zero, and the list price is recorded as `shippingAbsorbedMinor` on the creation event, so "what is this promotion costing" has an answer |
+| Q-37 promo codes | **Machinery done — table is one example code** | `src/lib/promo.ts`, `import 'server-only'` so the browser bundle can never carry the list. Percent or fixed amount, optional minimum and end date (inclusive, Europe/Sofia). Discounts the **goods only** — never the carriage or the наложен платеж fee, which are somebody else's invoice. Clamped to the goods total, so no code can produce a negative bill. Ships `55CANDLES10` at 10%: replace it before it is worth guessing |
 | Delivery form | Done | `/[locale]/checkout` + `DeliveryForm`. Fields switch on method; `useActionState` per the Next 16 forms guide |
 | Order totals | Done | `src/lib/order-total.ts` — re-priced server-side, shipping and COD fee as separate line items |
 | Courier office lookup | Done, and needs no credentials | `src/lib/couriers/` — Econt's nomenclature is public, so the picker shows the real 632 production offices out of the box. Speedy is still a stub that answers `unconfigured` |
@@ -227,7 +229,7 @@ been two competing sources of price that win or lose depending on which the call
 
 **What is still missing, and from whom:** price and packed weight per product (Q-11/Q-12, owner — the price landed in
 Phase 1b, the weight has not); Econt API credentials plus a hand-over point (Q-22 — these now buy *real* delivery prices, not just waybills; no rate cards need transcribing);
-free-delivery threshold (Q-24); who bears the COD fee (Q-23 — currently modelled as the merchant, the safer default).
+who bears the COD fee (Q-23 — currently modelled as the merchant, the safer default). The free-delivery threshold (Q-24) has since been settled: free from three candles, paid by the shop.
 Card payments are no longer on the list: Q-20 is closed, there will be none. Order storage has since landed (Q-34/B-01): checkout writes the order and returns its
 number. The checkout page stays `noindex` while the rates are placeholders, the legal pages are drafts and nothing can
 email a confirmation.
@@ -263,7 +265,8 @@ Two supporting pieces landed with it:
 
 **The checkout page deliberately shows no total until a delivery method is chosen.** A goods-only "total" that grows at
 the next step is precisely the pattern consumer law exists to prevent; the priced breakdown (goods, delivery, COD fee
-where applicable, total, parcel weight) appears once the action can compute it, as separate lines.
+where applicable, total, parcel weight) appears once the action can compute it, as separate lines. Since 2026-09-20 that
+breakdown arrives **before** the order rather than with it — see "Pricing before the order" below.
 
 `OrderSummary` is its own component rather than a block inside `DeliveryForm` because the form's summary only exists
 after a Server Action round trip, which jsdom cannot perform — the breakdown was untestable until it was extracted.
@@ -291,6 +294,45 @@ payment without an order is money received against nothing. Three pieces:
 What is still missing after it: no payment step (Q-20), no confirmation email (B-17) and no confirmation page, so the
 number shown on the form is the customer's only record — which is why the checkout page keeps its "not live" notice and
 stays `noindex`.
+
+### Pricing before the order, a promo code, free delivery from three candles (2026-09-20)
+
+Four changes the owner asked for, in one pass. The first is a defect fix, the other three are new rules.
+
+**The customer could not see the bill until the order existed.** `OrderSummary` was correct and complete — goods,
+delivery, COD fee, total, weight — but the only press that produced it was the press that *wrote the order*. So the
+figures a customer is entitled to read before committing were shown to them a moment after they had committed. That is
+the same objection as a goods-only total, one step later, and no amount of copy fixes it.
+
+The fix is a **two-step checkout**, `step=quote` → `step=confirm`, on one form:
+
+- The first press validates, asks Econt to price *this* parcel, and renders the breakdown with the button now reading
+  "confirm the order". Nothing is written.
+- The second press re-runs the same validation and pricing on the server and stores the order. The quote is not carried
+  in a hidden field, because a figure the browser holds is a figure the browser can edit.
+- Changing any field after a quote drops the form back to `step=quote`, so an order can never be confirmed against a
+  price computed for a different basket or a different office.
+- `stepOf()` is a whitelist — `value === 'confirm' ? 'confirm' : 'quote'` — so a missing, misspelt or hostile `step`
+  quotes instead of ordering. A hand-built POST cannot skip the price.
+
+A two-step flow is the only honest shape here: Econt prices the actual parcel to the actual office, so the delivery
+charge *cannot* exist before the form has been sent once. Pricing on every keystroke would mean calling a courier API
+from an unauthenticated endpoint on each edit.
+
+**Promo codes** (`src/lib/promo.ts`, Q-37) — see the Phase 1a row for the mechanism. Three decisions worth recording:
+the module is `server-only`, so the code list is not in the browser bundle and the page receives only a boolean saying
+whether to render the field; the discount applies to the **goods** and is clamped to them, so no code touches the
+carriage or the COD fee and no basket can total below zero; and an unrecognised code answers exactly as a non-existent
+one does, so the field cannot be used to enumerate the table.
+
+**Free delivery from three candles** (Q-24) — counted in candles, not lines, and earned on the goods total *before* the
+discount. The order of those two operations is the whole decision: judging it afterwards would let a promo code silently
+revoke free shipping a customer had already qualified for, at the moment they typed the code. The basket nudges ("one
+more candle and the delivery is free") because a threshold nobody is told about does not sell anything. What it costs is
+recorded per order as `shippingAbsorbedMinor` — 4.03 EUR office-to-office today, a fifth of one candle's price.
+
+Both new columns went onto `orders` in `drizzle/0003_secret_thor_girl.sql` (`discount_minor`, `promo_code`), applied to
+the live database. `tsc` clean, **740/740 tests across 44 files**.
 
 ### Corrections to this audit
 
@@ -461,7 +503,7 @@ glowColor?, emoji, highlight?, seasonal, price?, imagePath, hoverImagePath?
 | **N-08** | Frontend      | The hero headline is split on whitespace to italicise the last word. This is fragile across locales and breaks if a translation ends in punctuation or a multi-word phrase.                                                     | `src/components/home/Hero.tsx:55-58`                                                            | Typographic glitch in BG                           | S                          |
 | **N-09** | Accessibility | `prefers-reduced-motion` is not respected anywhere despite heavy `framer-motion` use.                                                                                                                                           | `src/app/globals.css:1-10`; all `motion.*` usages                                               | WCAG 2.3.3 (AAA) / comfort                         | S                          |
 | **N-10** | Frontend      | Image `alt` text is just `product.name` ("Cherry"), and the hero's is `"55candles hero"`. Descriptive alt text would serve both AT users and image search.                                                                      | `src/components/products/ProductCard.tsx:36`, `:53`; `src/components/home/Hero.tsx:20`          | Minor a11y/SEO                                     | S                          |
-| **N-11** | Commerce      | No wishlist, no product reviews, no search/filter by scent or mood, no gift wrapping, no discount codes, no abandoned-cart recovery. All reasonable v2.                                                                         | —                                                                                               | Growth                                             | M–L                        |
+| **N-11** | Commerce      | **Partial (2026-09-20): discount codes now exist** — `src/lib/promo.ts`, entered at checkout, see Q-37. Still absent: wishlist, product reviews, search/filter by scent or mood, gift wrapping, abandoned-cart recovery. All reasonable v2.                                                                         | —                                                                                               | Growth                                             | M–L                        |
 | **N-12** | Ops           | **DONE (Phase 0.7).** ~~No `.env.example`~~ to document required configuration once B-01 lands.                                                                                                                                                           | verified                                                                                        | Onboarding                                         | S                          |
 
 ---
@@ -518,7 +560,11 @@ These cannot be determined from the code. **Nothing below has been guessed.**
 - ~~**Q-21** Card *and* COD from day one, or COD first?~~ — **ANSWERED: наложен платеж only, indefinitely.**
 - **Q-22** Do you have Speedy and/or Econt merchant contracts yet, and API credentials for their test environments? Econt's are now the one thing standing between the checkout and real delivery prices — `ECONT_USERNAME`, `ECONT_PASSWORD` and `ECONT_SENDER_OFFICE_CODE`. Until they are set the checkout charges the stand-in card and says so.
 - **Q-23** Who absorbs the COD fee — you or the customer? It must be shown as a line item before the customer confirms.
-- **Q-24** Free-shipping threshold, if any?
+- ~~**Q-24** Free-shipping threshold, if any?~~ — **ANSWERED 2026-09-20: free delivery from 3 candles up, at the shop's
+  expense.** Counted in candles rather than order value, and rendered on the basket as "one more candle for free
+  delivery" so a customer one short can act on it. What this costs per parcel is on the creation event
+  (`shippingAbsorbedMinor`) — 4.03 EUR office-to-office today, which is a fifth of a single candle's price, so it is
+  worth watching on three-candle orders specifically.
 - **Q-25** Do you want to offer address-to-door, office pickup, and APS (автомат), or a subset?
 - ~~**Q-26** Statement descriptor you want on customers' card statements?~~ — **moot: no card statements** (Q-20).
 
@@ -553,6 +599,18 @@ These cannot be determined from the code. **Nothing below has been guessed.**
   the hover-swap logic in `ProductCard` — if you supply the `_alt.webp` assets, re-adding `hoverImagePath` to
   `src/data/products.ts` turns the effect back on with no code change. If you have no second shots, say so and I'll
   strip the component logic too.
+
+### Raised during Phase 1b
+
+- **Q-37** **What promo codes do you actually want, and what is each one worth?** The mechanism is built and live
+  (`PROMO_CODES` in `src/lib/promo.ts`): per code, a percentage or a fixed amount off the goods, an optional minimum
+  basket and an optional last day. What is *not* decided is the codes themselves, so the table ships one example —
+  `55CANDLES10`, 10% off, no minimum, no expiry. **It works the moment this deploys and anyone who guesses the string
+  can use it**, which is the argument for replacing it rather than leaving it: a ten-percent discount available to
+  everybody is a price cut, not a campaign. Tell me the codes, their values and their end dates and they go in as data.
+  Two things worth deciding at the same time: whether any code may combine with the free delivery (today it can — the
+  carriage is earned on candle count before the discount is applied), and whether you want per-code usage limits, which
+  would need a counter in the database rather than a table entry.
 
 ---
 
@@ -670,7 +728,7 @@ Steps:
    the order a **snapshot**: `courier`, `office_id`, `office_name`, `office_address`, `city`, `postcode`, `captured_at`.
    Re-validate the office id before creating the waybill — offices close.
 4. **Shipping price:** compute server-side from summed product weight (Q-12) + packaging weight, per courier, per
-   delivery type (door vs office vs APS), with the free-shipping threshold (Q-24) applied after. Cache office lists;
+   delivery type (door vs office vs APS), with the free-delivery rule applied after (Q-24, answered: free from 3 candles). Cache office lists;
    never quote from the client.
 5. **COD (наложен платеж):**
     - order goes to `awaiting_cod`, and there is no `paid` status to skip to (Q-20)
@@ -728,7 +786,7 @@ goods — `[TODO: Q-17, do not state either way until confirmed]`**.
 > timeframe `[TODO]` · **КЗП** contact details `[TODO: current address, phone, website]`.
 
 **Доставка и плащане** — `/legal/delivery`
-> Couriers and methods (door / office / APS) · **cost table by weight and method** `[TODO: Q-12, Q-24]` · timeframes
+> Couriers and methods (door / office / APS) · **cost table by weight and method** `[TODO: Q-12]` · **free delivery from 3 candles** (Q-24, answered — state it here too) · timeframes
 `[TODO]` · **наложен платеж and its fee** `[TODO: Q-23]` · card payment · what happens on a failed delivery · geographic
 > coverage `[TODO: Q-07]`.
 

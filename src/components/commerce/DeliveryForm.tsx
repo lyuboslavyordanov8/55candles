@@ -1,10 +1,11 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { submitCheckout, type CheckoutState } from '@/app/[locale]/checkout/actions'
 import { phoneProblem, PHONE_EXAMPLE, type PhoneProblem } from '@/lib/phone'
 import { sameBasket } from '@/lib/cart-params'
+import { formatMoney, money } from '@/lib/money'
 import {
   COURIERS,
   DELIVERY_METHODS,
@@ -27,6 +28,18 @@ import OrderSummary from './OrderSummary'
  * working without JavaScript and gives a `pending` flag for free. The action
  * re-validates and re-prices everything server-side — this form's validation
  * is a convenience, not a boundary.
+ *
+ * ── The button presses twice ────────────────────────────────────────────────
+ * The first press asks for a price and the second places the order (see
+ * `CheckoutStep` in the action). The customer must be able to read the delivery
+ * charge, any discount and the total *before* committing, which one press cannot
+ * deliver: the delivery charge is quoted by Econt for this exact parcel and
+ * destination, so it does not exist until the form has been sent.
+ *
+ * Any edit after a quote puts the button back to "price it" — see `edited` below.
+ * That is the whole safety property of the two steps: the figure on screen either
+ * describes the form as it now stands, or it is not offered as something to
+ * confirm.
  */
 
 const INITIAL: CheckoutState = { status: 'idle' }
@@ -137,6 +150,14 @@ interface Props {
   /** True when at least one courier rate card exists (Q-22). */
   shippingConfigured: boolean
   /**
+   * True when at least one promo code exists (Q-37), decided on the server.
+   *
+   * A boolean, never the codes: the table is `server-only` precisely so the
+   * browser bundle cannot carry a list of unpublished discounts. False hides the
+   * field entirely, because a box that rejects everything is worse than no box.
+   */
+  promoCodesEnabled?: boolean
+  /**
    * Couriers whose office list can actually be searched. Anything not listed
    * falls back to the free-text office field, so a courier without credentials
    * costs the customer some typing rather than the order.
@@ -152,6 +173,7 @@ export default function DeliveryForm({
   cart,
   intentToken,
   shippingConfigured,
+  promoCodesEnabled = false,
   officeLookup = [],
   officeDataIsDemo = false,
   locale,
@@ -176,6 +198,39 @@ export default function DeliveryForm({
    */
   const [phoneIssue, setPhoneIssue] = useState<PhoneProblem | null>(null)
 
+  /**
+   * The promo code, controlled so it survives the action's form reset — the same
+   * reason `city` and `postCode` are. A customer who is told their code has
+   * expired must not also have to retype it to try another.
+   */
+  const [promoCode, setPromoCode] = useState('')
+
+  /**
+   * Whether anything has been edited since the price on screen was calculated.
+   *
+   * Set by a single `onChange` on the `<form>`, which sees every field inside it —
+   * typing, radios, the office select — because enumerating the fields that affect
+   * a price is a list that would fall out of date. While it is true, the button
+   * offers a fresh quote rather than a confirmation, so the figures a customer
+   * confirms always describe the form they are looking at.
+   */
+  const [edited, setEdited] = useState(false)
+
+  /**
+   * Reset on every answer from the server, which is by definition a price for the
+   * form as it was just submitted.
+   *
+   * Adjusted during render rather than in an effect: React re-renders immediately
+   * with the new value and nothing stale is ever painted. This is the documented
+   * pattern for deriving state from a change, and an effect here would flash a
+   * "confirm" button for one frame after a rejected submission.
+   */
+  const priced = useRef(state)
+  if (priced.current !== state) {
+    priced.current = state
+    if (edited) setEdited(false)
+  }
+
   const errors = state.fieldErrors ?? {}
 
   /**
@@ -195,13 +250,23 @@ export default function DeliveryForm({
   const placed = state.status === 'placed'
 
   /**
+   * Whether the next press places the order.
+   *
+   * Requires a summary that describes this basket *and* an untouched form. Both
+   * halves matter: the first stops a quote for two candles being confirmed for one,
+   * the second stops a quote for an office in Sofia being confirmed for a street in
+   * Varna.
+   */
+  const readyToConfirm = Boolean(summary) && !edited && !placed
+
+  /**
    * Whether the message below reports on the order rather than on a mistake.
    *
-   * `placed` and `readyToPay` are both news, not errors, so they are announced
-   * politely (`role="status"`) in the body colour; everything else is an `alert`
-   * in red. The two are deliberately different states — see the action.
+   * `placed`, `quoted` and `readyToPay` are all news, not errors, so they are
+   * announced politely (`role="status"`) in the body colour; everything else is an
+   * `alert` in red. The three are deliberately different states — see the action.
    */
-  const informational = placed || state.status === 'readyToPay'
+  const informational = placed || state.status === 'quoted' || state.status === 'readyToPay'
 
   /** Field error text, or undefined. Codes are namespaced to avoid collisions. */
   const errorFor = (field: string): string | undefined => {
@@ -262,10 +327,46 @@ export default function DeliveryForm({
    */
   const hiddenLocationError = errorFor('city') ?? errorFor('postCode')
 
+  /**
+   * What the server made of the promo code, in words.
+   *
+   * An accepted code is confirmed as well as refused ones being explained: the
+   * discount appears in the summary, and a customer who cannot see their code
+   * named will retype it rather than trust the total.
+   */
+  const promo = state.promo
+  const promoMessage = !promo
+    ? undefined
+    : promo.status === 'applied'
+      ? t('promo.applied', { code: promo.code })
+      : promo.status === 'belowMinimum'
+        ? t('promo.belowMinimum', {
+            amount: formatMoney(money(promo.minGoodsMinor), locale),
+          })
+        : t(`promo.${promo.status}`)
+
   return (
-    <form action={formAction} className="space-y-8">
+    <form
+      action={formAction}
+      className="space-y-8"
+      /*
+        One listener for the whole form. React's `onChange` is the native `input`
+        event, which bubbles, so this fires for typing, for the courier and method
+        radios and for the office select — without this component having to know
+        which fields those are.
+      */
+      onChange={() => {
+        if (!edited) setEdited(true)
+      }}
+    >
       <input type="hidden" name="cart" value={JSON.stringify(cart)} />
       <input type="hidden" name="intentToken" value={intentToken} />
+      {/*
+        Which half of the flow this press is asking for. Rendered from state rather
+        than set by the button's own `value`, so that the form submitted by pressing
+        Enter in a text field asks for exactly what the button offers.
+      */}
+      <input type="hidden" name="step" value={readyToConfirm ? 'confirm' : 'quote'} />
 
       {!shippingConfigured && (
         <p role="note" className="rounded-sm bg-cream-surface p-4 text-xs text-ink-secondary">
@@ -521,6 +622,43 @@ export default function DeliveryForm({
       </section>
 
       {/*
+        The promo code, last — after the delivery and the payment method, before
+        the total it changes. Deliberately not at the top: a discount box above
+        the address is an invitation to leave and go looking for a code, and the
+        customer who has none should reach the end without being told twice that
+        somebody else paid less.
+
+        No "apply" button of its own. There is one submit button and it already
+        re-prices the order, so a second one would ask the customer to understand
+        the difference between applying a code and pricing the order.
+      */}
+      {promoCodesEnabled && (
+        <section aria-labelledby="promo-heading" className="space-y-2">
+          <h2 id="promo-heading" className="font-serif text-lg text-charcoal">
+            {t('promo.heading')}
+          </h2>
+          <Field
+            name="promoCode"
+            label={t('field.promoCode')}
+            required={false}
+            optionalLabel={t('optional')}
+            placeholder={t('promo.placeholder')}
+            value={promoCode}
+            onChange={setPromoCode}
+          />
+          {promoMessage && (
+            <p
+              className={`text-xs ${
+                promo?.status === 'applied' ? 'text-ink-secondary' : 'text-red-700'
+              }`}
+            >
+              {promoMessage}
+            </p>
+          )}
+        </section>
+      )}
+
+      {/*
         The priced breakdown, shown only once the server has produced one — and
         only while it still describes the basket in front of the customer.
       */}
@@ -580,8 +718,27 @@ export default function DeliveryForm({
         disabled={pending || placed}
         className="w-full rounded-sm bg-charcoal px-6 py-3 text-xs font-medium uppercase tracking-wide text-cream-base transition-opacity duration-200 hover:opacity-80 disabled:opacity-50"
       >
-        {pending ? t('submitting') : placed ? t('submitted') : t('submit')}
+        {pending
+          ? // Which wait this is matters: "pricing" and "placing your order" are
+            // very different things to be told while a button is disabled.
+            readyToConfirm
+            ? t('submitting')
+            : t('pricing')
+          : placed
+            ? t('submitted')
+            : readyToConfirm
+              ? t('confirm')
+              : t('submit')}
       </button>
+
+      {/*
+        Said under the button, where the decision is made, and only while the press
+        is not yet the order. Nothing has been sent to the courier and no money is
+        owed until the second press.
+      */}
+      {!placed && !readyToConfirm && (
+        <p className="text-xs text-ink-ghost">{t('priceFirstHint')}</p>
+      )}
     </form>
   )
 }

@@ -148,12 +148,81 @@ export function tariffKey(option: DeliveryOption): string {
 }
 
 /**
- * Free-delivery threshold (Q-24), or `null` for none.
+ * Free delivery from this many candles (Q-24), or `null` for none.
  *
- * `null` is not "no threshold decided" — it is "no free delivery", the safe
- * default, since a threshold that is accidentally zero ships everything free.
+ * Answered by the owner on 2026-09-20: **three candles or more and the shop pays
+ * the carriage.** Counted in candles rather than in money because that is how the
+ * promise was made and how it is advertised — "three candles, free delivery" is a
+ * sentence a customer can check against their own basket without arithmetic.
+ *
+ * It is a promotion, not a courier rate: Econt still charges its 4,03 EUR and the
+ * shop absorbs it, which is why the quote keeps the amount it gave up in
+ * `listPrice` rather than discarding it. See `ShippingQuote`.
+ */
+export const FREE_DELIVERY_FROM_ITEMS: number | null = 3
+
+/**
+ * Free-delivery threshold by order value (Q-24), or `null` for none.
+ *
+ * `null` is not "no threshold decided" — it is "no free delivery *by value*",
+ * which is the current decision: the promise is counted in candles, above. A
+ * threshold that is accidentally zero ships everything free, so the safe default
+ * stays.
  */
 export const FREE_DELIVERY_OVER: Money | null = null
+
+/**
+ * The basket, as the free-delivery rules need to see it.
+ *
+ * Passed as one object rather than as two positional arguments so that adding the
+ * candle count could not silently default to zero at a call site somebody forgot
+ * to update — the compiler names every one of them.
+ */
+export interface BasketForDelivery {
+  /**
+   * Goods subtotal, *before* any promo discount. Judged before, on purpose: a
+   * promo code must not be able to take a basket back under a free-delivery
+   * threshold it had already earned, which is a charge appearing because the
+   * customer saved money.
+   */
+  goods: Money
+  /** Candles in the basket — the sum of the line quantities, not the lines. */
+  itemCount: number
+}
+
+/**
+ * Whether this basket ships free.
+ *
+ * Either threshold is enough; both are the shop's own promotions, so neither
+ * depends on the courier answering.
+ */
+export function deliveryIsFree({ goods, itemCount }: BasketForDelivery): boolean {
+  if (FREE_DELIVERY_FROM_ITEMS !== null && itemCount >= FREE_DELIVERY_FROM_ITEMS) {
+    return true
+  }
+
+  if (FREE_DELIVERY_OVER && goods.amountMinor >= FREE_DELIVERY_OVER.amountMinor) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * How many more candles until the delivery is free, or `null` when there is
+ * nothing to say — no candle threshold, an empty basket, or one that already
+ * qualifies.
+ *
+ * For the nudge on the basket, which is the whole commercial point of the
+ * threshold: a customer one candle short should be told so while they can still
+ * act on it, not after they have paid for delivery.
+ */
+export function candlesUntilFreeDelivery(itemCount: number): number | null {
+  if (FREE_DELIVERY_FROM_ITEMS === null || itemCount <= 0) return null
+  if (itemCount >= FREE_DELIVERY_FROM_ITEMS) return null
+
+  return FREE_DELIVERY_FROM_ITEMS - itemCount
+}
 
 /**
  * Practical upper bound for a parcel locker. Bulgarian lockers are constrained
@@ -167,7 +236,21 @@ export const LOCKER_MAX_GRAMS = 20_000
 export const PACKAGING_WEIGHT_GRAMS = 150
 
 export type ShippingQuote =
-  | { status: 'quoted'; price: Money; free: boolean }
+  | {
+      status: 'quoted'
+      /** What the customer is charged. Zero when `free`. */
+      price: Money
+      free: boolean
+      /**
+       * What the carriage actually costs, whether or not the customer pays it.
+       *
+       * Equal to `price` on an ordinary order and to the amount the shop absorbed
+       * on a free one. Kept rather than discarded because "free delivery" is a
+       * cost the business carries, and a row of zeroes in the orders table is no
+       * basis for deciding next month whether the promotion is affordable.
+       */
+      listPrice: Money
+    }
   | { status: 'unconfigured'; reason: 'noTariff' }
   | { status: 'unavailable'; reason: 'tooHeavyForLocker' | 'noBandForWeight' }
 
@@ -216,9 +299,9 @@ export function billableWeight(itemWeightsGrams: readonly number[]): number {
 /**
  * Price a delivery.
  *
- * `orderTotal` is the goods total, used only for the free-delivery threshold.
- * The threshold is applied to goods, not to goods-plus-shipping, which would
- * be circular.
+ * `basket` is what the free-delivery rules are judged against — the candle count
+ * and the goods subtotal. The thresholds apply to goods, not to
+ * goods-plus-shipping, which would be circular.
  *
  * `courierPrice` is a rate the courier itself quoted for this exact parcel — see
  * `src/lib/shipping-rates.ts`. When it is supplied the table is not consulted at
@@ -226,11 +309,16 @@ export function billableWeight(itemWeightsGrams: readonly number[]): number {
  * fact about our packaging and the free-delivery threshold is our promotion, and
  * neither belongs to the courier. That is the whole reason a live rate comes in
  * as an argument rather than bypassing this function.
+ *
+ * A qualifying basket still needs a real price to exist before it can ship free.
+ * Returning `quoted` at zero from an unpriceable parcel would hide the one thing
+ * the shop needs to know about its own promotion — what it just cost — and would
+ * mean a courier outage silently produced orders nobody had costed.
  */
 export function quote(
   option: DeliveryOption,
   weightGrams: number,
-  orderTotal: Money,
+  basket: BasketForDelivery,
   courierPrice?: Money
 ): ShippingQuote {
   if (option.method === 'locker' && weightGrams > LOCKER_MAX_GRAMS) {
@@ -263,11 +351,17 @@ export function quote(
     price = band.price
   }
 
-  if (FREE_DELIVERY_OVER && orderTotal.amountMinor >= FREE_DELIVERY_OVER.amountMinor) {
-    return { status: 'quoted', price: money(0, orderTotal.currency), free: true }
+  if (deliveryIsFree(basket)) {
+    return {
+      status: 'quoted',
+      price: money(0, basket.goods.currency),
+      free: true,
+      // What the shop is absorbing on this parcel.
+      listPrice: price,
+    }
   }
 
-  return { status: 'quoted', price, free: false }
+  return { status: 'quoted', price, free: false, listPrice: price }
 }
 
 /**

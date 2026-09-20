@@ -15,7 +15,10 @@ import OrderSummary, { type OrderSummaryData } from '../OrderSummary'
 const SUMMARY: OrderSummaryData = {
   lines: [{ slug: 'cherry', quantity: 2, unitPriceMinor: 1999, lineTotalMinor: 3998 }],
   goodsMinor: 3998,
+  discountMinor: null,
+  promoCode: null,
   shippingMinor: 599,
+  freeShipping: false,
   codFeeMinor: null,
   totalMinor: 4597,
   weightGrams: 1150,
@@ -89,6 +92,49 @@ describe('OrderSummary', () => {
     })
 
     expect(screen.getByText(/ghost-candle/)).toBeInTheDocument()
+  })
+
+  it('shows a promo discount as its own signed line, named by its code', () => {
+    // The customer agreed to a goods price. Quietly shrinking that figure hides
+    // what the code was worth; a `−€4.00` line lets them check the arithmetic.
+    const { container } = renderSummary({
+      discountMinor: 400,
+      promoCode: '55CANDLES10',
+      totalMinor: 4197,
+    })
+
+    expect(screen.getByText(/Discount \(55CANDLES10\)/)).toBeInTheDocument()
+    expect(container.querySelector('[data-amount="-400"]')).toBeInTheDocument()
+    expect(screen.getByText('-€4.00')).toBeInTheDocument()
+  })
+
+  it('has no discount line when no code was used', () => {
+    // null, not zero: a `€0.00` discount row invites the customer to wonder
+    // which code they forgot.
+    renderSummary()
+
+    expect(screen.queryByText(/Discount/)).not.toBeInTheDocument()
+  })
+
+  it('names the discount without a code if one is somehow missing', () => {
+    renderSummary({ discountMinor: 400, promoCode: null, totalMinor: 4197 })
+
+    expect(screen.getByText(/^Discount$/)).toBeInTheDocument()
+  })
+
+  it('keeps the delivery line when the shop is paying it, and says so', () => {
+    // Q-24. The line stays because the customer is owed the fact that delivery
+    // was charged at nothing; a row that disappears reads as an omission. The
+    // amount attribute still carries the zero, so the arithmetic is checkable.
+    const { container } = renderSummary({
+      shippingMinor: 0,
+      freeShipping: true,
+      totalMinor: 3998,
+    })
+
+    expect(screen.getByText(/^Delivery$/)).toBeInTheDocument()
+    expect(screen.getByText(/^free$/)).toBeInTheDocument()
+    expect(container.querySelector('[data-amount="0"]')).toBeInTheDocument()
   })
 
   it('omits the cash-on-delivery line when the merchant absorbs the fee', () => {

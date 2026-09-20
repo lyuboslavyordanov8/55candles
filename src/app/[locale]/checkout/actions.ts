@@ -2,7 +2,8 @@
 
 import { courierClient } from '@/lib/couriers'
 import { validateDelivery, type DeliveryDetails, type FieldErrors } from '@/lib/delivery-schema'
-import { calculateTotal, priceCart, type CartLine } from '@/lib/order-total'
+import { calculateTotal, priceCart, type AppliedDiscount, type CartLine } from '@/lib/order-total'
+import { evaluatePromoCode, PROMO_CODE_MAX, type PromoOutcome } from '@/lib/promo'
 import { resolveDeliveryRate } from '@/lib/shipping-rates'
 import {
   createOrder,
@@ -30,6 +31,20 @@ import type { DeliveryOption } from '@/lib/shipping'
  *    moment (`src/lib/shipping-rates.ts`). If it cannot be, the submission stops
  *    with a "try again" rather than falling back to a made-up figure — an order
  *    stored at an invented price is indistinguishable from a real one.
+ *
+ * ── Two steps, not one ──────────────────────────────────────────────────────
+ * The same action prices (`step=quote`) and then places (`step=confirm`) the
+ * order. It used to do both on the single press of one button, which meant the
+ * customer first saw what the delivery cost — and what they owed in total — on the
+ * screen that told them the order had already been placed. That is precisely the
+ * pattern consumer law requires a shop not to use: the full breakdown, including
+ * carriage and any fee, has to be visible *before* the commitment, not as a
+ * receipt for it. So the first press answers with `quoted` and stores nothing, and
+ * only a request that explicitly says `confirm` may create an order.
+ *
+ * The default is therefore `quote`, which matters for a hand-built POST as much as
+ * for the form: a request that does not say which step it is on gets a price, not
+ * a parcel.
  *
  * The order *is* persisted now (Q-34, B-01): a valid submission writes it, its
  * lines and its first status event, and the customer is given the order number.
@@ -62,9 +77,23 @@ export type EchoedField = 'recipientName' | 'phone' | 'email' | 'street' | 'offi
  */
 const ECHO_MAX = 1_000
 
+/**
+ * Which half of the flow a submission is asking for.
+ *
+ * `quote` prices everything and stores nothing. `confirm` does the same and then
+ * creates the order — so it must be asked for explicitly.
+ */
+export type CheckoutStep = 'quote' | 'confirm'
+
 export interface CheckoutState {
   status:
     | 'idle'
+    /**
+     * Priced, nothing stored, and the customer is looking at the breakdown. The
+     * step before an order exists, and the only one the shop may show a total on
+     * before the commitment.
+     */
+    | 'quoted'
     /** The order is stored. See `order` for its number. */
     | 'placed'
     /**
@@ -102,6 +131,20 @@ export interface CheckoutState {
    * and absent when the office could not be verified.
    */
   collectionPoint?: { name: string; address: string }
+  /**
+   * What became of the promo code, when one was entered (Q-37).
+   *
+   * Reported on every outcome, including the successful one, so the customer can
+   * see the code was taken — and so a code that was *not* taken says why beside the
+   * field instead of vanishing. Absent when the field was left empty.
+   *
+   * `code` is echoed back canonically; the form puts it back in the box. The
+   * discount itself is in `summary`, because that is where money belongs.
+   */
+  promo?:
+    | { status: 'applied'; code: string }
+    | { status: 'unknown' | 'expired'; code: string }
+    | { status: 'belowMinimum'; code: string; minGoodsMinor: number }
   summary?: {
     /**
      * The lines the server actually priced, so the breakdown can name each
@@ -117,7 +160,13 @@ export interface CheckoutState {
       lineTotalMinor: number
     }>
     goodsMinor: number
+    /** A promo discount on the goods, or null. Positive; shown as a deduction. */
+    discountMinor: number | null
+    /** The code that produced it, for the summary line. */
+    promoCode: string | null
     shippingMinor: number
+    /** True when the shop is paying the carriage (Q-24). */
+    freeShipping: boolean
     codFeeMinor: number | null
     totalMinor: number
     weightGrams: number
@@ -197,6 +246,11 @@ export async function submitCheckout(
     }
   }
 
+  // Judged against the goods before anything else touches them, and never a
+  // reason to refuse the order: a code that does not apply produces a message
+  // beside the field and a total without it.
+  const promo = evaluatePromoCode(String(raw.promoCode ?? '').slice(0, PROMO_CODE_MAX), cart.goods)
+
   const rate = await resolveDeliveryRate({
     delivery: delivery.value,
     weightGrams: cart.weightGrams,
@@ -208,12 +262,22 @@ export async function submitCheckout(
     // not answer. Nothing is stored and no total is shown: the alternative is an
     // order priced from the placeholder card, which would look identical to a
     // real one. Logged with the reason in `resolveDeliveryRate`.
-    return { status: 'error', values, messageKey: 'deliveryRateUnavailable' }
+    return {
+      status: 'error',
+      values,
+      ...promoReport(promo),
+      messageKey: 'deliveryRateUnavailable',
+    }
   }
 
   let total
   try {
-    total = calculateTotal(lines, option, rate.source === 'courier' ? rate.rate : undefined)
+    total = calculateTotal(
+      lines,
+      option,
+      rate.source === 'courier' ? rate.rate : undefined,
+      appliedDiscount(promo)
+    )
   } catch {
     return { status: 'error', values, messageKey: 'cartUnreadable' }
   }
@@ -235,6 +299,7 @@ export async function submitCheckout(
   const priced = {
     values,
     ...(office.snapshot ? { collectionPoint: office.snapshot } : {}),
+    ...promoReport(promo),
     summary: {
       lines: total.lines.map((line) => ({
         slug: line.slug,
@@ -243,11 +308,21 @@ export async function submitCheckout(
         lineTotalMinor: line.lineTotal.amountMinor,
       })),
       goodsMinor: total.goods.amountMinor,
+      discountMinor: total.discount?.amountMinor ?? null,
+      promoCode: total.promoCode,
       shippingMinor: total.shipping.amountMinor,
+      freeShipping: total.freeShipping,
       codFeeMinor: total.codFee?.amountMinor ?? null,
       totalMinor: total.total.amountMinor,
       weightGrams: total.weightGrams,
     },
+  }
+
+  if (stepOf(raw.step) === 'quote') {
+    // The whole point of the two steps: priced, itemised, and nothing done. The
+    // customer is looking at the real delivery charge and the real total for the
+    // first time, and the next press is the commitment.
+    return { status: 'quoted', ...priced, messageKey: 'reviewBeforeConfirming' }
   }
 
   if (!isOrderStorageReady()) {
@@ -299,6 +374,50 @@ export async function submitCheckout(
     // they still owe anything.
     messageKey: 'orderPlacedCod',
   }
+}
+
+/**
+ * Which step a submission asked for.
+ *
+ * Anything other than the exact string `confirm` is a quote. Written as a
+ * whitelist rather than as `!== 'quote'` so that a typo, an empty field or a
+ * missing one cannot create an order — the failure mode of a guess here is a
+ * parcel the customer did not knowingly order.
+ */
+function stepOf(value: unknown): CheckoutStep {
+  return value === 'confirm' ? 'confirm' : 'quote'
+}
+
+/**
+ * The promo outcome, in the shape the form renders.
+ *
+ * Spread into the returned state, so `none` contributes nothing at all rather
+ * than an empty object the form would have to test for.
+ */
+function promoReport(outcome: PromoOutcome): Pick<CheckoutState, 'promo'> {
+  switch (outcome.status) {
+    case 'none':
+      return {}
+    case 'applied':
+      return { promo: { status: 'applied', code: outcome.code } }
+    case 'belowMinimum':
+      return {
+        promo: {
+          status: 'belowMinimum',
+          code: outcome.code,
+          minGoodsMinor: outcome.minGoods.amountMinor,
+        },
+      }
+    default:
+      return { promo: { status: outcome.status, code: outcome.code } }
+  }
+}
+
+/** The discount to price with, or nothing. Only an accepted code produces one. */
+function appliedDiscount(outcome: PromoOutcome): AppliedDiscount | undefined {
+  return outcome.status === 'applied'
+    ? { code: outcome.code, amount: outcome.discount }
+    : undefined
 }
 
 /**

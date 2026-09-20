@@ -95,6 +95,36 @@ describe('calculateTotal', () => {
 
   it('totals goods, weight and shipping once everything is configured', () => {
     withPricedCatalogue(() => {
+      // Two candles: below the free-delivery threshold, so the carriage is a
+      // real charge and the arithmetic of the whole bill is visible here.
+      const result = calculateTotal(
+        [
+          { slug: 'cherry', quantity: 1 },
+          { slug: 'vanilla', quantity: 1 },
+        ],
+        DELIVERY
+      )
+
+      expect(result.status).toBe('ok')
+      if (result.status !== 'ok') return
+
+      // 24.50 + 19.99 = 44.49
+      expect(result.goods.amountMinor).toBe(4449)
+      expect(result.itemCount).toBe(2)
+      // 500 + 450 + 150 packaging
+      expect(result.weightGrams).toBe(1100)
+      expect(result.shipping.amountMinor).toBe(400)
+      expect(result.freeShipping).toBe(false)
+      expect(result.shippingAbsorbed).toBeNull()
+      expect(result.total.amountMinor).toBe(4849)
+    })
+  })
+
+  it('counts candles across lines towards the free delivery (Q-24)', () => {
+    withPricedCatalogue(() => {
+      // Two of one scent and one of another is three candles. The promise is
+      // about how many candles the customer buys, not how many rows they
+      // happen to occupy.
       const result = calculateTotal(
         [
           { slug: 'cherry', quantity: 2 },
@@ -106,12 +136,14 @@ describe('calculateTotal', () => {
       expect(result.status).toBe('ok')
       if (result.status !== 'ok') return
 
-      // 2 × 24.50 + 19.99 = 68.99
-      expect(result.goods.amountMinor).toBe(6899)
-      // 2 × 500 + 450 + 150 packaging
-      expect(result.weightGrams).toBe(1600)
-      expect(result.shipping.amountMinor).toBe(400)
-      expect(result.total.amountMinor).toBe(7299)
+      expect(result.itemCount).toBe(3)
+      expect(result.freeShipping).toBe(true)
+      expect(result.shipping.amountMinor).toBe(0)
+      // What the shop is paying for this parcel, kept rather than discarded so
+      // the question "what is this promotion costing" stays answerable.
+      expect(result.shippingAbsorbed?.amountMinor).toBe(400)
+      // 2 × 24.50 + 19.99, and nothing on top.
+      expect(result.total.amountMinor).toBe(6899)
     })
   })
 
@@ -172,6 +204,94 @@ describe('calculateTotal', () => {
   })
 })
 
+describe('a promo discount', () => {
+  it('comes off the goods, not off the delivery or the fee', () => {
+    withPricedCatalogue(() => {
+      // 24.50 goods, 4.00 carriage. A 2.00 code makes the bill 26.50: the
+      // courier is owed the same 4.00 either way, so a discount that ate into
+      // the carriage would be the shop paying part of it without saying so.
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, undefined, {
+        code: 'TWOOFF',
+        amount: eur(2),
+      })
+
+      expect(result.status).toBe('ok')
+      if (result.status !== 'ok') return
+
+      expect(result.goods.amountMinor).toBe(2450)
+      expect(result.discount?.amountMinor).toBe(200)
+      expect(result.promoCode).toBe('TWOOFF')
+      expect(result.shipping.amountMinor).toBe(400)
+      expect(result.total.amountMinor).toBe(2650)
+    })
+  })
+
+  it('never takes the goods below zero, however large the code', () => {
+    withPricedCatalogue(() => {
+      // A code worth more than the basket must not turn into a refund, and must
+      // not make the delivery free by arithmetic accident.
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, undefined, {
+        code: 'HUGE',
+        amount: eur(1000),
+      })
+
+      expect(result.status).toBe('ok')
+      if (result.status !== 'ok') return
+
+      expect(result.discount?.amountMinor).toBe(2450)
+      expect(result.total.amountMinor).toBe(400)
+    })
+  })
+
+  it('is absent, not zero, when no code was used', () => {
+    withPricedCatalogue(() => {
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY)
+
+      expect(result.status).toBe('ok')
+      if (result.status !== 'ok') return
+
+      expect(result.discount).toBeNull()
+      expect(result.promoCode).toBeNull()
+    })
+  })
+
+  it('ignores a discount of nothing rather than showing an empty line', () => {
+    withPricedCatalogue(() => {
+      const result = calculateTotal([{ slug: 'cherry', quantity: 1 }], DELIVERY, undefined, {
+        code: 'ZERO',
+        amount: eur(0),
+      })
+
+      expect(result.status).toBe('ok')
+      if (result.status !== 'ok') return
+
+      expect(result.discount).toBeNull()
+      expect(result.promoCode).toBeNull()
+      expect(result.total.amountMinor).toBe(2850)
+    })
+  })
+
+  it('cannot revoke a free delivery the basket had already earned', () => {
+    withPricedCatalogue(() => {
+      // Three candles earn the carriage; a code then drops the goods well under
+      // any value threshold. Charging for delivery here would be a charge that
+      // appeared *because* the customer saved money.
+      const result = calculateTotal([{ slug: 'cherry', quantity: 3 }], DELIVERY, undefined, {
+        code: 'HALF',
+        amount: eur(60),
+      })
+
+      expect(result.status).toBe('ok')
+      if (result.status !== 'ok') return
+
+      expect(result.freeShipping).toBe(true)
+      expect(result.shipping.amountMinor).toBe(0)
+      // 3 × 24.50 = 73.50, less 60.00.
+      expect(result.total.amountMinor).toBe(1350)
+    })
+  })
+})
+
 describe('priceCart', () => {
   it('answers what the parcel weighs before there is a delivery price', () => {
     withPricedCatalogue(() => {
@@ -183,6 +303,8 @@ describe('priceCart', () => {
       if (cart.status !== 'ok') return
       expect(cart.weightGrams).toBe(billableWeight([500, 500]))
       expect(cart.goods.amountMinor).toBe(4900)
+      // Candles, which is what the free-delivery rule counts — not lines.
+      expect(cart.itemCount).toBe(2)
     })
   })
 

@@ -45,6 +45,8 @@ const VALID_FIELDS: Record<string, string> = {
   officeId: 'ECONT-1234',
   intentToken: INTENT,
   cart: JSON.stringify([{ slug: 'cherry', quantity: 2 }]),
+  /* The confirming press. Without it the action only quotes — see actions.test.ts. */
+  step: 'confirm',
 }
 
 function formData(overrides: Record<string, string> = {}): FormData {
@@ -353,5 +355,77 @@ describe('recording where the delivery price came from', () => {
     expect(state.status).toBe('error')
     expect(state.order).toBeUndefined()
     expect(error).toHaveBeenCalled()
+  })
+})
+
+describe('what the two steps store', () => {
+  it('stores nothing on the pricing press', async () => {
+    // The first press exists so the customer can read the bill. If it wrote an
+    // order, every abandoned checkout would be a parcel somebody has to cancel.
+    const state = await submitCheckout(IDLE, formData({ step: 'quote' }))
+
+    expect(state.status).toBe('quoted')
+    expect(createOrder).not.toHaveBeenCalled()
+  })
+
+  it('stores nothing for a request that does not say which step it is on', async () => {
+    // A hand-built POST, or a form from before this field existed. Defaulting to
+    // `confirm` would create orders nobody had been shown a price for.
+    const data = formData()
+    data.delete('step')
+
+    expect((await submitCheckout(IDLE, data)).status).toBe('quoted')
+    expect(createOrder).not.toHaveBeenCalled()
+  })
+
+  it('stores the order on the confirming press', async () => {
+    const state = await submitCheckout(IDLE, formData({ step: 'confirm' }))
+
+    expect(state.status).toBe('placed')
+    expect(createOrder).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('what it records about a discount and a free delivery', () => {
+  it('hands storage the discount the server worked out, and the code', async () => {
+    // Not a figure from the form: the only thing the browser may send is the
+    // code itself. 10% of 2 × 19.99 is 4.00.
+    await submitCheckout(IDLE, formData({ promoCode: '55candles10', discountMinor: '3900' }))
+
+    const { total } = vi.mocked(createOrder).mock.calls[0][0]
+    expect(total.promoCode).toBe('55CANDLES10')
+    expect(total.discount?.amountMinor).toBe(400)
+    expect(total.total.amountMinor).toBe(3998 - 400 + 499)
+  })
+
+  it('stores no code when the one entered was not accepted', async () => {
+    // The order still goes through — a typo is not a reason to lose it — but
+    // nothing is recorded against a campaign that gave no discount.
+    await submitCheckout(IDLE, formData({ promoCode: 'NOTACODE' }))
+
+    const { total } = vi.mocked(createOrder).mock.calls[0][0]
+    expect(total.promoCode).toBeNull()
+    expect(total.discount).toBeNull()
+  })
+
+  it('records the carriage the shop absorbed, not just that it was free', async () => {
+    // Three candles: the customer pays nothing for delivery. The list price has
+    // to survive into storage, or "what is this promotion costing" has no answer.
+    await submitCheckout(IDLE, formData({ cart: JSON.stringify([{ slug: 'cherry', quantity: 3 }]) }))
+
+    const { total } = vi.mocked(createOrder).mock.calls[0][0]
+    expect(total.freeShipping).toBe(true)
+    expect(total.shipping.amountMinor).toBe(0)
+    expect(total.shippingAbsorbed?.amountMinor).toBeGreaterThan(0)
+    expect(total.itemCount).toBe(3)
+  })
+
+  it('charges the customer the carriage below the threshold', async () => {
+    await submitCheckout(IDLE, formData({ cart: JSON.stringify([{ slug: 'cherry', quantity: 2 }]) }))
+
+    const { total } = vi.mocked(createOrder).mock.calls[0][0]
+    expect(total.freeShipping).toBe(false)
+    expect(total.shippingAbsorbed).toBeNull()
+    expect(total.shipping.amountMinor).toBeGreaterThan(0)
   })
 })

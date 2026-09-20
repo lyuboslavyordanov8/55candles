@@ -119,7 +119,7 @@ describe('CheckoutPage', () => {
     // law exists to prevent.
     await renderPage('cherry:2')
 
-    expect(screen.getByText(/delivery is added once you choose/i)).toBeInTheDocument()
+    expect(screen.getByText(/Econt prices the delivery once you choose/i)).toBeInTheDocument()
     expect(screen.queryByText(/^Total$/)).not.toBeInTheDocument()
   })
 
@@ -160,5 +160,37 @@ describe('CheckoutPage', () => {
     await renderPage('not-a-candle:3')
 
     expect(screen.getByText(/basket is empty/i)).toBeInTheDocument()
+  })
+})
+
+describe('the free-delivery promise on the checkout page', () => {
+  it('says how many more candles would earn it, beside the basket', async () => {
+    // Next to the ± buttons, because a customer one candle short can only act on
+    // it while they are still looking at the basket. Told at the summary, it is
+    // told too late.
+    await renderPage('cherry:1')
+
+    expect(screen.getByText(/2 more candles for free delivery/i)).toBeInTheDocument()
+  })
+
+  it('counts in candles, so two of one scent is two', async () => {
+    await renderPage('cherry:2')
+
+    expect(screen.getByText(/1 more candle for free delivery/i)).toBeInTheDocument()
+  })
+
+  it('says it has been earned once the basket is there', async () => {
+    await renderPage('cherry:3')
+
+    expect(screen.getByText(/delivery is free/i)).toBeInTheDocument()
+    expect(screen.queryByText(/more candles? for free delivery/i)).not.toBeInTheDocument()
+  })
+
+  it('offers the promo code field, since the shop has codes', async () => {
+    // Whether to show it is a server-side question — `promoCodesConfigured()` —
+    // because the codes themselves must never reach the browser bundle.
+    await renderPage('cherry:1')
+
+    expect(screen.getByRole('textbox', { name: /promo code/i })).toBeInTheDocument()
   })
 })

@@ -177,6 +177,21 @@ export const orders = pgTable(
     // --- Money, all integer minor units ---
     currency: text('currency').notNull().default('EUR'),
     goodsMinor: integer('goods_minor').notNull(),
+    /**
+     * Promo discount taken off the goods (AUDIT.md Q-37). Zero on most orders.
+     *
+     * Its own column, not folded into `goods_minor`: the invoice has to show the
+     * price the customer agreed to and the discount off it as separate lines, and
+     * a net figure cannot be reconciled against the price they were shown.
+     */
+    discountMinor: integer('discount_minor').notNull().default(0),
+    /**
+     * The code that produced the discount, canonical and empty when none. Kept so
+     * a campaign can be counted afterwards — the discount alone does not say which
+     * promotion paid for itself.
+     */
+    promoCode: text('promo_code').notNull().default(''),
+    /** What the customer pays for delivery. Zero on a free-delivery order. */
     shippingMinor: integer('shipping_minor').notNull(),
     /** Null when the merchant absorbs it (Q-23). */
     codFeeMinor: integer('cod_fee_minor'),

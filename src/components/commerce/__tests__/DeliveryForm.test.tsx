@@ -29,6 +29,36 @@ function renderForm(props: Partial<Parameters<typeof DeliveryForm>[0]> = {}) {
   )
 }
 
+/**
+ * The form's one submit button, whatever it currently says.
+ *
+ * Its label is a state, not a name: "Calculate the final price" before there is
+ * a price, "Confirm the order" once the customer has seen the bill, "Order
+ * placed" afterwards. Matching on the words would tie every test that merely
+ * needs to press the button to whichever step it happens to be on — and, worse,
+ * a test could go green against a button that says something else entirely.
+ */
+function submitButton(): HTMLButtonElement {
+  const buttons = document.querySelectorAll('form button[type="submit"]')
+
+  // Exactly one, asserted rather than assumed: a second submit button would make
+  // "press the button" ambiguous, and picking the first silently would hide it.
+  if (buttons.length !== 1 || !(buttons[0] instanceof HTMLButtonElement)) {
+    throw new Error(`expected one submit button in the form, found ${buttons.length}`)
+  }
+
+  return buttons[0]
+}
+
+/** The form itself, for assertions about the payload rather than the page. */
+function checkoutForm(): HTMLFormElement {
+  const form = submitButton().closest('form')
+
+  if (!form) throw new Error('the submit button is not inside a form')
+
+  return form
+}
+
 describe('DeliveryForm', () => {
   it('asks for the recipient and a mobile number the courier can reach', () => {
     renderForm()
@@ -158,7 +188,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
 
       // Gated on the rejection message, so the assertions below cannot run
       // against a render that has not received the action's state yet. The
@@ -178,7 +208,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       expect(valueOf(/^city$/i)).toBe('София')
@@ -198,7 +228,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       expect(valueOf(/mobile number/i)).toBe('+359887115957')
@@ -217,7 +247,7 @@ describe('DeliveryForm', () => {
       await user.type(screen.getByLabelText(/post code/i), '1000')
       await user.type(screen.getByLabelText(/street/i), 'ул. Цар Самуил 3')
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       // Losing the courier on the way back would send the parcel through a
@@ -241,7 +271,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       expect(screen.getByText(/for now we ship with Econt/i)).toBeInTheDocument()
@@ -261,7 +291,7 @@ describe('DeliveryForm', () => {
       await user.type(screen.getByLabelText(/post code/i), '1000')
       await user.type(screen.getByLabelText(/office or locker/i), 'ECONT-1234')
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       expect(valueOf(/email address/i)).toBe('')
@@ -385,8 +415,7 @@ describe('DeliveryForm', () => {
     it('sends no payment method in the payload, so the server decides', () => {
       renderForm()
 
-      const form = screen.getByRole('button', { name: /place order/i }).closest('form')
-      expect(form?.querySelector('[name="paymentMethod"]')).toBeNull()
+      expect(checkoutForm().querySelector('[name="paymentMethod"]')).toBeNull()
     })
   })
 
@@ -585,7 +614,7 @@ describe('DeliveryForm', () => {
       await user.type(screen.getByLabelText(/full name/i), 'Мария Иванова')
       await user.type(screen.getByLabelText(/mobile number/i), '0887115957')
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
       expect(screen.getByRole('button', { name: /change city/i })).toBeInTheDocument()
@@ -627,7 +656,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
 
       expect(await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })).toBeInTheDocument()
       expect(screen.getByText(/order received/i)).toBeInTheDocument()
@@ -639,7 +668,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
       await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })
 
       // A stored order read out as an `alert` would sound like a failure.
@@ -655,7 +684,7 @@ describe('DeliveryForm', () => {
       renderForm()
       await fillIn(user)
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
       await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })
 
       expect(screen.getByRole('button', { name: /order placed/i })).toBeDisabled()
@@ -675,10 +704,274 @@ describe('DeliveryForm', () => {
         'minted-by-the-page'
       )
 
-      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await user.click(submitButton())
       await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })
 
       expect(submitted).toBe('minted-by-the-page')
+    })
+  })
+})
+
+describe('DeliveryForm, pricing before ordering', () => {
+  /**
+   * Everything a valid office order needs. Its own copy rather than the one in
+   * the block above, which is scoped to those tests.
+   */
+  async function fillIn(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(screen.getByLabelText(/full name/i), 'Мария Иванова')
+    await user.type(screen.getByLabelText(/mobile number/i), '0887115957')
+    await user.type(screen.getByLabelText(/email address/i), 'maria@example.com')
+    await user.type(screen.getByLabelText(/^city$/i), 'София')
+    await user.type(screen.getByLabelText(/post code/i), '1000')
+    await user.type(screen.getByLabelText(/office or locker/i), 'ECONT-1234')
+  }
+
+  const QUOTE = {
+    lines: [{ slug: 'cherry', quantity: 1, unitPriceMinor: 1999, lineTotalMinor: 1999 }],
+    goodsMinor: 1999,
+    discountMinor: null,
+    promoCode: null,
+    shippingMinor: 499,
+    freeShipping: false,
+    codFeeMinor: null,
+    totalMinor: 2498,
+    weightGrams: 400,
+  }
+
+  /**
+   * The values the real action echoes back, derived from the submission exactly
+   * as it does. Needed by any test that presses twice: React resets an
+   * uncontrolled field when an action completes, so without the echo the second
+   * press meets an empty `required` name and the browser never submits it.
+   */
+  function valuesFrom(data: FormData) {
+    return Object.fromEntries(
+      ['recipientName', 'phone', 'email', 'street', 'officeId', 'note']
+        .map((field) => [field, String(data.get(field) ?? '')])
+        .filter(([, submitted]) => submitted)
+    )
+  }
+
+  /** The server's answer to the pricing press. */
+  function quotingAction(summary: Partial<typeof QUOTE> = {}) {
+    return vi.mocked(submitCheckout).mockImplementationOnce(async () => ({
+      status: 'quoted' as const,
+      summary: { ...QUOTE, ...summary },
+      messageKey: 'reviewBeforeConfirming',
+    }))
+  }
+
+  it('asks to be pressed for a price before it offers to place the order', () => {
+    // The whole complaint this answers: the customer could not see what delivery
+    // cost until the press that had already ordered the candles.
+    renderForm()
+
+    expect(submitButton()).toHaveTextContent(/calculate the final price/i)
+    expect(screen.getByText(/you will see the full bill/i)).toBeInTheDocument()
+  })
+
+  it('sends step=quote on the first press and step=confirm on the second', async () => {
+    const user = userEvent.setup()
+    const steps: string[] = []
+    vi.mocked(submitCheckout).mockImplementation(async (_previous, data) => {
+      steps.push(String(data.get('step')))
+      return {
+        status: 'quoted' as const,
+        summary: QUOTE,
+        values: valuesFrom(data),
+        messageKey: 'reviewBeforeConfirming',
+      }
+    })
+
+    try {
+      renderForm()
+      await fillIn(user)
+
+      await user.click(submitButton())
+      await screen.findByRole('heading', { name: /order summary/i }, { timeout: 5_000 })
+      await user.click(submitButton())
+
+      // The second press is a different request, not a repeat: only `confirm`
+      // may create an order, so the customer cannot order without having been
+      // shown the bill.
+      expect(steps).toEqual(['quote', 'confirm'])
+    } finally {
+      vi.mocked(submitCheckout).mockReset()
+      vi.mocked(submitCheckout).mockImplementation(async () => ({ status: 'idle' as const }))
+    }
+  })
+
+  it('shows the whole bill, and only then offers to confirm', async () => {
+    const user = userEvent.setup()
+    quotingAction()
+    renderForm()
+    await fillIn(user)
+
+    await user.click(submitButton())
+
+    expect(await screen.findByRole('heading', { name: /order summary/i }, { timeout: 5_000 }))
+      .toBeInTheDocument()
+    expect(document.body.querySelector('[data-amount="499"]')).toBeInTheDocument()
+    expect(document.body.querySelector('[data-amount="2498"]')).toBeInTheDocument()
+    expect(submitButton()).toHaveTextContent(/confirm the order/i)
+    // And the hint about a second press is gone, because this *is* the second.
+    expect(screen.queryByText(/you will see the full bill/i)).not.toBeInTheDocument()
+  })
+
+  it('reads the quote out as news, not as an error', async () => {
+    // `reviewBeforeConfirming` is a normal step in the flow. As an `alert` it
+    // would sound to a screen-reader user like the submission had failed.
+    const user = userEvent.setup()
+    quotingAction()
+    renderForm()
+    await fillIn(user)
+
+    await user.click(submitButton())
+    await screen.findByRole('heading', { name: /order summary/i }, { timeout: 5_000 })
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/this is the final bill/i)
+  })
+
+  it('goes back to asking for a price when anything is edited after the quote', async () => {
+    // Otherwise the customer could be shown a price for an office in Sofia and
+    // confirm it for a street in Varna. Any change at all re-prices, because the
+    // list of fields a price depends on is one that would fall out of date.
+    const user = userEvent.setup()
+    quotingAction()
+    renderForm()
+    await fillIn(user)
+
+    await user.click(submitButton())
+    await screen.findByRole('heading', { name: /order summary/i }, { timeout: 5_000 })
+    expect(submitButton()).toHaveTextContent(/confirm the order/i)
+
+    await user.type(screen.getByLabelText(/note for the courier/i), 'Друг адрес')
+
+    expect(submitButton()).toHaveTextContent(/calculate the final price/i)
+    expect(checkoutForm().querySelector('input[name="step"]')).toHaveValue('quote')
+  })
+
+  it('says which wait it is, while it waits', async () => {
+    // "Placing your order…" under a press that is only fetching a price would be
+    // a lie at the worst possible moment.
+    const user = userEvent.setup()
+    let release: () => void = () => {}
+    vi.mocked(submitCheckout).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({
+              status: 'quoted' as const,
+              summary: QUOTE,
+              messageKey: 'reviewBeforeConfirming',
+            })
+        })
+    )
+    renderForm()
+    await fillIn(user)
+
+    await user.click(submitButton())
+
+    expect(submitButton()).toHaveTextContent(/calculating the price/i)
+    release()
+    await screen.findByRole('heading', { name: /order summary/i }, { timeout: 5_000 })
+  })
+
+  describe('the promo code field', () => {
+    it('is not shown at all when the shop has no codes', () => {
+      // A box that can only ever answer "not valid" is worse than no box.
+      renderForm({ promoCodesEnabled: false })
+
+      expect(screen.queryByRole('textbox', { name: /promo code/i })).not.toBeInTheDocument()
+    })
+
+    it('is optional, and says so', () => {
+      // Most orders carry no code. An unmarked empty field reads as a missing
+      // requirement.
+      renderForm({ promoCodesEnabled: true })
+
+      const field = screen.getByRole('textbox', { name: /promo code/i })
+      expect(field).not.toBeRequired()
+      // The label carries the marker, so it is read out with the field name.
+      expect(document.querySelector(`label[for="${field.id}"]`)).toHaveTextContent(/optional/i)
+    })
+
+    it('sends what was typed, and keeps it in the box afterwards', async () => {
+      // React clears an uncontrolled field when an action completes. A customer
+      // told their code expired must not have to retype it to try another.
+      const user = userEvent.setup()
+      let sent: string | null = null
+      vi.mocked(submitCheckout).mockImplementationOnce(async (_previous, data) => {
+        sent = String(data.get('promoCode'))
+        return {
+          status: 'quoted' as const,
+          summary: QUOTE,
+          promo: { status: 'expired' as const, code: 'KOLEDA' },
+          messageKey: 'reviewBeforeConfirming',
+        }
+      })
+      renderForm({ promoCodesEnabled: true })
+      await fillIn(user)
+      await user.type(screen.getByRole('textbox', { name: /promo code/i }), 'koleda')
+
+      await user.click(submitButton())
+      await screen.findByText(/that code has expired/i, {}, { timeout: 5_000 })
+
+      expect(sent).toBe('koleda')
+      expect(screen.getByRole('textbox', { name: /promo code/i })).toHaveValue('koleda')
+    })
+
+    it('names an accepted code beside the field and its discount in the summary', async () => {
+      const user = userEvent.setup()
+      vi.mocked(submitCheckout).mockImplementationOnce(async () => ({
+        status: 'quoted' as const,
+        summary: { ...QUOTE, discountMinor: 200, promoCode: '55CANDLES10', totalMinor: 2298 },
+        promo: { status: 'applied' as const, code: '55CANDLES10' },
+        messageKey: 'reviewBeforeConfirming',
+      }))
+      renderForm({ promoCodesEnabled: true })
+      await fillIn(user)
+      await user.type(screen.getByRole('textbox', { name: /promo code/i }), '55CANDLES10')
+
+      await user.click(submitButton())
+
+      expect(await screen.findByText(/code 55CANDLES10 applied/i, {}, { timeout: 5_000 }))
+        .toBeInTheDocument()
+      expect(screen.getByText(/Discount \(55CANDLES10\)/)).toBeInTheDocument()
+      expect(document.body.querySelector('[data-amount="-200"]')).toBeInTheDocument()
+    })
+
+    it('says what a code’s minimum is, in money', async () => {
+      const user = userEvent.setup()
+      vi.mocked(submitCheckout).mockImplementationOnce(async () => ({
+        status: 'quoted' as const,
+        summary: QUOTE,
+        promo: { status: 'belowMinimum' as const, code: 'FROM40', minGoodsMinor: 4000 },
+        messageKey: 'reviewBeforeConfirming',
+      }))
+      renderForm({ promoCodesEnabled: true })
+      await fillIn(user)
+
+      await user.click(submitButton())
+
+      // "Not valid" would be a dead end; the amount is what the customer can act
+      // on. Formatted for their locale, like every other figure on the page.
+      expect(await screen.findByText(/from €40.00 up/i, {}, { timeout: 5_000 }))
+        .toBeInTheDocument()
+    })
+
+    it('says nothing about a code nobody entered', async () => {
+      const user = userEvent.setup()
+      quotingAction()
+      renderForm({ promoCodesEnabled: true })
+      await fillIn(user)
+
+      await user.click(submitButton())
+      await screen.findByRole('heading', { name: /order summary/i }, { timeout: 5_000 })
+
+      expect(screen.queryByText(/that code is not valid/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Discount/)).not.toBeInTheDocument()
     })
   })
 })

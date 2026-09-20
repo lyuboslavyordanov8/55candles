@@ -32,6 +32,13 @@ const VALID_FIELDS: Record<string, string> = {
   postCode: '1000',
   officeId: 'ECONT-1234',
   cart: JSON.stringify([{ slug: 'cherry', quantity: 2 }]),
+  /*
+    Checkout is two presses (`quote` then `confirm`), because the customer has to
+    see the delivery charge and the total before anything is ordered. These
+    fixtures stand for the second press; the first is asserted on its own below,
+    and the default for a missing `step` is deliberately `quote`.
+  */
+  step: 'confirm',
 }
 
 function formData(overrides: Record<string, string> = {}): FormData {
@@ -164,7 +171,10 @@ describe('submitCheckout', () => {
     expect(state.summary).toEqual({
       lines: [{ slug: 'cherry', quantity: 2, unitPriceMinor: 1999, lineTotalMinor: 3998 }],
       goodsMinor: 3998,
+      discountMinor: null,
+      promoCode: null,
       shippingMinor: 499,
+      freeShipping: false,
       codFeeMinor: null,
       totalMinor: 4497,
       weightGrams: 650,
@@ -207,7 +217,10 @@ describe('submitCheckout', () => {
     expect(state.summary).toEqual({
       lines: [{ slug: 'cherry', quantity: 2, unitPriceMinor: 2450, lineTotalMinor: 4900 }],
       goodsMinor: 4900,
+      discountMinor: null,
+      promoCode: null,
       shippingMinor: 400,
+      freeShipping: false,
       codFeeMinor: null,
       totalMinor: 5300,
       weightGrams: 1150,
@@ -543,5 +556,148 @@ describe('submitCheckout, when the courier prices the parcel', () => {
       'officeId',
       'weightGrams',
     ])
+  })
+})
+
+describe('the two steps a checkout takes', () => {
+  // Why there are two: the customer has to see the delivery charge and the total
+  // before anything is ordered, and the delivery charge does not exist until the
+  // form has been sent — Econt prices this parcel to this office. So the first
+  // press prices and the second commits.
+
+  it('prices the order and stores nothing on the first press', async () => {
+    const state = await submitCheckout(IDLE, formData({ step: 'quote' }))
+
+    expect(state.status).toBe('quoted')
+    expect(state.order).toBeUndefined()
+    // With the whole bill in hand — which is the point of stopping here.
+    expect(state.summary?.shippingMinor).toBe(499)
+    expect(state.summary?.totalMinor).toBe(4497)
+    expect(state.messageKey).toBe('reviewBeforeConfirming')
+  })
+
+  it('treats a request that does not say which step it is on as a quote', async () => {
+    // A hand-built POST, or a form rendered before the field existed. The default
+    // has to be the harmless half: the failure mode of guessing `confirm` is a
+    // parcel the customer never knowingly ordered.
+    const data = formData()
+    data.delete('step')
+
+    expect((await submitCheckout(IDLE, data)).status).toBe('quoted')
+  })
+
+  it('treats an unrecognised step as a quote rather than as a confirmation', async () => {
+    // Whitelisted, not `!== 'quote'`: a typo must not be able to create an order.
+    for (const step of ['CONFIRM', 'confirm ', 'yes', '']) {
+      expect((await submitCheckout(IDLE, formData({ step }))).status).toBe('quoted')
+    }
+  })
+
+  it('gets past the quote only when the request says confirm', async () => {
+    // `readyToPay` rather than `placed` because no database is configured in this
+    // file — what matters is that it is no longer `quoted`. `persistence.test.ts`
+    // covers the stored order.
+    const state = await submitCheckout(IDLE, formData({ step: 'confirm' }))
+
+    expect(state.status).toBe('readyToPay')
+  })
+
+  it('quotes the same figures the confirmation will charge', async () => {
+    // The two presses must not be able to disagree. They price identically here
+    // because the only difference between them is what happens after the total.
+    const quoted = await submitCheckout(IDLE, formData({ step: 'quote' }))
+    const confirmed = await submitCheckout(IDLE, formData({ step: 'confirm' }))
+
+    expect(quoted.summary).toEqual(confirmed.summary)
+  })
+
+  it('still refuses an invalid form on the first press', async () => {
+    // The quote step is not a free pass through validation: a price for an
+    // address the courier cannot deliver to is not a price.
+    const state = await submitCheckout(IDLE, formData({ step: 'quote', phone: '02 123 4567' }))
+
+    expect(state.status).toBe('invalid')
+    expect(state.summary).toBeUndefined()
+  })
+})
+
+describe('a promo code at checkout', () => {
+  it('takes a valid code off the goods and reports it applied', async () => {
+    // The shipped 10% code against 2 × 19.99: 4.00 off the goods, delivery
+    // untouched at 4.99.
+    const state = await submitCheckout(IDLE, formData({ promoCode: '55candles10' }))
+
+    expect(state.promo).toEqual({ status: 'applied', code: '55CANDLES10' })
+    expect(state.summary?.discountMinor).toBe(400)
+    expect(state.summary?.promoCode).toBe('55CANDLES10')
+    expect(state.summary?.shippingMinor).toBe(499)
+    expect(state.summary?.totalMinor).toBe(3998 - 400 + 499)
+  })
+
+  it('says a code is not valid without refusing the order', async () => {
+    // A mistyped code is not a reason to lose the order. The customer is told,
+    // beside the field, and the bill is the one without it.
+    const state = await submitCheckout(IDLE, formData({ promoCode: 'NOTACODE' }))
+
+    expect(state.status).toBe('readyToPay')
+    expect(state.promo).toEqual({ status: 'unknown', code: 'NOTACODE' })
+    expect(state.summary?.discountMinor).toBeNull()
+    expect(state.summary?.totalMinor).toBe(4497)
+  })
+
+  it('reports the code on the quote, so it can be checked before confirming', async () => {
+    const state = await submitCheckout(IDLE, formData({ step: 'quote', promoCode: '55CANDLES10' }))
+
+    expect(state.status).toBe('quoted')
+    expect(state.promo).toEqual({ status: 'applied', code: '55CANDLES10' })
+    expect(state.summary?.discountMinor).toBe(400)
+  })
+
+  it('says nothing at all about a field that was left empty', async () => {
+    // `undefined`, not a status: "that code is not valid" under an untouched box
+    // is a support message waiting to happen.
+    const state = await submitCheckout(IDLE, formData({ promoCode: '   ' }))
+
+    expect(state.promo).toBeUndefined()
+    expect(state.summary?.discountMinor).toBeNull()
+  })
+
+  it('reports the code even when the courier cannot price the parcel', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(canQuoteLiveRates).mockReturnValue(true)
+    vi.mocked(courierClient).mockImplementation((courier) => ({
+      courier,
+      searchCities: async () => ({ status: 'unconfigured', courier }),
+      officesIn: async () => ({ status: 'unconfigured', courier }),
+      findOffice: async () => ({ status: 'unconfigured', courier }),
+      priceShipment: async () => ({ status: 'failed', courier, reason: 'HTTP 517' }),
+    }))
+
+    const state = await submitCheckout(IDLE, formData({ promoCode: 'NOTACODE' }))
+
+    // The retry must not silently drop what the customer typed — including the
+    // news that it was wrong, which is the thing they need to fix before retrying.
+    expect(state.status).toBe('error')
+    expect(state.promo).toEqual({ status: 'unknown', code: 'NOTACODE' })
+    expect(error).toHaveBeenCalled()
+  })
+
+  it('ignores a discount the client tries to name for itself', async () => {
+    // The only thing the form may send is a code. A `discountMinor` in the
+    // payload is a browser naming its own price, and is not read at all.
+    const state = await submitCheckout(
+      IDLE,
+      formData({ discountMinor: '3900', discount: '39.00', totalMinor: '1' })
+    )
+
+    expect(state.summary?.discountMinor).toBeNull()
+    expect(state.summary?.totalMinor).toBe(4497)
+  })
+
+  it('caps what it reads from the field, so a huge code cannot inflate the reply', async () => {
+    const state = await submitCheckout(IDLE, formData({ promoCode: 'X'.repeat(5_000) }))
+
+    expect(state.promo?.status).toBe('unknown')
+    expect(state.promo?.code.length).toBeLessThanOrEqual(40)
   })
 })

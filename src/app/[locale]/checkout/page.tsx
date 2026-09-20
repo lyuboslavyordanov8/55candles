@@ -6,8 +6,14 @@ import type { Metadata } from 'next'
 import { isLocale } from '@/i18n/locales'
 import BasketEditor from '@/components/commerce/BasketEditor'
 import DeliveryForm from '@/components/commerce/DeliveryForm'
-import { isShippingConfigured, type Courier } from '@/lib/shipping'
+import {
+  candlesUntilFreeDelivery,
+  FREE_DELIVERY_FROM_ITEMS,
+  isShippingConfigured,
+  type Courier,
+} from '@/lib/shipping'
 import { deliveryRatesArePlaceholders } from '@/lib/shipping-rates'
+import { promoCodesConfigured } from '@/lib/promo'
 import { couriersWithOfficeLookup, econtEnvironment } from '@/lib/couriers'
 import { unpricedSlugs, PRICING_IS_PROVISIONAL } from '@/data/pricing'
 import { parseCartParam } from '@/lib/cart-params'
@@ -81,6 +87,11 @@ export default async function CheckoutPage({
         real one.
       */
       ratesArePlaceholders={deliveryRatesArePlaceholders()}
+      /*
+        A boolean, never the code table: `src/lib/promo.ts` is `server-only`
+        precisely so the browser bundle cannot carry a list of live discounts.
+      */
+      promoCodesEnabled={promoCodesConfigured()}
       unpricedCount={unpricedSlugs().length}
       officeLookup={couriersWithOfficeLookup()}
       officeDataIsDemo={econtEnvironment() === 'demo'}
@@ -99,6 +110,7 @@ function CheckoutContent({
   intentToken,
   shippingConfigured,
   ratesArePlaceholders,
+  promoCodesEnabled,
   unpricedCount,
   officeLookup,
   officeDataIsDemo,
@@ -108,11 +120,16 @@ function CheckoutContent({
   intentToken: string
   shippingConfigured: boolean
   ratesArePlaceholders: boolean
+  promoCodesEnabled: boolean
   unpricedCount: number
   officeLookup: readonly Courier[]
   officeDataIsDemo: boolean
 }) {
   const t = useTranslations('checkout')
+
+  /** Candles, not lines: three of one scent earn the free delivery (Q-24). */
+  const itemCount = cart.reduce((count, line) => count + line.quantity, 0)
+  const candlesToFree = candlesUntilFreeDelivery(itemCount)
 
   return (
     <main className="bg-cream-base min-h-screen px-6 py-20">
@@ -186,16 +203,34 @@ function CheckoutContent({
                 No total here on purpose. Shipping depends on the delivery
                 method the customer has not chosen yet, and showing a
                 goods-only "total" that grows at the next step is the pattern
-                consumer law exists to prevent. The action returns the full
-                breakdown once a method is picked.
+                consumer law exists to prevent. The form's first press returns
+                the full breakdown, before anything is ordered.
               */}
               <p className="text-xs text-ink-ghost">{t('shippingAddedAfterMethod')}</p>
+
+              {/*
+                The free-delivery promise, and how far off it this basket is
+                (Q-24). Said here, next to the ± buttons, because a customer one
+                candle short can only act on it while they are still looking at
+                the basket — being told at the summary is being told too late.
+              */}
+              {FREE_DELIVERY_FROM_ITEMS !== null && (
+                <p className="text-xs text-clay">
+                  {candlesToFree === null
+                    ? t('freeDeliveryEarned')
+                    : t('freeDeliveryNudge', {
+                        missing: candlesToFree,
+                        from: FREE_DELIVERY_FROM_ITEMS,
+                      })}
+                </p>
+              )}
             </section>
 
             <DeliveryForm
               cart={cart}
               intentToken={intentToken}
               shippingConfigured={shippingConfigured}
+              promoCodesEnabled={promoCodesEnabled}
               officeLookup={officeLookup}
               officeDataIsDemo={officeDataIsDemo}
               locale={locale}

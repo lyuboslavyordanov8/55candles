@@ -216,6 +216,8 @@ export async function createOrder(draft: OrderDraft): Promise<PlacedOrder> {
 
     currency: total.total.currency,
     goodsMinor: total.goods.amountMinor,
+    discountMinor: total.discount?.amountMinor ?? 0,
+    promoCode: total.promoCode ?? '',
     shippingMinor: total.shipping.amountMinor,
     codFeeMinor: total.codFee?.amountMinor ?? null,
     totalMinor: total.total.amountMinor,
@@ -248,7 +250,19 @@ export async function createOrder(draft: OrderDraft): Promise<PlacedOrder> {
           deliveryMethod: delivery.method,
           totalMinor: total.total.amountMinor,
           currency: total.total.currency,
+          itemCount: total.itemCount,
           freeShipping: total.freeShipping,
+          // What the free-delivery promotion cost on this parcel (Q-24). Recorded
+          // here rather than as a column because it is a cost the shop carried,
+          // not part of what the customer owes — but "is the promotion
+          // affordable" is unanswerable if nobody wrote it down.
+          ...(total.shippingAbsorbed
+            ? { shippingAbsorbedMinor: total.shippingAbsorbed.amountMinor }
+            : {}),
+          // The campaign, so it can be counted afterwards (Q-37).
+          ...(total.promoCode
+            ? { promoCode: total.promoCode, discountMinor: total.discount?.amountMinor ?? 0 }
+            : {}),
           // Whether the office code was confirmed against the courier, or taken
           // on trust because the courier could not be reached. Read this before
           // printing a waybill.

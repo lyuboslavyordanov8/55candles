@@ -485,9 +485,12 @@
     "delivery": "Delivery",
     "payment": "Payment",
     "optional": "(optional)",
-    "submit": "Place order",
+    "submit": "Calculate the final price",
+    "confirm": "Confirm the order",
     "submitted": "Order placed",
     "submitting": "Placing your order…",
+    "pricing": "Calculating the price…",
+    "priceFirstHint": "You will see the full bill, delivery included, first. The next button places the order.",
     "officeLookupPending": "Type the office name or number for now. A searchable list will appear here once the courier accounts are connected.",
     "field": {
       "recipientName": "Full name",
@@ -499,7 +502,8 @@
       "postCode": "Post code",
       "street": "Street, number and any block details",
       "officeId": "Office or locker",
-      "note": "Note for the courier"
+      "note": "Note for the courier",
+      "promoCode": "Promo code"
     },
     "courier": {
       "econt": "Econt",
@@ -542,6 +546,14 @@
     },
     "paymentHint": {
       "cod": "Pay the courier in cash when the parcel arrives."
+    },
+    "promo": {
+      "heading": "Promo code",
+      "placeholder": "Enter your code, if you have one",
+      "applied": "Code {code} applied — see the discount in the summary below.",
+      "unknown": "That code is not valid. Check it for typos.",
+      "expired": "That code has expired.",
+      "belowMinimum": "That code applies to orders from {amount} up."
     },
     "error": {
       "recipientName": {
@@ -589,6 +601,7 @@
     },
     "message": {
       "fixTheFields": "Please check the highlighted fields.",
+      "reviewBeforeConfirming": "This is the final bill, delivery included. Check it and press “Confirm the order” — nothing has been ordered and no payment taken yet.",
       "cartEmpty": "Your basket is empty.",
       "cartUnreadable": "Something went wrong reading your basket. Please start again.",
       "notPricedYet": "One or more items in your basket has no price yet, so the order can't be completed. Please contact us and we'll help directly.",
@@ -609,11 +622,16 @@
     "basketEmpty": "Your basket is empty.",
     "browseProducts": "Browse the candles",
     "lineUnpriced": "Price on request",
-    "shippingAddedAfterMethod": "Delivery is added once you choose a courier and method below.",
+    "shippingAddedAfterMethod": "Econt prices the delivery once you choose a method and an office below. You will see the whole bill before you confirm.",
+    "freeDeliveryEarned": "Delivery is free — we are paying it.",
+    "freeDeliveryNudge": "{missing, plural, one {# more candle for free delivery — from {from} candles up, we pay the carriage.} other {# more candles for free delivery — from {from} candles up, we pay the carriage.}}",
     "summary": {
       "title": "Order summary",
       "goods": "Candles",
+      "discount": "Discount",
+      "discountWithCode": "Discount ({code})",
       "delivery": "Delivery",
+      "deliveryFree": "free",
       "codFee": "Cash-on-delivery fee",
       "total": "Total",
       "weight": "Parcel weight: {grams} g, including packaging."
