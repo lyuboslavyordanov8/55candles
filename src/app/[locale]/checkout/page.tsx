@@ -128,9 +128,22 @@ function CheckoutContent({
           {unpricedCount > 0 && ` ${t('unpricedCount', { count: unpricedCount })}`}
         </p>
 
-        {(PRICING_IS_PROVISIONAL || TARIFFS_ARE_PLACEHOLDER) && (
+        {/*
+          One notice per flag, rather than one sentence covering both. They were
+          combined, and the combined text went on calling the parcel weight a
+          stand-in after the owner supplied the real one — a claim the customer
+          has no way to check and no reason to disbelieve. Each notice now says
+          only what its own flag is still true about.
+        */}
+        {PRICING_IS_PROVISIONAL && (
           <p role="note" className="rounded-sm border border-clay/40 bg-cream-surface p-4 text-xs leading-relaxed text-ink-secondary">
-            {t('provisionalNumbers')}
+            {t('provisionalPricing')}
+          </p>
+        )}
+
+        {TARIFFS_ARE_PLACEHOLDER && (
+          <p role="note" className="rounded-sm border border-clay/40 bg-cream-surface p-4 text-xs leading-relaxed text-ink-secondary">
+            {t('provisionalRates')}
           </p>
         )}
 

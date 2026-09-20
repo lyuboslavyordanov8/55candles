@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import messages from '../../../../../messages/en.json'
 import { CartProvider } from '@/components/cart/CartProvider'
+import { PRICING_IS_PROVISIONAL } from '@/data/pricing'
 import CheckoutPage from '../page'
 
 // The action is a server function; the page's own rendering is what is under
@@ -50,6 +51,18 @@ describe('CheckoutPage', () => {
     await renderPage('cherry:1')
 
     expect(screen.getByText(/delivery rates are placeholders/i)).toBeInTheDocument()
+  })
+
+  it('does not call the prices or the weight stand-ins, now that they are real', async () => {
+    // They were, and one notice covered both; when the owner supplied the real
+    // price and weight the sentence kept calling them placeholders — a claim the
+    // customer cannot check and has no reason to disbelieve. The two notices are
+    // gated separately now, so this fails if they are merged again.
+    expect(PRICING_IS_PROVISIONAL).toBe(false)
+    await renderPage('cherry:1')
+
+    expect(screen.queryByText(/stand-ins/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/does not affect the candle prices/i)).toBeInTheDocument()
   })
 
   it('shows an empty basket and a way out, rather than a dead form', async () => {

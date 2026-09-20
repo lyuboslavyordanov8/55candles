@@ -602,7 +602,8 @@
       "heading": "Order received",
       "numberLabel": "Your order number"
     },
-    "provisionalNumbers": "The prices shown are real, but the parcel weights and delivery rates are placeholders while the courier contracts are being set up. Delivery costs shown here are illustrative and are not what you would be charged.",
+    "provisionalPricing": "The candle prices and parcel weights shown here are stand-ins until they are confirmed.",
+    "provisionalRates": "Delivery rates are placeholders until the Econt contract is signed, so the delivery cost shown is illustrative and not what you would be charged. It does not affect the candle prices or the parcel weight.",
     "basket": "Your basket",
     "basketEmpty": "Your basket is empty.",
     "browseProducts": "Browse the candles",
