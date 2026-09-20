@@ -18,6 +18,26 @@ export const COURIERS = ['econt', 'speedy'] as const
 export type Courier = (typeof COURIERS)[number]
 
 /**
+ * The couriers an order may actually be placed with (AUDIT.md Q-22).
+ *
+ * Econt only, by decision: Speedy needs a signed contract and credentials
+ * issued by hand before its API answers anything, so a parcel chosen for it
+ * could not be labelled. It stays in `COURIERS` — the type, the database enum
+ * and the tariff table all keep a place for it, and the checkout shows it as
+ * coming soon rather than pretending it was never planned.
+ *
+ * Client-safe on purpose, so the form can grey the option out and the server can
+ * refuse it from the same list. It is a commercial fact, not a credential: see
+ * `couriersWithOfficeLookup()` in `src/lib/couriers/` for the separate question
+ * of whose office list can be searched.
+ */
+export const BOOKABLE_COURIERS: readonly Courier[] = ['econt']
+
+export function isCourierBookable(courier: Courier): boolean {
+  return BOOKABLE_COURIERS.includes(courier)
+}
+
+/**
  * `door` — to the customer's address.
  * `office` — collected from a courier branch.
  * `locker` — automated parcel station (Econt автомат / Speedy locker).

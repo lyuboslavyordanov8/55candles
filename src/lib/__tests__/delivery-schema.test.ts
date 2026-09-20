@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { fieldsFor, LIMITS, validateDelivery } from '../delivery-schema'
+import { BOOKABLE_COURIERS, COURIERS, isCourierBookable } from '../shipping'
 
 const VALID_OFFICE = {
   recipientName: 'Мария Иванова',
@@ -211,6 +212,22 @@ describe('validateDelivery', () => {
       expect(validateDelivery({ ...VALID_OFFICE, courier: undefined }).errors.courier).toBe(
         'invalid'
       )
+    })
+
+    it('refuses a courier that is known but cannot be booked yet', () => {
+      // Speedy is a real courier with a real place in the schema and a greyed
+      // option in the form, but no contract and no credentials — so a parcel
+      // chosen for it could never be labelled. `invalid` would be the wrong
+      // word for it, and the message the customer sees says so.
+      for (const courier of COURIERS.filter((option) => !isCourierBookable(option))) {
+        expect(validateDelivery({ ...VALID_OFFICE, courier }).errors.courier).toBe('unavailable')
+      }
+    })
+
+    it('accepts every courier that can be booked', () => {
+      for (const courier of BOOKABLE_COURIERS) {
+        expect(validateDelivery({ ...VALID_OFFICE, courier }).errors.courier).toBeUndefined()
+      }
     })
   })
 

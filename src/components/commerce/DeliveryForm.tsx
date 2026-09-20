@@ -5,7 +5,13 @@ import { useTranslations } from 'next-intl'
 import { submitCheckout, type CheckoutState } from '@/app/[locale]/checkout/actions'
 import { phoneProblem, PHONE_EXAMPLE, type PhoneProblem } from '@/lib/phone'
 import { sameBasket } from '@/lib/cart-params'
-import { COURIERS, DELIVERY_METHODS, type Courier, type DeliveryMethod } from '@/lib/shipping'
+import {
+  COURIERS,
+  DELIVERY_METHODS,
+  isCourierBookable,
+  type Courier,
+  type DeliveryMethod,
+} from '@/lib/shipping'
 import CourierMark from './CourierMark'
 import OfficePicker from './OfficePicker'
 import OrderSummary from './OrderSummary'
@@ -323,36 +329,68 @@ export default function DeliveryForm({
             aria-labelledby="delivery-courier-label"
             className="flex flex-wrap gap-x-6 gap-y-3"
           >
-            {COURIERS.map((option) => (
-              <label
-                key={option}
-                className="flex cursor-pointer items-center gap-3 rounded-sm border border-border bg-cream-base px-4 py-3 transition-colors duration-200 has-[:checked]:border-clay"
-              >
-                {/*
-                  `defaultChecked`, not `checked`. React clears the form when the
-                  action completes and restores controlled *text* inputs
-                  afterwards, but not radios: a controlled one came back visibly
-                  unselected while the state behind it still said Speedy, so the
-                  customer would be looking at Econt and submitting Speedy.
-                  Deriving the default from the state makes the reset restore
-                  exactly what is chosen. `onChange` still keeps the state, which
-                  is what decides whether the office field is a picker.
-                */}
-                <input
-                  type="radio"
-                  name="courier"
-                  value={option}
-                  defaultChecked={courier === option}
-                  onChange={() => setCourier(option)}
-                />
-                <CourierMark
-                  courier={option}
-                  locale={locale}
-                  name={t(`courier.${option}`)}
-                />
-              </label>
-            ))}
+            {COURIERS.map((option) => {
+              /*
+                Speedy is shown but cannot be chosen: no contract and no API
+                credentials yet, so a parcel picked for it could not be labelled
+                (`BOOKABLE_COURIERS` in src/lib/shipping.ts). Left visible and
+                marked "coming soon" rather than removed, because a customer who
+                uses Speedy should learn that it is planned instead of wondering
+                whether this shop ignores it. `disabled` keeps it out of the tab
+                order and out of the submitted data; the schema refuses it too,
+                for the request that never touched this form.
+              */
+              const bookable = isCourierBookable(option)
+
+              return (
+                <label
+                  key={option}
+                  className={`flex items-center gap-3 rounded-sm border border-border bg-cream-base px-4 py-3 transition-colors duration-200 has-[:checked]:border-clay ${
+                    bookable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  {/*
+                    `defaultChecked`, not `checked`. React clears the form when the
+                    action completes and restores controlled *text* inputs
+                    afterwards, but not radios: a controlled one came back visibly
+                    unselected while the state behind it still held the chosen
+                    courier, so the customer would be looking at one and
+                    submitting another. Deriving the default from the state makes
+                    the reset restore exactly what is chosen. `onChange` still
+                    keeps the state, which is what decides whether the office
+                    field is a picker.
+                  */}
+                  <input
+                    type="radio"
+                    name="courier"
+                    value={option}
+                    defaultChecked={courier === option}
+                    onChange={() => setCourier(option)}
+                    disabled={!bookable}
+                  />
+                  <CourierMark
+                    courier={option}
+                    locale={locale}
+                    name={t(`courier.${option}`)}
+                  />
+                  {!bookable && (
+                    <span className="text-[10px] uppercase tracking-widest text-ink-ghost">
+                      {t('courierSoon')}
+                    </span>
+                  )}
+                </label>
+              )
+            })}
           </div>
+          {/*
+            Only reachable when the radio above was bypassed — a page left open
+            while `BOOKABLE_COURIERS` changed, or a submission built by hand. The
+            group-level alert names no field, so without this the customer would
+            be told to fix something with nothing marked as wrong.
+          */}
+          {errorFor('courier') && (
+            <p className="text-xs text-red-700">{errorFor('courier')}</p>
+          )}
         </div>
 
         {/*

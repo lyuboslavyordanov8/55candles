@@ -210,7 +210,6 @@ describe('DeliveryForm', () => {
         echoingAction({ street: 'required' }) as typeof submitCheckout
       )
       renderForm()
-      await user.click(screen.getByRole('radio', { name: 'Speedy' }))
       await user.click(screen.getByRole('radio', { name: /to my address/i }))
       await user.type(screen.getByLabelText(/full name/i), 'Мария Иванова')
       await user.type(screen.getByLabelText(/mobile number/i), '0887115957')
@@ -221,11 +220,31 @@ describe('DeliveryForm', () => {
       await user.click(screen.getByRole('button', { name: /place order/i }))
       await screen.findByRole('alert', {}, { timeout: 5_000 })
 
-      // Silently reverting to Econt at the door would send the parcel to the
-      // wrong courier at the price quoted for the other one.
-      expect(screen.getByRole('radio', { name: 'Speedy' })).toBeChecked()
+      // Losing the courier on the way back would send the parcel through a
+      // different contract than the one the price was quoted against. Econt is
+      // the only bookable courier today, so this asserts the value survives
+      // rather than that it changed — the state it lives in is the same either
+      // way, and a second courier is expected (see `BOOKABLE_COURIERS`).
+      expect(screen.getByRole('radio', { name: 'Econt' })).toBeChecked()
       expect(screen.getByRole('radio', { name: /to my address/i })).toBeChecked()
       expect(valueOf(/street/i)).toBe('ул. Цар Самуил 3')
+    })
+
+    it('names the courier when the server refuses the one submitted', async () => {
+      // The radio for an unbookable courier is disabled, so this arrives only
+      // from a stale page or a hand-built POST — and the group-level alert
+      // names no field, which would leave nothing marked as wrong.
+      const user = userEvent.setup()
+      vi.mocked(submitCheckout).mockImplementationOnce(
+        echoingAction({ courier: 'unavailable' }) as typeof submitCheckout
+      )
+      renderForm()
+      await fillIn(user)
+
+      await user.click(screen.getByRole('button', { name: /place order/i }))
+      await screen.findByRole('alert', {}, { timeout: 5_000 })
+
+      expect(screen.getByText(/for now we ship with Econt/i)).toBeInTheDocument()
     })
 
     it('leaves a field the customer never filled in empty', async () => {
@@ -256,14 +275,32 @@ describe('DeliveryForm', () => {
     expect(screen.getByLabelText(/email address/i)).not.toBeRequired()
   })
 
-  it('offers both couriers and all three delivery methods', () => {
+  it('starts on the courier it can actually book, and offers all three delivery methods', () => {
     renderForm()
 
     expect(screen.getByRole('radio', { name: 'Econt' })).toBeChecked()
-    expect(screen.getByRole('radio', { name: 'Speedy' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Econt' })).toBeEnabled()
     expect(screen.getByRole('radio', { name: /to my address/i })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /courier office/i })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /parcel locker/i })).toBeInTheDocument()
+  })
+
+  it('shows Speedy as coming soon rather than as a choice or an absence', async () => {
+    // Speedy has no contract and no credentials yet, so a parcel chosen for it
+    // could not be labelled — but it was announced, and removing it outright
+    // would read as "never". Disabled keeps it out of the tab order and out of
+    // the submitted data; `delivery-schema.ts` refuses it server-side too.
+    const user = userEvent.setup()
+    renderForm()
+
+    const speedy = screen.getByRole('radio', { name: /speedy/i })
+    expect(speedy).toBeDisabled()
+    expect(speedy).not.toBeChecked()
+    expect(speedy).toHaveAccessibleName(/coming soon/i)
+
+    await user.click(speedy)
+
+    expect(screen.getByRole('radio', { name: 'Econt' })).toBeChecked()
   })
 
   it('labels each courier with its own logo, named for a screen reader', () => {
@@ -422,12 +459,10 @@ describe('DeliveryForm', () => {
     })
 
     it('keeps the free-text field for a courier that has none', async () => {
-      // Econt first, then Speedy, whose client is still a stub. One courier being
-      // connected must not imply the other is.
-      const user = userEvent.setup()
-      renderForm({ officeLookup: ['econt'] })
-
-      await user.click(screen.getByRole('radio', { name: 'Speedy' }))
+      // A lookup belongs to one courier, not to the checkout: Speedy's office
+      // list being searchable says nothing about Econt's, which is the courier
+      // the order is actually going out with.
+      renderForm({ officeLookup: ['speedy'] })
 
       expect(screen.getByLabelText(/office or locker/i)).toBeInTheDocument()
       expect(screen.queryByLabelText(/city or post code/i)).not.toBeInTheDocument()
@@ -494,17 +529,19 @@ describe('DeliveryForm', () => {
       expect(screen.getByLabelText(/^post code$/i)).toHaveValue('1000')
     })
 
-    it('starts a fresh picker when the courier changes', async () => {
-      // Without the remount, an Econt office code would survive a switch to
-      // Speedy and be submitted against the wrong nomenclature.
+    it('starts a fresh picker when the delivery point changes', async () => {
+      // The picker is keyed on courier *and* method, so a chosen office cannot
+      // survive into a list it does not belong to: an office code submitted for
+      // a locker — or, once Speedy is bookable, an Econt code submitted against
+      // Speedy's nomenclature — is a parcel addressed nowhere.
       const user = userEvent.setup()
-      renderForm({ officeLookup: ['econt', 'speedy'] })
+      renderForm({ officeLookup: ['econt'] })
 
       await user.type(screen.getByLabelText(/city or post code/i), 'Соф')
       await user.click(await screen.findByRole('button', { name: /София/ }))
       expect(screen.getByRole('button', { name: /change city/i })).toBeInTheDocument()
 
-      await user.click(screen.getByRole('radio', { name: 'Speedy' }))
+      await user.click(screen.getByRole('radio', { name: /parcel locker/i }))
 
       expect(screen.getByLabelText(/city or post code/i)).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /change city/i })).not.toBeInTheDocument()

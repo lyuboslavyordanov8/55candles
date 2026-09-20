@@ -1,5 +1,11 @@
 import { normaliseBulgarianPhone } from './phone'
-import { COURIERS, DELIVERY_METHODS, type Courier, type DeliveryMethod } from './shipping'
+import {
+  COURIERS,
+  DELIVERY_METHODS,
+  isCourierBookable,
+  type Courier,
+  type DeliveryMethod,
+} from './shipping'
 
 /**
  * Delivery details validation (AUDIT.md Q-25).
@@ -149,6 +155,11 @@ export function validateDelivery(input: Partial<Record<string, unknown>>): Valid
 
   if (!(COURIERS as readonly string[]).includes(value.courier)) {
     errors.courier = 'invalid'
+  } else if (!isCourierBookable(value.courier)) {
+    // A courier we cannot label a parcel for is refused here rather than in the
+    // action, so the form says so as soon as it is chosen — and so a hand-built
+    // POST naming Speedy cannot store an order nobody can ship.
+    errors.courier = 'unavailable'
   }
 
   if (!(DELIVERY_METHODS as readonly string[]).includes(value.method)) {

@@ -194,6 +194,7 @@ guessed.
 | B-03 prices | **Machinery only — table empty** | `src/data/pricing.ts`. Price *and* packed weight per slug; a test fails if either is invented |
 | Q-25 delivery methods | Done; rates are placeholders | `src/lib/shipping.ts` — 2 couriers × 3 methods, weight-banded tariffs. All 6 cards now carry `PLACEHOLDER_BANDS` so the flow is walkable; the real cards are still owed (Q-22) |
 | Q-21 payment methods | **Settled: наложен платеж only** | `src/lib/payments.ts`. Decided 2026-09-20; the card path has been removed rather than left dormant |
+| Q-22 couriers at launch | **Settled: Еконт only, Спиди "очаквайте скоро"** | `BOOKABLE_COURIERS` in `src/lib/shipping.ts`. Decided 2026-09-20. Speedy keeps its place in the type, the enum and the tariff table; the checkout greys it out and `validateDelivery` returns `courier: 'unavailable'`, so a hand-built POST cannot store an order nobody can label. One flag flips it back when the contract exists |
 | Delivery form | Done | `/[locale]/checkout` + `DeliveryForm`. Fields switch on method; `useActionState` per the Next 16 forms guide |
 | Order totals | Done | `src/lib/order-total.ts` — re-priced server-side, shipping and COD fee as separate line items |
 | Courier office lookup | **Interface only** | `src/lib/couriers/` returns `unconfigured` until credentials exist (Q-22) |

@@ -100,6 +100,18 @@ describe('submitCheckout', () => {
     expect(state.fieldErrors?.phone).toBe('required')
   })
 
+  it('refuses a courier the shop cannot book, even when everything else is valid', async () => {
+    // Speedy is greyed out in the form, but the form is not a boundary. Without
+    // this the shop would store an order for a parcel nobody can label, and the
+    // customer would hear about it only when it failed to arrive.
+    const state = await submitCheckout(IDLE, formData({ courier: 'speedy' }))
+
+    expect(state.status).toBe('invalid')
+    expect(state.fieldErrors?.courier).toBe('unavailable')
+    expect(state.messageKey).toBe('fixTheFields')
+    expect(state.summary).toBeUndefined()
+  })
+
   it('ignores a payment method in the payload, because there is only one', async () => {
     // Наложен платеж is the shop's only method, so the server names it and never
     // reads this field. A hand-built POST asking for something else gets the same
@@ -344,14 +356,14 @@ describe('submitCheckout', () => {
     })
 
     it('looks the office up by its code, at the submitted courier', async () => {
+      // The courier comes from the submission, not from a constant: Econt is the
+      // only one an order may name today (`BOOKABLE_COURIERS`), and a second one
+      // must reach its own nomenclature rather than Econt's.
       const findOffice = stubFindOffice({ status: 'ok', data: null })
 
-      await submitCheckout(
-        IDLE,
-        formData({ courier: 'speedy', officeId: '77', officeName: 'Русе Централен' })
-      )
+      await submitCheckout(IDLE, formData({ officeId: '77', officeName: 'Русе Централен' }))
 
-      expect(courierClient).toHaveBeenCalledWith('speedy')
+      expect(courierClient).toHaveBeenCalledWith('econt')
       expect(findOffice).toHaveBeenCalledWith('77')
     })
 
@@ -399,13 +411,11 @@ describe('submitCheckout', () => {
     })
 
     it('accepts a hand-typed office from a courier it cannot query', async () => {
-      // Speedy, whose client is still a stub: the form rendered a free-text
-      // field, so there is nothing to check the value against. Rejecting it
-      // would leave the customer no way to order at all.
-      const state = await submitCheckout(
-        IDLE,
-        formData({ courier: 'speedy', officeId: 'офис Гладстон' })
-      )
+      // The default stub answers `unconfigured` — a courier whose credentials
+      // are unset, which is how the shop runs until they are issued. The form
+      // rendered a free-text field, so there is nothing to check the value
+      // against, and rejecting it would leave the customer no way to order.
+      const state = await submitCheckout(IDLE, formData({ officeId: 'офис Гладстон' }))
 
       expect(state.status).toBe('readyToPay')
       expect(state.collectionPoint).toBeUndefined()

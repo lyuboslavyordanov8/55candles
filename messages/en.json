@@ -561,7 +561,8 @@
         "tooLong": "That email address is too long."
       },
       "courier": {
-        "invalid": "Please choose a courier."
+        "invalid": "Please choose a courier.",
+        "unavailable": "Speedy is coming soon — for now we ship with Econt."
       },
       "method": {
         "invalid": "Please choose where we should deliver."
@@ -614,7 +615,8 @@
       "codFee": "Cash-on-delivery fee",
       "total": "Total",
       "weight": "Parcel weight: {grams} g, including packaging."
-    }
+    },
+    "courierSoon": "coming soon"
   },
   "cart": {
     "title": "Cart",
