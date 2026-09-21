@@ -13,6 +13,7 @@ import {
   startAdminSession,
 } from '@/lib/admin-auth'
 import { advanceOrderStatus } from '@/lib/admin-orders'
+import { issueWaybillForOrder } from '@/lib/waybills'
 import { orderStatus, type OrderStatus } from '@/db/schema'
 
 /**
@@ -112,6 +113,38 @@ export async function changeStatus(formData: FormData): Promise<void> {
   }
 
   redirect(`/admin/orders/${orderId}?changed=${to}`)
+}
+
+/**
+ * Book the parcel at the courier.
+ *
+ * The one action in the admin that costs money, so it takes no arguments beyond
+ * the order: everything about the parcel is read from the stored order, and there
+ * is no field on the form an admin could mistype into a wrong address or a wrong
+ * amount to collect. Every guard lives in `issueWaybillForOrder`, which is also
+ * where the "not twice" invariant is kept.
+ */
+export async function issueWaybill(formData: FormData): Promise<void> {
+  await requireAdmin()
+
+  const orderId = String(formData.get('orderId') ?? '')
+  if (!orderId) redirect('/admin')
+
+  const result = await issueWaybillForOrder(orderId)
+
+  if (result.status === 'missing') redirect('/admin?error=missing')
+
+  revalidatePath(`/admin/orders/${orderId}`)
+  revalidatePath('/admin')
+
+  if (result.status === 'ok') {
+    redirect(`/admin/orders/${orderId}?waybill=${encodeURIComponent(result.waybill.number)}`)
+  }
+
+  // The courier's own wording is too long for a query string and too useful to
+  // lose, so it is written to the order's history instead and the page points
+  // there. See `issueWaybillForOrder`.
+  redirect(`/admin/orders/${orderId}?error=waybill_${result.status}`)
 }
 
 /** A status the enum actually contains, or undefined. Never a cast. */

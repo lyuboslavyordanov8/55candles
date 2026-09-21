@@ -1,14 +1,18 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { company } from '../../company'
 import {
+  canBookWaybills,
   canQuoteLiveRates,
   courierClient,
   couriersWithOfficeLookup,
+  econtCodPayout,
   econtEnvironment,
+  econtSender,
   econtShipFrom,
   isCourierConfigured,
   missingCourierCredentials,
   missingLiveRateRequirements,
+  missingWaybillRequirements,
 } from '..'
 
 /**
@@ -339,5 +343,115 @@ describe('the Speedy stub', () => {
       weightGrams: 550,
       codAmount: null,
     })).toEqual({ status: 'unconfigured', courier: 'speedy' })
+  })
+})
+
+describe('who the parcel is from', () => {
+  it('is nobody without a phone, because Econt refuses a label without one', () => {
+    // `company.contact.phone` is deliberately null — the owner does not publish
+    // their number — so the phone can only come from configuration.
+    expect(econtSender()).toBeNull()
+  })
+
+  it('defaults the name to the legal entity, which is the name on the invoice', () => {
+    vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
+
+    expect(econtSender()).toEqual({ name: company.legalName, phone: '+359888123456' })
+  })
+
+  it('takes a different sender name when one is configured', () => {
+    vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
+    vi.stubEnv('ECONT_SENDER_NAME', '55° свещи')
+
+    expect(econtSender()).toEqual({ name: '55° свещи', phone: '+359888123456' })
+  })
+})
+
+describe('where the наложен платеж money goes', () => {
+  it('is unset by default, which means Econt\u2019s own arrangement, not an error', () => {
+    // A personal профил pays out at an office counter. That works; it is just not
+    // automatic, so it must not read as a misconfiguration.
+    expect(econtCodPayout()).toBeNull()
+  })
+
+  it('prefers the profile template, so the IBAN never travels in a request', () => {
+    vi.stubEnv('ECONT_COD_PAY_TEMPLATE', 'ШН0022')
+    vi.stubEnv('ECONT_COD_IBAN', 'BG18RZBB91550123456789')
+    vi.stubEnv('ECONT_COD_BIC', 'RZBBBGSF')
+
+    expect(econtCodPayout()).toEqual({ template: 'ШН0022' })
+  })
+
+  it('sends the account when there is no template', () => {
+    vi.stubEnv('ECONT_COD_IBAN', 'BG18RZBB91550123456789')
+    vi.stubEnv('ECONT_COD_BIC', 'RZBBBGSF')
+
+    expect(econtCodPayout()).toEqual({
+      method: 'bank',
+      iban: 'BG18RZBB91550123456789',
+      bic: 'RZBBBGSF',
+      currency: 'EUR',
+    })
+  })
+
+  it('ignores half an arrangement rather than failing the booking with it', () => {
+    // Econt rejects an IBAN without a BIC. Falling back to the profile default
+    // books the parcel; sending the half would lose it.
+    vi.stubEnv('ECONT_COD_IBAN', 'BG18RZBB91550123456789')
+
+    expect(econtCodPayout()).toBeNull()
+  })
+})
+
+describe('whether a courier can issue a real waybill', () => {
+  it('needs everything pricing needs, plus a sender', () => {
+    vi.stubEnv('ECONT_USERNAME', 'merchant')
+    vi.stubEnv('ECONT_PASSWORD', 'secret')
+    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
+
+    // Live prices with hand-written labels is a working shop, and is exactly where
+    // this one stood before booking was built.
+    expect(canQuoteLiveRates('econt')).toBe(true)
+    expect(canBookWaybills('econt')).toBe(false)
+    expect(missingWaybillRequirements()).toEqual(['ECONT_SENDER_PHONE'])
+
+    vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
+
+    expect(canBookWaybills('econt')).toBe(true)
+    expect(missingWaybillRequirements()).toEqual([])
+  })
+
+  it('reports the pricing gaps too, so the checklist is one list', () => {
+    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
+
+    expect(missingWaybillRequirements()).toEqual([
+      'ECONT_USERNAME',
+      'ECONT_PASSWORD',
+      'ECONT_SENDER_PHONE',
+    ])
+  })
+
+  it('is false for Speedy, whose labels are still made by hand', () => {
+    vi.stubEnv('SPEEDY_USERNAME', 'merchant')
+    vi.stubEnv('SPEEDY_PASSWORD', 'secret')
+    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
+    vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
+
+    expect(canBookWaybills('speedy')).toBe(false)
+  })
+})
+
+describe('the Speedy stub, asked to book', () => {
+  it('answers unconfigured rather than booking nothing and reporting success', async () => {
+    expect(
+      await courierClient('speedy').createWaybill({
+        method: 'office',
+        officeId: '1012',
+        weightGrams: 550,
+        codAmount: null,
+        recipient: { name: 'Мария Иванова', phone: '+359887115957' },
+        orderNumber: '55C-2026-000123',
+      })
+    ).toEqual({ status: 'unconfigured', courier: 'speedy' })
   })
 })

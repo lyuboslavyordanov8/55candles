@@ -5,7 +5,9 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { getOrderDetail } from '@/lib/admin-orders'
 import { nextStatuses, STATUS_LABELS } from '@/lib/order-status'
 import { formatMoney, money } from '@/lib/money'
-import { changeStatus } from '../../actions'
+import { waybillBlocker } from '@/lib/waybills'
+import type { OrderEvent } from '@/db/schema'
+import { changeStatus, issueWaybill } from '../../actions'
 
 /**
  * One order: everything needed to pack it, ship it and settle it.
@@ -29,6 +31,30 @@ const methodLabels: Record<string, string> = {
 
 const notices: Record<string, string> = {
   stale: 'Поръчката вече е в друг статус — някой я е преместил. Виж историята по-долу.',
+  waybill_failed:
+    'Econt не издаде товарителница. Точната причина е записана в историята по-долу.',
+  waybill_busy: 'Товарителницата за тази поръчка се издава в момента. Изчакай и презареди.',
+  waybill_blocked: 'Товарителница не може да се издаде за тази поръчка — виж по-долу защо.',
+}
+
+/**
+ * The label PDF from the order's history, newest first.
+ *
+ * Kept in the event's `detail` rather than in a column: it is one link per booking
+ * and the history is already where a booking is recorded, so a column would be a
+ * migration to store a duplicate of something we have.
+ */
+function labelPdfUrl(events: readonly OrderEvent[]): string | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const detail = events[i].detail
+
+    if (detail && typeof detail === 'object') {
+      const url = (detail as Record<string, unknown>).waybillPdfUrl
+      if (typeof url === 'string' && url.startsWith('https://')) return url
+    }
+  }
+
+  return null
 }
 
 export default async function AdminOrderPage({
@@ -36,7 +62,7 @@ export default async function AdminOrderPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ error?: string; changed?: string }>
+  searchParams: Promise<{ error?: string; changed?: string; waybill?: string }>
 }) {
   await requireAdmin()
 
@@ -45,10 +71,12 @@ export default async function AdminOrderPage({
   if (!detail) notFound()
 
   const { order, items, events } = detail
-  const { error, changed } = await searchParams
+  const { error, changed, waybill } = await searchParams
 
   const currency = order.currency as 'EUR'
   const amount = (minor: number) => formatMoney(money(minor, currency), 'bg')
+  const blocker = waybillBlocker(order)
+  const pdfUrl = labelPdfUrl(events)
 
   return (
     <div className="space-y-6">
@@ -71,6 +99,12 @@ export default async function AdminOrderPage({
       {error && notices[error] && (
         <p role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
           {notices[error]}
+        </p>
+      )}
+
+      {waybill && (
+        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+          Товарителница {waybill} е издадена. Разпечатай етикета и подай пратката на Econt.
         </p>
       )}
 
@@ -152,7 +186,24 @@ export default async function AdminOrderPage({
               </Row>
             )}
             {order.note && <Row label="Бележка">{order.note}</Row>}
-            <Row label="Товарителница">{order.waybillNumber || '—'}</Row>
+            <Row label="Товарителница">
+              {order.waybillNumber ? (
+                order.trackingUrl ? (
+                  <a
+                    href={order.trackingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    {order.waybillNumber}
+                  </a>
+                ) : (
+                  order.waybillNumber
+                )
+              ) : (
+                '—'
+              )}
+            </Row>
           </dl>
         </section>
 
@@ -179,6 +230,62 @@ export default async function AdminOrderPage({
           </dl>
         </section>
       </div>
+
+      <section className="rounded-sm border border-stone-200 bg-white p-4">
+        <h2 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">
+          Товарителница
+        </h2>
+
+        {order.waybillNumber ? (
+          <p className="text-xs text-stone-600">
+            Издадена: <span className="font-medium">{order.waybillNumber}</span>
+            {pdfUrl && (
+              <>
+                {' · '}
+                <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                  етикет (PDF)
+                </a>
+              </>
+            )}
+            {order.trackingUrl && (
+              <>
+                {' · '}
+                <a
+                  href={order.trackingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  проследяване
+                </a>
+              </>
+            )}
+            <span className="mt-1 block text-stone-400">
+              Втора товарителница за същата поръчка не се издава оттук. Ако тази е грешна, отмени я
+              в my.econt.com.
+            </span>
+          </p>
+        ) : blocker ? (
+          <p className="text-xs text-stone-500">{blockerText(blocker)}</p>
+        ) : (
+          <form action={issueWaybill} className="space-y-2">
+            <input type="hidden" name="orderId" value={order.id} />
+            <p className="text-xs text-stone-600">
+              Econt ще издаде истинска товарителница —{' '}
+              {order.deliveryMethod === 'door'
+                ? `до адрес: ${order.street}, ${order.postCode} ${order.city}`
+                : `до ${methodLabels[order.deliveryMethod] ?? order.deliveryMethod} ${order.officeName} (код ${order.officeId})`}
+              , {order.weightGrams} г, наложен платеж {amount(order.totalMinor)}.
+            </p>
+            <button
+              type="submit"
+              className="rounded-sm bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-700"
+            >
+              Издай товарителница
+            </button>
+          </form>
+        )}
+      </section>
 
       <section className="rounded-sm border border-stone-200 bg-white p-4">
         <h2 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">
@@ -262,6 +369,37 @@ export default async function AdminOrderPage({
     </div>
   )
 }
+
+/**
+ * Why the button is not there, in the words of someone who has to act on it.
+ *
+ * Each branch names the thing to do next rather than the state that is wrong —
+ * "потвърди поръчката" is actionable where "неправилен статус" is not.
+ */
+function blockerText(blocker: NonNullable<ReturnType<typeof waybillBlocker>>): string {
+  switch (blocker.reason) {
+    case 'alreadyIssued':
+      return `Вече има товарителница ${blocker.waybillNumber}.`
+    case 'wrongStatus':
+      return BOOKABLE_AFTER.includes(blocker.status)
+        ? `Поръчката е в статус „${STATUS_LABELS[blocker.status]}“ — товарителницата вече е трябвало да е издадена.`
+        : `Първо потвърди поръчката (сега е „${STATUS_LABELS[blocker.status]}“).`
+    case 'notBookable':
+      return blocker.courier === 'speedy'
+        ? 'Speedy още не се поддържа — направи товарителницата ръчно в системата на Speedy.'
+        : `Econt не е настроен за товарителници. Липсва: ${blocker.missing.join(', ')}.`
+  }
+}
+
+/** Statuses the parcel has already left the shop in, for the message above. */
+const BOOKABLE_AFTER: readonly string[] = [
+  'shipped',
+  'delivered',
+  'cod_collected',
+  'reconciled',
+  'refused_at_delivery',
+  'returned',
+]
 
 /**
  * The event's `detail` jsonb as one readable line, or `''` when there is nothing.

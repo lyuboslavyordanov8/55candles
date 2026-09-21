@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { createEcontClient } from '../econt'
+import { createEcontClient, econtTrackingUrl } from '../econt'
 import type { CourierClient } from '../types'
 
 /**
@@ -602,6 +602,20 @@ describe('pricing a parcel', () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
 
     expect(body.label.services).toBeUndefined()
+  })
+
+  it('bills the carriage to the shop, not to the person at the counter', async () => {
+    // Q-23. The customer was shown one number and the delivery they paid for is
+    // already inside it, so billing the receiver would collect the courier's fees
+    // a second time at the door. Verified 2026-09-21: the total is 3.74 either
+    // way, so this changes who is billed and not what the checkout shows.
+    respondWithQuote(quoted())
+
+    await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+
+    expect(body.label.paymentSenderMethod).toBe('cash')
     expect(body.label.paymentReceiverMethod).toBeUndefined()
   })
 
@@ -746,5 +760,268 @@ describe('refusing to price', () => {
 
     expect(result).toMatchObject({ status: 'failed' })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Booking (AUDIT.md Phase 4).
+ *
+ * The one call in this client with a side effect at the courier, so the tests are
+ * about the two ways it can cost money: sending `create` when a quote was meant,
+ * and reporting a failure for a parcel that in fact exists. The fixture is the
+ * demo service's own `create` response, recorded 2026-09-21.
+ */
+
+const SENDER = { name: 'ВиреонЛабс ЕООД', phone: '+359888123456' }
+
+/** A client that can book, with whatever is not overridden. */
+function bookingClient(
+  overrides: Partial<Parameters<typeof createEcontClient>[0]> = {}
+): CourierClient {
+  return createEcontClient({
+    ...CONFIG,
+    credentials: () => CREDENTIALS,
+    shipFrom: () => SHIP_FROM,
+    sender: () => SENDER,
+    ...overrides,
+  })
+}
+
+const OFFICE_PARCEL_TO_BOOK = {
+  ...OFFICE_PARCEL,
+  recipient: { name: 'Мария Иванова', phone: '+359887115957', email: 'maria@example.com' },
+  orderNumber: '55C-2026-000123',
+}
+
+/** The booked-label response, as Econt sends it. */
+function booked(overrides: Record<string, unknown> = {}) {
+  const quote = quoted()
+
+  return {
+    label: {
+      shipmentNumber: '1053118220',
+      pdfURL: 'https://ee.econt.com/services/PDFService.getPDF.json?id=1053118220',
+      expectedDeliveryDate: '2026-09-23',
+      ...quote.label,
+      ...overrides,
+    },
+  }
+}
+
+function bodyOf(call = 0): Record<string, any> {
+  return JSON.parse(fetchMock.mock.calls[call][1].body as string)
+}
+
+describe('booking a parcel', () => {
+  it('asks for a waybill, not a calculation', async () => {
+    respondWithQuote(booked())
+
+    await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    const [url] = fetchMock.mock.calls[0]
+
+    expect(url).toBe('https://demo.example/services/Shipments/LabelService.createLabel.json')
+    expect(bodyOf().mode).toBe('create')
+  })
+
+  it('sends both parties, because a parcel cannot be delivered to nobody', async () => {
+    respondWithQuote(booked())
+
+    await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    const { label } = bodyOf()
+
+    expect(label.senderClient).toEqual({ name: 'ВиреонЛабс ЕООД', phones: ['+359888123456'] })
+    expect(label.receiverClient).toEqual({
+      name: 'Мария Иванова',
+      phones: ['+359887115957'],
+      email: 'maria@example.com',
+    })
+    expect(label.senderOfficeCode).toBe('1120')
+    expect(label.receiverOfficeCode).toBe('4015')
+  })
+
+  it('carries our order number, so a parcel on a shelf leads back to an order', async () => {
+    respondWithQuote(booked())
+
+    await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(bodyOf().label.orderNumber).toBe('55C-2026-000123')
+  })
+
+  it('omits the email when the customer gave none, rather than sending an empty one', async () => {
+    respondWithQuote(booked())
+
+    await bookingClient().createWaybill({
+      ...OFFICE_PARCEL_TO_BOOK,
+      recipient: { name: 'Мария Иванова', phone: '+359887115957' },
+    })
+
+    expect(bodyOf().label.receiverClient.email).toBeUndefined()
+  })
+
+  it('asks the courier to collect the amount the customer owes', async () => {
+    respondWithQuote(booked())
+
+    await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(bodyOf().label.services).toMatchObject({
+      cdAmount: 19.99,
+      cdType: 'get',
+      cdCurrency: 'EUR',
+    })
+    // And it collects *only* that: the courier's own fees are billed to us, so the
+    // customer hands over exactly the total the confirmation email named (Q-23).
+    expect(bodyOf().label.paymentSenderMethod).toBe('cash')
+    expect(bodyOf().label.paymentReceiverMethod).toBeUndefined()
+  })
+
+  it('names the payout template when one is configured, and sends no account number', async () => {
+    // The preferred arrangement: the IBAN lives on the Econt profile, not in our
+    // requests or our logs.
+    respondWithQuote(booked())
+
+    await bookingClient({ codPayout: () => ({ template: 'ШН0022' }) }).createWaybill(
+      OFFICE_PARCEL_TO_BOOK
+    )
+
+    expect(bodyOf().label.services.cdPayOptionsTemplate).toBe('ШН0022')
+    expect(bodyOf().label.services.cdPayOptions).toBeUndefined()
+  })
+
+  it('sends the bank account per shipment when there is no template', async () => {
+    // What a personal е-Еконт profile can do without a signed contract. Field
+    // names are Econt's own: `IBAN`, `BIC`, `bankCurrency`.
+    respondWithQuote(booked())
+
+    await bookingClient({
+      codPayout: () => ({
+        method: 'bank',
+        iban: 'BG18RZBB91550123456789',
+        bic: 'RZBBBGSF',
+        currency: 'EUR',
+      }),
+    }).createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(bodyOf().label.services.cdPayOptions).toEqual({
+      method: 'bank',
+      IBAN: 'BG18RZBB91550123456789',
+      BIC: 'RZBBBGSF',
+      bankCurrency: 'EUR',
+    })
+  })
+
+  it('books with no payout instruction at all, leaving the profile default', async () => {
+    // Not a misconfiguration: the money then waits at an Econt counter, which is a
+    // working arrangement and the one a personal profile starts with.
+    respondWithQuote(booked())
+
+    await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(bodyOf().label.services.cdPayOptions).toBeUndefined()
+    expect(bodyOf().label.services.cdPayOptionsTemplate).toBeUndefined()
+  })
+
+  it('returns the number, a tracking link a customer can open, and the label', async () => {
+    respondWithQuote(booked())
+
+    const result = await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(result).toMatchObject({
+      status: 'ok',
+      data: {
+        number: '1053118220',
+        trackingUrl: 'https://www.econt.com/services/track-shipment/1053118220',
+        pdfUrl: 'https://ee.econt.com/services/PDFService.getPDF.json?id=1053118220',
+        expectedDeliveryDate: '2026-09-23',
+        price: { total: { amountMinor: 374 }, codFee: { amountMinor: 30 } },
+      },
+    })
+  })
+
+  it('reports the parcel even when the price cannot be read', async () => {
+    // The expensive mistake this guards: a booked parcel reported as a failure
+    // invites a second press of the button, and Econt bills for both.
+    respondWithQuote(booked({ totalPrice: null, currency: null, services: [] }))
+
+    const result = await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(result).toMatchObject({ status: 'ok', data: { number: '1053118220' } })
+    expect(result.status === 'ok' && result.data.price).toBeUndefined()
+  })
+
+  it('never retries, because a retry is a second parcel', async () => {
+    // `postJson` cannot tell a request that never arrived from one whose answer
+    // was lost, so booking gets exactly one attempt.
+    fetchMock.mockResolvedValue(new Response('upstream is down', { status: 503 }))
+
+    const result = await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toMatchObject({ status: 'failed' })
+  })
+
+  it('is unconfigured without a sender, which pricing does not need', async () => {
+    const result = await bookingClient({ sender: () => null }).createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(result).toEqual({ status: 'unconfigured', courier: 'econt' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('is unconfigured without credentials or a hand-over point', async () => {
+    expect(
+      await bookingClient({ credentials: () => null }).createWaybill(OFFICE_PARCEL_TO_BOOK)
+    ).toEqual({ status: 'unconfigured', courier: 'econt' })
+    expect(
+      await bookingClient({ shipFrom: () => null }).createWaybill(OFFICE_PARCEL_TO_BOOK)
+    ).toEqual({ status: 'unconfigured', courier: 'econt' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('treats a 200 with no waybill number as a failure, loudly', async () => {
+    // Nothing was created, so this one *is* safe to report as a failure — but if
+    // that reading is ever wrong the log is the only evidence there was a parcel.
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    respondWithQuote({ label: { totalPrice: 3.74, currency: 'EUR' } })
+
+    const result = await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(result).toMatchObject({ status: 'failed' })
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('55C-2026-000123'))
+  })
+
+  it('books to an address without touching the office fields', async () => {
+    respondWithQuote(booked())
+
+    await bookingClient().createWaybill({
+      ...OFFICE_PARCEL_TO_BOOK,
+      method: 'door',
+      officeId: undefined,
+      address: { city: 'Пловдив', postCode: '4000', street: 'ул. Христо Ботев 15, ап. 9' },
+    })
+
+    const { label } = bodyOf()
+
+    expect(label.receiverAddress).toEqual({
+      city: { name: 'Пловдив', postCode: '4000' },
+      fullAddress: 'ул. Христо Ботев 15, ап. 9',
+    })
+    expect(label.receiverOfficeCode).toBeUndefined()
+  })
+})
+
+describe('econtTrackingUrl', () => {
+  it('points at the public page, not the API host', async () => {
+    // It is stored on the order and sent to the customer, so it has to be a page
+    // that opens without credentials.
+    expect(econtTrackingUrl('1053118220')).toBe(
+      'https://www.econt.com/services/track-shipment/1053118220'
+    )
+  })
+
+  it('escapes whatever it is given', () => {
+    expect(econtTrackingUrl('10 53/118')).toBe(
+      'https://www.econt.com/services/track-shipment/10%2053%2F118'
+    )
   })
 })
