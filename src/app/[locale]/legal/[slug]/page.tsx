@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl'
 import Reveal from '@/components/motion/Reveal'
 import Impressum from '@/components/legal/Impressum'
 import { BreadcrumbJsonLd } from '@/components/seo/JsonLd'
-import { locales } from '@/i18n/locales'
+import { locales, localeAlternates } from '@/i18n/locales'
 import { LEGAL_DOCS, LEGAL_IS_DRAFT, isLegalSlug, legalDoc, legalPath } from '@/lib/legal'
 import type { LegalSlug } from '@/lib/legal'
 
@@ -38,7 +38,7 @@ export async function generateMetadata({
     description: t('summary'),
     alternates: {
       canonical: `/${locale}${path}`,
-      languages: Object.fromEntries(locales.map((l) => [l, `/${l}${path}`])),
+      languages: localeAlternates(path),
     },
     // Draft legal text should not be indexed or shared as though it were
     // final; the pages are reachable, just not advertised.

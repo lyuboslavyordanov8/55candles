@@ -11,7 +11,7 @@ import MotionProvider from '@/components/providers/MotionProvider'
 import { OrganizationJsonLd } from '@/components/seo/JsonLd'
 import { homeBanner, bannerText } from '@/content/home-banner'
 import { fontVariables } from '@/fonts'
-import { defaultLocale, isLocale, locales } from '@/i18n/locales'
+import { defaultLocale, isLocale, locales, localeAlternates } from '@/i18n/locales'
 import { pickClientMessages } from '@/i18n/client-namespaces'
 import { siteUrl, isSiteUrlConfigured } from '@/lib/site'
 
@@ -54,7 +54,7 @@ export async function generateMetadata({
     description,
     alternates: {
       canonical: `/${locale}`,
-      languages: Object.fromEntries(locales.map((l) => [l, `/${l}`])),
+      languages: localeAlternates(''),
     },
     openGraph: {
       type: 'website',

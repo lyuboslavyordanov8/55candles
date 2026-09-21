@@ -27,3 +27,17 @@ describe('sitemap lastModified', () => {
     }
   })
 })
+
+describe('sitemap hreflang', () => {
+  const entries = sitemap()
+
+  it('gives every entry an x-default alongside its locale alternates, all absolute', () => {
+    for (const entry of entries) {
+      const languages = entry.alternates?.languages as Record<string, string> | undefined
+      expect(languages?.bg, entry.url).toBeDefined()
+      expect(languages?.en, entry.url).toBeDefined()
+      expect(languages?.['x-default'], entry.url).toBeDefined()
+      expect(languages!['x-default']).toMatch(/^https?:\/\//)
+    }
+  })
+})

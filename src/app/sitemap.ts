@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { products } from '@/data/products'
-import { locales, defaultLocale } from '@/i18n/locales'
+import { defaultLocale, localeAlternates } from '@/i18n/locales'
 import { LEGAL_DOCS, LEGAL_IS_DRAFT } from '@/lib/legal'
 import { absoluteUrl } from '@/lib/site'
 
@@ -16,9 +16,9 @@ const staticPaths: Array<{ path: string; priority: number; changeFrequency: 'wee
 
 /**
  * Emits one entry per path (using the default locale as the canonical URL)
- * with every locale listed under alternates.languages, which is how Google
- * wants hreflang expressed in a sitemap. Emitting one entry per locale
- * instead would look like duplicate content.
+ * with every locale — plus `x-default` — listed under alternates.languages,
+ * which is how Google wants hreflang expressed in a sitemap. Emitting one
+ * entry per locale instead would look like duplicate content.
  *
  * `lastModified` is only set when the caller has a real date for the
  * content. It used to be `new Date()` unconditionally, which put the build
@@ -42,7 +42,10 @@ function entry(
     priority,
     alternates: {
       languages: Object.fromEntries(
-        locales.map((locale) => [locale, absoluteUrl(`/${locale}${path}`)])
+        Object.entries(localeAlternates(path)).map(([lang, relativeUrl]) => [
+          lang,
+          absoluteUrl(relativeUrl),
+        ])
       ),
     },
   }
