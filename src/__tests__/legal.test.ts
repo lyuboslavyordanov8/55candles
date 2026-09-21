@@ -109,18 +109,44 @@ describe('legal documents', () => {
     expect(remaining, `[TODO] markers are back:\n  ${remaining.join('\n  ')}`).toEqual([])
   })
 
-  it('still warns that the wording is unreviewed', () => {
-    // The banner is the only thing left standing between a draft and a customer
-    // relying on it, so it outlives the placeholders it used to point at.
-    expect(LEGAL_IS_DRAFT).toBe(true)
+  it('is published rather than drafted, and keeps the banner copy to hand', () => {
+    // The banner came down on 2026-09-21. The strings stay in the catalogue on
+    // purpose: reopening the texts means setting the flag, not rewriting copy,
+    // and a missing message would crash the page it is meant to warn on.
+    expect(LEGAL_IS_DRAFT).toBe(false)
 
     for (const messages of [enMessages, bgMessages] as const) {
-      const notice = (messages.legal as unknown as { draftNoticeBody: string }).draftNoticeBody
-      // No longer allowed to promise that "[TODO]" marks what is outstanding:
-      // nothing is marked any more, so saying so would send a reader looking for
-      // markers that do not exist.
-      expect(notice).not.toContain('TODO')
-      expect(notice.length).toBeGreaterThan(0)
+      const legal = messages.legal as unknown as {
+        draftNoticeTitle: string
+        draftNoticeBody: string
+      }
+      expect(legal.draftNoticeTitle.length).toBeGreaterThan(0)
+      expect(legal.draftNoticeBody.length).toBeGreaterThan(0)
+      // Whatever it says, it may not promise that "[TODO]" marks what is
+      // outstanding — nothing is marked any more.
+      expect(legal.draftNoticeBody).not.toContain('TODO')
+    }
+  })
+
+  it('numbers every section once, in order', () => {
+    // Inserting a clause means renumbering the ones after it, and a duplicated
+    // "13." is the mistake that survives review because each page looks fine on
+    // its own. Cheap to assert, so it is asserted.
+    for (const { key } of LEGAL_DOCS) {
+      for (const [locale, messages] of [
+        ['en', enMessages],
+        ['bg', bgMessages],
+      ] as const) {
+        const numbers = doc(messages as Catalogue, key).sections.map((section) => {
+          const match = /^(\d+)\./.exec(section.heading)
+          return match ? Number(match[1]) : null
+        })
+
+        const numbered = numbers.filter((n): n is number => n !== null)
+        expect(numbered, `${locale}/${key} numbering`).toEqual(
+          numbered.map((_, index) => index + 1)
+        )
+      }
     }
   })
 })

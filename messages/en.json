@@ -256,7 +256,7 @@
           },
           {
             "heading": "5. How a contract is formed",
-            "body": "Adding items to your basket and reaching the checkout is not an order. A contract is formed only when you confirm your order and we send you a written order confirmation to the email address you gave us. Until then no contract exists and you owe us nothing."
+            "body": "Adding products to the basket and reaching the checkout is not an order. A contract is formed only once you confirm your order and we send you written confirmation to the email address you gave. Until then there is no contract and you owe nothing. If we cannot fulfil an order — because a candle has run out, or the delivery details are incomplete — we will email or call you before confirming it, and you will owe nothing."
           },
           {
             "heading": "6. Payment",
@@ -284,14 +284,18 @@
           },
           {
             "heading": "12. Complaints and dispute resolution",
-            "body": "Please contact us first — most issues are resolved quickly. You may also complain to the Commission for Consumer Protection (Комисия за защита на потребителите, kzp.bg) and, for out-of-court settlement, to the relevant conciliation commission or the EU online dispute resolution platform."
+            "body": "Please contact us first — most questions are settled quickly. If we cannot agree, you may complain to the Bulgarian Commission for Consumer Protection (kzp.bg) or ask for the dispute to be heard, free of charge, by a conciliation commission attached to it. None of this takes away your right to go to a Bulgarian court."
           },
           {
-            "heading": "13. Applicable law",
+            "heading": "13. The content of this site",
+            "body": "The photographs, text, logo and design of this site are ours and are protected by copyright. You are welcome to look at them and to share links to our pages. Copying them for commercial purposes — for another shop or listing, say — needs our written permission. The names of the couriers and other companies mentioned in these terms belong to their respective owners."
+          },
+          {
+            "heading": "14. Applicable law",
             "body": "These Terms are governed by Bulgarian law. Nothing in them limits the rights you have as a consumer under mandatory Bulgarian or EU law. If any provision is unenforceable, the rest continues to apply."
           },
           {
-            "heading": "14. Changes",
+            "heading": "15. Changes",
             "body": "We may update these Terms. The version that applies to your order is the one published when you placed it, and we keep the date of the last change at the top of this page."
           }
         ]
@@ -305,8 +309,8 @@
             "body": "The data controller is VireonLabs EOOD, reg. no. 208907603. Our contact details are below. We are not required to appoint a data protection officer and have not appointed one: we are not a public authority, our business does not involve large-scale systematic monitoring of people, and we do not process special categories of data on a large scale (Article 37 GDPR). Write to the email address below with any question about your data and we will answer it ourselves."
           },
           {
-            "heading": "2. What we collect today",
-            "body": "This website has no user accounts. If you use the contact form we handle the name, email address and message you send us, in order to answer you. If you place an order we record the recipient name, telephone number, email address, delivery address or collection point, and what you ordered, because we cannot deliver a parcel without them. We load no analytics, advertising or tracking services."
+            "heading": "2. No accounts, no tracking",
+            "body": "This site has no user accounts — you do not register or create a password in order to buy. We load no analytics, advertising or tracking services, and we do not profile visitors. Exactly what we record when you order or write to us is set out in the next section."
           },
           {
             "heading": "3. What we collect",
@@ -428,7 +432,7 @@
           },
           {
             "heading": "6. If we cannot agree",
-            "body": "You may refer the matter to the Commission for Consumer Protection (Комисия за защита на потребителите, kzp.bg), to the relevant conciliation commission for an out-of-court settlement, or to the EU online dispute resolution platform."
+            "body": "You may complain to the Commission for Consumer Protection (kzp.bg) or ask for the dispute to be heard free of charge by a conciliation commission attached to it — the procedure is out of court and voluntary, but we will take part in it. Your right to go to a Bulgarian court remains, and choosing a conciliation commission does not waive it."
           }
         ]
       },
