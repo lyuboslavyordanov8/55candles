@@ -112,10 +112,19 @@ export interface EcontShipFrom {
  * `company.contact.phone`, which is deliberately `null` because the owner does
  * not publish their number (see `src/lib/company.ts`). Unpublished is not the
  * same as unknown, and the courier is not the open web.
+ *
+ * `molName` is the natural person authorised to act for the sender — Econt's
+ * own abbreviation for "материално отговорно лице". `name` here is always
+ * `company.legalName` unless overridden (see `econtSender()`), i.e. a
+ * юридическо лице, and Econt refuses to `create` a label for a juridical
+ * sender with nobody named on it: confirmed against the live service on
+ * 2026-09-21, `517 ExInvalidParam` — *"подател: За юридическо лице,
+ * задължително се попълва упълномощено лице."*
  */
 export interface EcontSender {
   name: string
   phone: string
+  molName: string
 }
 
 /**
@@ -542,7 +551,15 @@ function waybillBody(
 
   return {
     label: {
-      senderClient: { name: sender.name, phones: [sender.phone] },
+      senderClient: {
+        name: sender.name,
+        phones: [sender.phone],
+        // Always true: the sender is always `company.legalName`, our registered
+        // ЕООД, even when `EcontSender.name` is overridden for display — see the
+        // doc comment on `EcontSender`.
+        juridicalEntity: true,
+        molName: sender.molName,
+      },
       ...origin,
       receiverClient: {
         name: request.recipient.name,

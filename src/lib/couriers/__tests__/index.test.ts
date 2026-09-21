@@ -469,20 +469,38 @@ describe('who the parcel is from', () => {
   it('is nobody without a phone, because Econt refuses a label without one', () => {
     // `company.contact.phone` is deliberately null — the owner does not publish
     // their number — so the phone can only come from configuration.
+    vi.stubEnv('ECONT_SENDER_MOL_NAME', 'Иван Иванов')
+
+    expect(econtSender()).toBeNull()
+  })
+
+  it('is nobody without an authorised person either, since our sender is a юридическо лице', () => {
+    vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
+
     expect(econtSender()).toBeNull()
   })
 
   it('defaults the name to the legal entity, which is the name on the invoice', () => {
     vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
+    vi.stubEnv('ECONT_SENDER_MOL_NAME', 'Иван Иванов')
 
-    expect(econtSender()).toEqual({ name: company.legalName, phone: '+359888123456' })
+    expect(econtSender()).toEqual({
+      name: company.legalName,
+      phone: '+359888123456',
+      molName: 'Иван Иванов',
+    })
   })
 
   it('takes a different sender name when one is configured', () => {
     vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
     vi.stubEnv('ECONT_SENDER_NAME', '55° свещи')
+    vi.stubEnv('ECONT_SENDER_MOL_NAME', 'Иван Иванов')
 
-    expect(econtSender()).toEqual({ name: '55° свещи', phone: '+359888123456' })
+    expect(econtSender()).toEqual({
+      name: '55° свещи',
+      phone: '+359888123456',
+      molName: 'Иван Иванов',
+    })
   })
 })
 
@@ -532,9 +550,13 @@ describe('whether a courier can issue a real waybill', () => {
     // this one stood before booking was built.
     expect(canQuoteLiveRates('econt')).toBe(true)
     expect(canBookWaybills('econt')).toBe(false)
-    expect(missingWaybillRequirements('econt')).toEqual(['ECONT_SENDER_PHONE'])
+    expect(missingWaybillRequirements('econt')).toEqual([
+      'ECONT_SENDER_PHONE',
+      'ECONT_SENDER_MOL_NAME',
+    ])
 
     vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
+    vi.stubEnv('ECONT_SENDER_MOL_NAME', 'Иван Иванов')
 
     expect(canBookWaybills('econt')).toBe(true)
     expect(missingWaybillRequirements('econt')).toEqual([])
@@ -547,6 +569,7 @@ describe('whether a courier can issue a real waybill', () => {
       'ECONT_USERNAME',
       'ECONT_PASSWORD',
       'ECONT_SENDER_PHONE',
+      'ECONT_SENDER_MOL_NAME',
     ])
   })
 

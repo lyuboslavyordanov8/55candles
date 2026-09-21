@@ -60,6 +60,7 @@ function configured() {
   vi.stubEnv('ECONT_PASSWORD', 'secret')
   vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
   vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
+  vi.stubEnv('ECONT_SENDER_MOL_NAME', 'Иван Иванов')
 }
 
 afterEach(() => {
@@ -127,7 +128,7 @@ describe('whether an order may be booked', () => {
     expect(waybillBlocker(order())).toEqual({
       reason: 'notBookable',
       courier: 'econt',
-      missing: ['ECONT_SENDER_PHONE'],
+      missing: ['ECONT_SENDER_PHONE', 'ECONT_SENDER_MOL_NAME'],
     })
   })
 

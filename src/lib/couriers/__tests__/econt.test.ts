@@ -772,7 +772,7 @@ describe('refusing to price', () => {
  * demo service's own `create` response, recorded 2026-09-21.
  */
 
-const SENDER = { name: 'ВиреонЛабс ЕООД', phone: '+359888123456' }
+const SENDER = { name: 'ВиреонЛабс ЕООД', phone: '+359888123456', molName: 'Иван Иванов' }
 
 /** A client that can book, with whatever is not overridden. */
 function bookingClient(
@@ -831,7 +831,12 @@ describe('booking a parcel', () => {
 
     const { label } = bodyOf()
 
-    expect(label.senderClient).toEqual({ name: 'ВиреонЛабс ЕООД', phones: ['+359888123456'] })
+    expect(label.senderClient).toEqual({
+      name: 'ВиреонЛабс ЕООД',
+      phones: ['+359888123456'],
+      juridicalEntity: true,
+      molName: 'Иван Иванов',
+    })
     expect(label.receiverClient).toEqual({
       name: 'Мария Иванова',
       phones: ['+359887115957'],

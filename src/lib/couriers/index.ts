@@ -80,6 +80,7 @@ const SENDER_VARS = {
 const IDENTITY_VARS = {
   name: 'ECONT_SENDER_NAME',
   phone: 'ECONT_SENDER_PHONE',
+  molName: 'ECONT_SENDER_MOL_NAME',
 } as const
 
 /** Where the наложен платеж money goes. See `econtCodPayout()`. */
@@ -150,21 +151,26 @@ export function econtShipFrom(): EcontShipFrom | null {
 }
 
 /**
- * Who the parcel is from, for the waybill. `null` while no phone is configured.
+ * Who the parcel is from, for the waybill. `null` while the phone or the
+ * authorised person (МОЛ) is not configured.
  *
- * The phone is the whole of the requirement: Econt refuses a label without one,
- * and `company.contact.phone` is deliberately `null` because the owner does not
- * publish their number. `ECONT_SENDER_NAME` is optional and defaults to the legal
- * entity — the name on the parcel should be the name on the invoice unless the
- * owner has a reason otherwise.
+ * Both are required: Econt refuses a label without a phone to ring, and — since
+ * the sender is always our registered ЕООД — without a `molName` to put beside
+ * it (see the doc comment on `EcontSender`). `company.contact.phone` is
+ * deliberately `null` because the owner does not publish their number.
+ * `ECONT_SENDER_NAME` is optional and defaults to the legal entity — the name
+ * on the parcel should be the name on the invoice unless the owner has a
+ * reason otherwise.
  */
 export function econtSender(): EcontSender | null {
   const phone = process.env[IDENTITY_VARS.phone]?.trim()
-  if (!phone) return null
+  const molName = process.env[IDENTITY_VARS.molName]?.trim()
+  if (!phone || !molName) return null
 
   return {
     name: process.env[IDENTITY_VARS.name]?.trim() || company.legalName,
     phone,
+    molName,
   }
 }
 
@@ -291,7 +297,10 @@ export function canBookWaybills(courier: Courier): boolean {
 export function missingWaybillRequirements(courier: Courier): string[] {
   const missing = missingLiveRateRequirements(courier)
 
-  if (courier === 'econt' && econtSender() === null) missing.push(IDENTITY_VARS.phone)
+  if (courier === 'econt' && econtSender() === null) {
+    if (!process.env[IDENTITY_VARS.phone]?.trim()) missing.push(IDENTITY_VARS.phone)
+    if (!process.env[IDENTITY_VARS.molName]?.trim()) missing.push(IDENTITY_VARS.molName)
+  }
 
   return missing
 }
