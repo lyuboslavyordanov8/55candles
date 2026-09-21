@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useLocale } from 'next-intl'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 
 /**
@@ -23,9 +23,20 @@ import { motion } from 'framer-motion'
 export default function LanguageSwitcher() {
   const locale = useLocale()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
 
+  /**
+   * `usePathname()` never includes the query string — that is how Next.js
+   * defines it — so building the link from the path alone silently drops it.
+   * Checkout is the one page where that matters: its basket lives entirely
+   * in `?items=` (see `src/lib/cart-params.ts`), so switching language there
+   * used to land on an empty basket. Carrying the query string forward fixes
+   * checkout and is also simply correct for any other page with one.
+   */
   function hrefFor(newLocale: string) {
-    return pathname.replace(/^\/(en|bg)/, `/${newLocale}`)
+    const newPath = pathname.replace(/^\/(en|bg)/, `/${newLocale}`)
+    const query = searchParams.toString()
+    return query ? `${newPath}?${query}` : newPath
   }
 
   const languages = [

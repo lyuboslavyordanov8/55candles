@@ -6,6 +6,7 @@ import Footer from '../Footer'
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en',
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 function renderFooter() {

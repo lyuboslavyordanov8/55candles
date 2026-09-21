@@ -8,6 +8,7 @@ import Navbar from '../Navbar'
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en',
+  useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
