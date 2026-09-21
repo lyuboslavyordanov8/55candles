@@ -7,11 +7,16 @@ import { redirect } from 'next/navigation'
 /**
  * Admin access (AUDIT.md Phase 7).
  *
- * One shared password, deliberately. The shop is one or two people, there are no
- * roles to distinguish and no per-user audit requirement beyond `actor: 'admin'`
- * on the order events — so a users table would be machinery with nothing to hold.
- * Whenever a second person needs their own login, this module is the only place
- * that changes: everything above it asks `requireAdmin()` and gets a session.
+ * One shared password, deliberately. The shop is one or a few people and there
+ * are no roles to distinguish — a users table would be machinery with nothing to
+ * hold. What the order-management back office does need, and this module now
+ * carries, is *attribution*: "who changed this order's status" and "who wrote
+ * this note" have to name a person, not just say "admin", even though everyone
+ * signs in with the same password. So the session records a self-declared name
+ * alongside the expiry — nothing verifies it is truthful, the same way nothing
+ * verifies which of the shop's few staff is at the keyboard today. That is a
+ * label for the audit trail, not an identity, and it is not a permission system:
+ * every session can still do everything every other session can.
  *
  * ## Configuration
  *
@@ -23,11 +28,13 @@ import { redirect } from 'next/navigation'
  *
  * ## What the cookie is
  *
- * `<expiry>.<hmac(expiry)>` — a signed expiry and nothing else. There is no
- * session store, so there is nothing to read from the database on each request,
- * and the cookie cannot be edited to extend itself without the secret. It is
- * `HttpOnly`, `SameSite=Lax` and `Secure` outside development, so it is not
- * readable from JavaScript and not sent from another site's form post.
+ * `<expiry>.<nonce>.<name>.<hmac(expiry.nonce.name)>` — a signed expiry, a nonce
+ * and a name, nothing else. There is no session store, so there is nothing to
+ * read from the database on each request, and the cookie cannot be edited —
+ * including the name — without the secret, because the signature covers the
+ * whole payload. It is `HttpOnly`, `SameSite=Lax` and `Secure` outside
+ * development, so it is not readable from JavaScript and not sent from another
+ * site's form post.
  *
  * Changing `ADMIN_PASSWORD` invalidates every existing session, because the
  * password is the default signing key. That is the intended behaviour: the way you
@@ -41,6 +48,12 @@ const SESSION_MS = 12 * 60 * 60 * 1000
 
 /** Where an unauthenticated request is sent. */
 export const ADMIN_LOGIN_PATH = '/admin/login'
+
+/** The attribution label when nobody typed one at login. */
+export const DEFAULT_ADMIN_NAME = 'admin'
+
+/** Longest name accepted. Long enough for a real name, short enough for a cookie. */
+const NAME_MAX = 40
 
 /** True once a password is configured and the admin can be used at all. */
 export function isAdminConfigured(): boolean {
@@ -77,34 +90,76 @@ export function isCorrectPassword(entered: string): boolean {
   return equals(entered, expected)
 }
 
-/** A fresh signed session value, valid for `SESSION_MS`. */
-export function newSessionValue(now = Date.now()): string {
+/**
+ * A name as it goes into the cookie: base64url, so it cannot contain the `.`
+ * the payload is delimited on, whatever script the staff member's name uses.
+ */
+function encodeName(name: string): string {
+  return Buffer.from(name.trim().slice(0, NAME_MAX), 'utf8').toString('base64url')
+}
+
+/** The inverse. `''` (rather than throwing) for a value that will not decode. */
+function decodeName(encoded: string): string {
+  try {
+    return Buffer.from(encoded, 'base64url').toString('utf8')
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * A fresh signed session value, valid for `SESSION_MS`.
+ *
+ * `name` is whatever the staff member typed at login, for attribution on the
+ * order events they go on to write — see the module docblock. Falls back to
+ * `DEFAULT_ADMIN_NAME` rather than an empty label, since "" is not a name
+ * anyone reading the history later could make sense of.
+ */
+export function newSessionValue(name: string, now = Date.now()): string {
   const expiresAt = String(now + SESSION_MS)
   // A nonce so two logins in the same millisecond do not produce the same cookie.
-  const payload = `${expiresAt}.${randomBytes(8).toString('base64url')}`
+  const nonce = randomBytes(8).toString('base64url')
+  const encodedName = encodeName(name || DEFAULT_ADMIN_NAME)
+  const payload = `${expiresAt}.${nonce}.${encodedName}`
   return `${payload}.${sign(payload)}`
+}
+
+interface ParsedSession {
+  name: string
+  expiresAt: number
+}
+
+/**
+ * Validate and decode in one pass, so the two operations can never disagree
+ * about what counts as a valid cookie.
+ */
+function parseSession(value: string | undefined, now: number): ParsedSession | null {
+  if (!value || !signingKey()) return null
+
+  const parts = value.split('.')
+  if (parts.length !== 4) return null
+
+  const [expiresAt, nonce, encodedName, signature] = parts
+  const payload = `${expiresAt}.${nonce}.${encodedName}`
+
+  if (!equals(signature, sign(payload))) return null
+
+  const expiry = Number(expiresAt)
+  if (!Number.isSafeInteger(expiry) || expiry <= now) return null
+
+  return { name: decodeName(encodedName) || DEFAULT_ADMIN_NAME, expiresAt: expiry }
 }
 
 /** True when the cookie value is intact and has not expired. */
 export function isValidSessionValue(value: string | undefined, now = Date.now()): boolean {
-  if (!value || !signingKey()) return false
-
-  const parts = value.split('.')
-  if (parts.length !== 3) return false
-
-  const [expiresAt, nonce, signature] = parts
-
-  if (!equals(signature, sign(`${expiresAt}.${nonce}`))) return false
-
-  const expiry = Number(expiresAt)
-  return Number.isSafeInteger(expiry) && expiry > now
+  return parseSession(value, now) !== null
 }
 
 /** Write the session cookie. Called from the login action. */
-export async function startAdminSession(): Promise<void> {
+export async function startAdminSession(name: string): Promise<void> {
   const store = await cookies()
 
-  store.set(COOKIE_NAME, newSessionValue(), {
+  store.set(COOKIE_NAME, newSessionValue(name), {
     httpOnly: true,
     sameSite: 'lax',
     // Off in development, where the dev server is plain HTTP and a Secure cookie
@@ -127,6 +182,16 @@ export async function hasAdminSession(): Promise<boolean> {
 }
 
 /**
+ * The name recorded at login, or the default label when there is no valid
+ * session. Never throws and never redirects — for places (the layout's
+ * "signed in as" line) that want to *show* the name without gating on it.
+ */
+export async function currentAdminName(): Promise<string> {
+  const store = await cookies()
+  return parseSession(store.get(COOKIE_NAME)?.value, Date.now())?.name ?? DEFAULT_ADMIN_NAME
+}
+
+/**
  * The gate. Every admin page and every admin action calls this first.
  *
  * Redirects rather than returning a boolean, so forgetting to check is not
@@ -134,9 +199,19 @@ export async function hasAdminSession(): Promise<boolean> {
  * the login form instead of a stack trace. Called in the page *and* in the action:
  * a Server Action is its own POST endpoint, and a page-level check does not guard
  * it (see the Server Actions note in `checkout/actions.ts`).
+ *
+ * Returns the session's attribution name, so a caller that is about to write an
+ * order event can name who did it without a second read of the cookie —
+ * `const actor = await requireAdmin()`. Callers that only need the gate, not the
+ * name, are free to ignore the return value.
  */
-export async function requireAdmin(): Promise<void> {
-  if (!(await hasAdminSession())) redirect(ADMIN_LOGIN_PATH)
+export async function requireAdmin(): Promise<string> {
+  const store = await cookies()
+  const session = parseSession(store.get(COOKIE_NAME)?.value, Date.now())
+
+  if (!session) redirect(ADMIN_LOGIN_PATH)
+
+  return session.name
 }
 
 /** The cookie name, exported for the tests and nothing else. */
