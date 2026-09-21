@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import { fontVariables } from '@/fonts'
-import { hasAdminSession, isAdminConfigured } from '@/lib/admin-auth'
+import { currentAdminName, hasAdminSession, isAdminConfigured } from '@/lib/admin-auth'
 import { logOut } from './actions'
 
 import '../globals.css'
@@ -31,6 +31,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // A read, not a gate. The gate is `requireAdmin()` in each page and action; this
   // only decides whether to draw the logout button.
   const signedIn = isAdminConfigured() && (await hasAdminSession())
+  // Only worth reading when there is a session to name — a signed-out visitor
+  // gets the login-form default rather than a call to a cookie that is not there.
+  const name = signedIn ? await currentAdminName() : null
 
   return (
     <html lang="bg" className={fontVariables}>
@@ -44,14 +47,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </Link>
 
             {signedIn && (
-              <form action={logOut}>
-                <button
-                  type="submit"
-                  className="rounded-sm border border-stone-300 px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-100"
-                >
-                  Изход
-                </button>
-              </form>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-stone-500">{name}</span>
+                <form action={logOut}>
+                  <button
+                    type="submit"
+                    className="rounded-sm border border-stone-300 px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-100"
+                  >
+                    Изход
+                  </button>
+                </form>
+              </div>
             )}
           </div>
         </header>

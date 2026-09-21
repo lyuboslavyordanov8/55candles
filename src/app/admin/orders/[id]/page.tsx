@@ -2,21 +2,26 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { requireAdmin } from '@/lib/admin-auth'
-import { getOrderDetail } from '@/lib/admin-orders'
-import { nextStatuses, STATUS_LABELS } from '@/lib/order-status'
+import { getOrderDetail, refusalHistory, undoEligibility, UNDO_WINDOW_MS } from '@/lib/admin-orders'
+import { nextStatuses, STATUS_LABELS, statusRequiresReason } from '@/lib/order-status'
 import { formatMoney, money } from '@/lib/money'
 import { defaultBuyerFor, getInvoiceForOrder, invoiceBlocker } from '@/lib/invoices'
 import { waybillBlocker } from '@/lib/waybills'
 import type { OrderEvent } from '@/db/schema'
-import { changeStatus, issueInvoice, issueWaybill } from '../../actions'
+import CopyButton from '@/components/admin/CopyButton'
+import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
+import { addNote, changeStatus, issueInvoice, issueWaybill, undoStatusChange } from '../../actions'
 
 /**
  * One order: everything needed to pack it, ship it and settle it.
  *
- * The three blocks are in the order they are used — what to put in the box, where
- * it goes and who to call, then what has happened to it so far. The status form is
- * the only thing on the page that writes, and it can only offer moves the graph in
- * `src/lib/order-status.ts` allows.
+ * The blocks are in the order they are used — what to put in the box, where it
+ * goes and who to call, then what can be done to it now, then what has happened
+ * so far. Status moves are single-click buttons, one per status the order may go
+ * to next (`src/lib/order-status.ts` decides which), with a short Undo window
+ * rather than a dropdown-and-save: see `undoEligibility`. `refused_at_delivery`
+ * and `returned` are the one exception — both require a reason, so both need a
+ * field before they can be a click.
  */
 
 const dateFormat = new Intl.DateTimeFormat('bg-BG', {
@@ -32,14 +37,21 @@ const methodLabels: Record<string, string> = {
 
 const notices: Record<string, string> = {
   stale: 'Поръчката вече е в друг статус — някой я е преместил. Виж историята по-долу.',
+  reason_required: 'Тази стъпка изисква причина — попълни полето и опитай пак.',
   waybill_failed:
     'Econt не издаде товарителница. Точната причина е записана в историята по-долу.',
   waybill_busy: 'Товарителницата за тази поръчка се издава в момента. Изчакай и презареди.',
   waybill_blocked: 'Товарителница не може да се издаде за тази поръчка — виж по-долу защо.',
+  waybill_confirm: 'Номерът на поръчката не съвпада — товарителница не е издадена.',
   invoice_buyer: 'Фактурата не беше издадена: липсва име на получателя.',
   invoice_blocked: 'Фактура не може да се издаде за тази поръчка — виж по-долу защо.',
+  invoice_confirm: 'Номерът на поръчката не съвпада — фактура не е издадена.',
   invoice_failed:
     'Фактурата не беше издадена и номер не е изразходван. Опитай отново; ако пак не стане, провери логовете.',
+  undo_tooLate: 'Твърде късно е за отмяна — прозорецът от 2 минути е изтекъл.',
+  undo_notLastTransition:
+    'Няма какво да се отмени — статусът се е променил отново след последната стъпка.',
+  note_empty: 'Бележката е празна — нищо не е записано.',
 }
 
 /**
@@ -62,6 +74,33 @@ function labelPdfUrl(events: readonly OrderEvent[]): string | null {
   return null
 }
 
+/** One address, as one string, for the copy button — shaped for pasting into the courier's own system. */
+function addressForCopy(order: {
+  deliveryMethod: string
+  recipientName: string
+  phone: string
+  street: string
+  city: string
+  postCode: string
+  officeName: string
+  officeAddress: string
+  officeId: string
+}): string {
+  const lines = [`${order.recipientName}, ${order.phone}`]
+
+  if (order.deliveryMethod === 'door') {
+    lines.push(order.street, `${order.postCode} ${order.city}`)
+  } else {
+    lines.push(
+      `${order.officeName || 'офис ' + order.officeId} (код ${order.officeId})`,
+      order.officeAddress,
+      `${order.postCode} ${order.city}`
+    )
+  }
+
+  return lines.filter(Boolean).join('\n')
+}
+
 export default async function AdminOrderPage({
   params,
   searchParams,
@@ -70,6 +109,8 @@ export default async function AdminOrderPage({
   searchParams: Promise<{
     error?: string
     changed?: string
+    reverted?: string
+    noted?: string
     waybill?: string
     invoice?: string
   }>
@@ -81,16 +122,22 @@ export default async function AdminOrderPage({
   if (!detail) notFound()
 
   const { order, items, events } = detail
-  const { error, changed, waybill, invoice } = await searchParams
+  const { error, changed, reverted, noted, waybill, invoice } = await searchParams
 
   const currency = order.currency as 'EUR'
   const amount = (minor: number) => formatMoney(money(minor, currency), 'bg')
   const blocker = waybillBlocker(order)
   const pdfUrl = labelPdfUrl(events)
+  const undo = undoEligibility(events, order.status)
+  const refusals = await refusalHistory(order.phone, order.id)
 
   const issued = await getInvoiceForOrder(order.id)
   const invoiceStop = invoiceBlocker(order, issued)
   const buyer = defaultBuyerFor(order)
+
+  const upcoming = nextStatuses(order.status)
+  const normalNext = upcoming.filter((status) => !statusRequiresReason(status))
+  const reasonNext = upcoming.filter(statusRequiresReason)
 
   return (
     <div className="space-y-6">
@@ -109,6 +156,22 @@ export default async function AdminOrderPage({
           <span className="text-lg">{amount(order.totalMinor)}</span>
         </p>
       </div>
+
+      {refusals.length > 0 && (
+        <p role="alert" className="rounded-sm border border-red-300 bg-red-50 p-3 text-xs text-red-900">
+          Този телефон има {refusals.length}{' '}
+          {refusals.length === 1 ? 'предишна отказана/върната поръчка' : 'предишни отказани/върнати поръчки'}:{' '}
+          {refusals.map((row, index) => (
+            <span key={row.id}>
+              {index > 0 && ', '}
+              <Link href={`/admin/orders/${row.id}`} className="underline">
+                {row.orderNumber}
+              </Link>
+            </span>
+          ))}
+          . Провери преди да подадеш отново.
+        </p>
+      )}
 
       {error && notices[error] && (
         <p role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
@@ -132,9 +195,21 @@ export default async function AdminOrderPage({
         </p>
       )}
 
+      {noted && (
+        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+          Бележката е записана.
+        </p>
+      )}
+
       {changed && STATUS_LABELS[changed as keyof typeof STATUS_LABELS] && (
         <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
           Статусът е сменен на „{STATUS_LABELS[changed as keyof typeof STATUS_LABELS]}“.
+        </p>
+      )}
+
+      {reverted && STATUS_LABELS[reverted as keyof typeof STATUS_LABELS] && (
+        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+          Отменено — статусът е върнат на „{STATUS_LABELS[reverted as keyof typeof STATUS_LABELS]}“.
         </p>
       )}
 
@@ -188,9 +263,12 @@ export default async function AdminOrderPage({
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-sm border border-stone-200 bg-white p-4">
-          <h2 className="mb-2 text-xs font-medium tracking-wide text-stone-500 uppercase">
-            Доставка
-          </h2>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-xs font-medium tracking-wide text-stone-500 uppercase">
+              Доставка
+            </h2>
+            <CopyButton text={addressForCopy(order)} label="Копирай адреса" />
+          </div>
           <dl className="space-y-1 text-xs">
             <Row label="Куриер">
               {order.courier === 'econt' ? 'Econt' : 'Speedy'} ·{' '}
@@ -301,12 +379,7 @@ export default async function AdminOrderPage({
                 : `до ${methodLabels[order.deliveryMethod] ?? order.deliveryMethod} ${order.officeName} (код ${order.officeId})`}
               , {order.weightGrams} г, наложен платеж {amount(order.totalMinor)}.
             </p>
-            <button
-              type="submit"
-              className="rounded-sm bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-700"
-            >
-              Издай товарителница
-            </button>
+            <ConfirmSubmit expected={order.orderNumber} buttonLabel="Издай товарителница" />
           </form>
         )}
       </section>
@@ -348,12 +421,7 @@ export default async function AdminOrderPage({
               <Field name="buyerAccountable" label="МОЛ" />
             </div>
 
-            <button
-              type="submit"
-              className="rounded-sm bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-700"
-            >
-              Издай фактура
-            </button>
+            <ConfirmSubmit expected={order.orderNumber} buttonLabel="Издай фактура" />
           </form>
         )}
       </section>
@@ -363,57 +431,79 @@ export default async function AdminOrderPage({
           Следваща стъпка
         </h2>
 
-        {nextStatuses(order.status).length === 0 ? (
-          <p className="text-xs text-stone-500">
-            Поръчката е приключена — няма следващ статус.
-          </p>
-        ) : (
-          <form action={changeStatus} className="flex flex-wrap items-end gap-3">
+        {undo.eligible && (
+          <form action={undoStatusChange} className="mb-3 flex items-center gap-2 rounded-sm border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
             <input type="hidden" name="orderId" value={order.id} />
-            {/*
-              What the page was rendered against. Enforced server-side, so two
-              people working the same order cannot both advance it from a status
-              only one of them saw.
-            */}
-            <input type="hidden" name="expectedFrom" value={order.status} />
-
-            <label className="text-xs">
-              <span className="mb-1 block text-stone-500">Нов статус</span>
-              <select
-                name="to"
-                required
-                defaultValue={nextStatuses(order.status)[0]}
-                className="rounded-sm border border-stone-300 px-2 py-1.5"
-              >
-                {nextStatuses(order.status).map((status) => (
-                  <option key={status} value={status}>
-                    {STATUS_LABELS[status]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="text-xs">
-              <span className="mb-1 block text-stone-500">Товарителница (при изпращане)</span>
-              <input
-                name="waybillNumber"
-                defaultValue={order.waybillNumber ?? ''}
-                className="rounded-sm border border-stone-300 px-2 py-1.5"
-              />
-            </label>
-
-            <label className="grow text-xs">
-              <span className="mb-1 block text-stone-500">Бележка (влиза в историята)</span>
-              <input name="note" className="w-full rounded-sm border border-stone-300 px-2 py-1.5" />
-            </label>
-
+            <span>
+              Последна промяна преди {Math.round((Date.now() - undo.event.createdAt.getTime()) / 1000)} сек.
+            </span>
             <button
               type="submit"
-              className="rounded-sm bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-700"
+              className="rounded-sm border border-amber-400 bg-white px-2 py-1 font-medium hover:bg-amber-100"
             >
-              Запиши
+              Отмени (до {Math.round(UNDO_WINDOW_MS / 60_000)} мин.)
             </button>
           </form>
+        )}
+
+        {upcoming.length === 0 ? (
+          <p className="text-xs text-stone-500">Поръчката е приключена — няма следващ статус.</p>
+        ) : (
+          <div className="space-y-3">
+            {normalNext.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {normalNext.map((status) => (
+                  <form key={status} action={changeStatus}>
+                    <input type="hidden" name="orderId" value={order.id} />
+                    <input type="hidden" name="expectedFrom" value={order.status} />
+                    <input type="hidden" name="to" value={status} />
+                    {status === 'shipped' && (
+                      <input
+                        type="hidden"
+                        name="waybillNumber"
+                        value={order.waybillNumber ?? ''}
+                      />
+                    )}
+                    <button
+                      type="submit"
+                      className="rounded-sm bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-700"
+                    >
+                      → {STATUS_LABELS[status]}
+                    </button>
+                  </form>
+                ))}
+              </div>
+            )}
+
+            {reasonNext.map((status) => (
+              <form
+                key={status}
+                action={changeStatus}
+                className="flex flex-wrap items-end gap-2 rounded-sm border border-stone-200 p-3"
+              >
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="expectedFrom" value={order.status} />
+                <input type="hidden" name="to" value={status} />
+                <label className="grow text-xs">
+                  <span className="mb-1 block text-stone-500">
+                    Причина (задължително за „{STATUS_LABELS[status]}“)
+                  </span>
+                  <input
+                    name="reason"
+                    required
+                    maxLength={500}
+                    className="w-full rounded-sm border border-stone-300 px-2 py-1.5"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="rounded-sm border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-900 hover:bg-red-100"
+                >
+                  → {STATUS_LABELS[status]}
+                </button>
+              </form>
+            ))}
+          </div>
         )}
       </section>
 
@@ -421,13 +511,16 @@ export default async function AdminOrderPage({
         <h2 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">
           История
         </h2>
-        <ol className="space-y-2 text-xs">
+        <ol className="mb-4 space-y-2 text-xs">
           {events.map((event) => (
             <li key={event.id} className="flex flex-wrap gap-x-3 border-b border-stone-100 pb-2 last:border-0">
-              <span className="text-stone-400">{dateFormat.format(event.createdAt)}</span>
+              <span className="text-stone-400" title={event.createdAt.toISOString()}>
+                {dateFormat.format(event.createdAt)}
+              </span>
               <span>
-                {event.fromStatus ? `${STATUS_LABELS[event.fromStatus]} → ` : ''}
-                {STATUS_LABELS[event.toStatus]}
+                {event.fromStatus && event.fromStatus !== event.toStatus
+                  ? `${STATUS_LABELS[event.fromStatus]} → ${STATUS_LABELS[event.toStatus]}`
+                  : STATUS_LABELS[event.toStatus]}
               </span>
               <span className="text-stone-400">{event.actor}</span>
               {formatDetail(event.detail) ? (
@@ -436,6 +529,22 @@ export default async function AdminOrderPage({
             </li>
           ))}
         </ol>
+
+        <form action={addNote} className="flex flex-wrap items-end gap-2 border-t border-stone-100 pt-3">
+          <input type="hidden" name="orderId" value={order.id} />
+          <label className="grow text-xs">
+            <span className="mb-1 block text-stone-500">
+              Бележка (напр. „обадих се два пъти, никой не отговори“)
+            </span>
+            <input name="note" maxLength={500} className="w-full rounded-sm border border-stone-300 px-2 py-1.5" />
+          </label>
+          <button
+            type="submit"
+            className="rounded-sm border border-stone-300 px-3 py-1.5 text-xs hover:bg-stone-100"
+          >
+            Добави бележка
+          </button>
+        </form>
       </section>
     </div>
   )

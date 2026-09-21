@@ -7,6 +7,7 @@ import { OPEN_STATUSES, STATUS_LABELS } from '@/lib/order-status'
 import { orderStatus, type OrderStatus } from '@/db/schema'
 import { formatMoney, money } from '@/lib/money'
 import { isMailerConfigured, orderRecipient } from '@/lib/mailer'
+import { COURIERS, type Courier } from '@/lib/shipping'
 
 /**
  * The order list — the page the shop keeps open (AUDIT.md Phase 7).
@@ -29,10 +30,20 @@ const methodLabels: Record<string, string> = {
   locker: 'автомат',
 }
 
+const COURIER_LABELS: Record<string, string> = { econt: 'Econt', speedy: 'Speedy' }
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; page?: string }>
+  searchParams: Promise<{
+    status?: string
+    q?: string
+    page?: string
+    courier?: string
+    dateFrom?: string
+    dateTo?: string
+  }>
 }) {
   await requireAdmin()
 
@@ -44,11 +55,31 @@ export default async function AdminOrdersPage({
     )
   }
 
-  const { status = 'open', q = '', page = '1' } = await searchParams
+  const {
+    status = 'open',
+    q = '',
+    page = '1',
+    courier = '',
+    dateFrom = '',
+    dateTo = '',
+  } = await searchParams
   const statuses = statusFilter(status)
+  const courierValue = COURIERS.includes(courier as Courier) ? (courier as Courier) : undefined
+  // A malformed date in the URL is dropped rather than sent to the database,
+  // since a bare string here would otherwise reach a `new Date(...)` call one
+  // module away with no chance to say which part of the URL was the problem.
+  const dateFromValue = DATE_PATTERN.test(dateFrom) ? dateFrom : undefined
+  const dateToValue = DATE_PATTERN.test(dateTo) ? dateTo : undefined
 
   const [list, counts] = await Promise.all([
-    listOrders({ statuses, query: q, page: Number(page) || 1 }),
+    listOrders({
+      statuses,
+      query: q,
+      page: Number(page) || 1,
+      courier: courierValue,
+      dateFrom: dateFromValue,
+      dateTo: dateToValue,
+    }),
     countByStatus(),
   ])
 
@@ -94,9 +125,10 @@ export default async function AdminOrdersPage({
           ))}
       </div>
 
-      <form className="flex gap-2" action="/admin">
+      <form className="flex flex-wrap items-end gap-2" action="/admin">
         {/* Preserved, so searching does not silently drop the status filter. */}
         <input type="hidden" name="status" value={status} />
+
         <input
           type="search"
           name="q"
@@ -104,6 +136,43 @@ export default async function AdminOrdersPage({
           placeholder="номер, име, телефон или имейл"
           className="w-full max-w-sm rounded-sm border border-stone-300 px-3 py-1.5 text-xs"
         />
+
+        <label className="text-xs">
+          <span className="mb-1 block text-stone-500">Куриер</span>
+          <select
+            name="courier"
+            defaultValue={courier}
+            className="rounded-sm border border-stone-300 px-2 py-1.5"
+          >
+            <option value="">всички</option>
+            {COURIERS.map((value) => (
+              <option key={value} value={value}>
+                {COURIER_LABELS[value]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-xs">
+          <span className="mb-1 block text-stone-500">От дата</span>
+          <input
+            type="date"
+            name="dateFrom"
+            defaultValue={dateFrom}
+            className="rounded-sm border border-stone-300 px-2 py-1.5"
+          />
+        </label>
+
+        <label className="text-xs">
+          <span className="mb-1 block text-stone-500">До дата</span>
+          <input
+            type="date"
+            name="dateTo"
+            defaultValue={dateTo}
+            className="rounded-sm border border-stone-300 px-2 py-1.5"
+          />
+        </label>
+
         <button
           type="submit"
           className="rounded-sm border border-stone-300 px-3 py-1.5 text-xs hover:bg-stone-100"
@@ -166,10 +235,7 @@ export default async function AdminOrdersPage({
       {list.pageCount > 1 && (
         <nav className="flex items-center gap-3 text-xs">
           {list.page > 1 && (
-            <Link
-              href={`/admin?status=${status}&q=${encodeURIComponent(q)}&page=${list.page - 1}`}
-              className="underline"
-            >
+            <Link href={pageHref({ status, q, courier, dateFrom, dateTo }, list.page - 1)} className="underline">
               ← по-нови
             </Link>
           )}
@@ -177,10 +243,7 @@ export default async function AdminOrdersPage({
             страница {list.page} от {list.pageCount} · по {PAGE_SIZE}
           </span>
           {list.page < list.pageCount && (
-            <Link
-              href={`/admin?status=${status}&q=${encodeURIComponent(q)}&page=${list.page + 1}`}
-              className="underline"
-            >
+            <Link href={pageHref({ status, q, courier, dateFrom, dateTo }, list.page + 1)} className="underline">
               по-стари →
             </Link>
           )}
@@ -196,6 +259,22 @@ export default async function AdminOrdersPage({
  * `all` and anything unrecognised mean no filter — a mistyped status shows
  * everything rather than an empty table that looks like lost orders.
  */
+/**
+ * A pagination link that keeps every other filter — without this, going to
+ * page 2 would silently drop the courier or date range the admin had just set.
+ */
+function pageHref(
+  filters: { status: string; q: string; courier: string; dateFrom: string; dateTo: string },
+  page: number
+): string {
+  const params = new URLSearchParams({ status: filters.status, page: String(page) })
+  if (filters.q) params.set('q', filters.q)
+  if (filters.courier) params.set('courier', filters.courier)
+  if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
+  if (filters.dateTo) params.set('dateTo', filters.dateTo)
+  return `/admin?${params.toString()}`
+}
+
 function statusFilter(value: string): readonly OrderStatus[] | undefined {
   if (value === 'open') return OPEN_STATUSES
   if ((orderStatus.enumValues as readonly string[]).includes(value)) {

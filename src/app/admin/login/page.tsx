@@ -46,13 +46,27 @@ export default async function AdminLoginPage({
 
       <form action={logIn} className="space-y-3">
         <label className="block">
+          <span className="mb-1 block text-xs text-stone-600">
+            Име (за историята на поръчките)
+          </span>
+          <input
+            type="text"
+            name="name"
+            autoComplete="name"
+            autoFocus
+            maxLength={40}
+            placeholder="напр. Мария"
+            className="w-full rounded-sm border border-stone-300 px-3 py-2"
+          />
+        </label>
+
+        <label className="block">
           <span className="mb-1 block text-xs text-stone-600">Парола</span>
           <input
             type="password"
             name="password"
             required
             autoComplete="current-password"
-            autoFocus
             className="w-full rounded-sm border border-stone-300 px-3 py-2"
           />
         </label>
