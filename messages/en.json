@@ -614,7 +614,8 @@
       "orderPlacedCod": "Your order is saved and you'll pay the courier on delivery. We don't send confirmation emails yet, so please keep the number above — we'll call to confirm the parcel.",
       "orderNotSaved": "We couldn't save your order, so nothing has been placed and no payment was taken. Please try again in a moment, or contact us and we'll take it directly.",
       "formOutdated": "This page has been open too long. Please reload it and submit again — nothing has been placed.",
-      "deliveryRateUnavailable": "We could not get a delivery price from Econt just now, so your order was not saved and no payment was taken. Please try again in a minute, or contact us and we'll take it directly."
+      "deliveryRateUnavailable": "We could not get a delivery price from Econt just now, so your order was not saved and no payment was taken. Please try again in a minute, or contact us and we'll take it directly.",
+      "rateLimited": "You've submitted this a lot in a short time. Please wait a few minutes and try again."
     },
     "orderPlaced": {
       "heading": "Order received",

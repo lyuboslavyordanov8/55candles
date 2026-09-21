@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { headers } from 'next/headers'
 import { submitCheckout } from '../actions'
+import { CHECKOUT_MAX_PER_WINDOW } from '../rate-limit-config'
 import { canQuoteLiveRates, courierClient } from '@/lib/couriers'
 import type { CourierOffice, LookupResult, ShipmentRate } from '@/lib/couriers/types'
 import { eur } from '@/lib/money'
@@ -18,6 +20,26 @@ vi.mock('@/lib/couriers', () => ({
   // card prices the delivery. `shipping-rates.test.ts` covers the live path.
   canQuoteLiveRates: vi.fn(() => false),
 }))
+
+/**
+ * `submitCheckout` now reads the client's address for its rate limiter (see
+ * "Rate limiting" in `../actions.ts`), and `next/headers` throws outside a
+ * real request scope — every test needs this mocked or none of them can call
+ * the action at all. Each test gets a distinct address by default, the same
+ * reasoning as `api/contact/__tests__/route.test.ts`'s `ipCounter`: the
+ * limiter is module-level state that persists across tests in this file, so
+ * without distinct addresses the tests would rate-limit each other.
+ */
+vi.mock('next/headers', () => ({ headers: vi.fn() }))
+
+let ipCounter = 0
+
+beforeEach(() => {
+  ipCounter += 1
+  vi.mocked(headers).mockResolvedValue(
+    new Headers({ 'x-forwarded-for': `10.0.0.${ipCounter}` }) as never
+  )
+})
 
 const DELIVERY = { courier: 'econt' as const, method: 'office' as const }
 const KEY = tariffKey(DELIVERY)
@@ -699,5 +721,53 @@ describe('a promo code at checkout', () => {
 
     expect(state.promo?.status).toBe('unknown')
     expect(state.promo?.code.length).toBeLessThanOrEqual(40)
+  })
+})
+
+describe('submitCheckout rate limiting (security review)', () => {
+  /**
+   * Distinct from the `10.0.0.N` addresses the top-level `beforeEach` hands
+   * out — those exist precisely so unrelated tests do not share a budget with
+   * each other, and these tests need the opposite: every call in a block below
+   * must land on the very same key.
+   */
+  const SAME_CLIENT = '198.51.100.7'
+  const OTHER_CLIENT = '198.51.100.8'
+
+  function fromSameClient() {
+    vi.mocked(headers).mockResolvedValue(new Headers({ 'x-forwarded-for': SAME_CLIENT }) as never)
+  }
+
+  it("refuses a submission once one client's window is spent, before the courier or the database is touched", async () => {
+    fromSameClient()
+    const findOffice = stubFindOffice({ status: 'unconfigured', courier: 'econt' })
+
+    for (let i = 0; i < CHECKOUT_MAX_PER_WINDOW; i += 1) {
+      const state = await submitCheckout(IDLE, formData())
+      expect(state.messageKey).not.toBe('rateLimited')
+    }
+
+    const callsBeforeTheLimitedOne = findOffice.mock.calls.length
+
+    const limited = await submitCheckout(IDLE, formData())
+
+    expect(limited).toEqual({ status: 'error', messageKey: 'rateLimited' })
+    // The whole point: a request over budget must never reach resolveOffice
+    // (which calls the courier) or anything past it.
+    expect(findOffice.mock.calls.length).toBe(callsBeforeTheLimitedOne)
+  })
+
+  it('does not share one client\'s budget with another', async () => {
+    fromSameClient()
+
+    for (let i = 0; i < CHECKOUT_MAX_PER_WINDOW; i += 1) {
+      await submitCheckout(IDLE, formData())
+    }
+
+    vi.mocked(headers).mockResolvedValue(new Headers({ 'x-forwarded-for': OTHER_CLIENT }) as never)
+
+    const state = await submitCheckout(IDLE, formData())
+
+    expect(state.messageKey).not.toBe('rateLimited')
   })
 })

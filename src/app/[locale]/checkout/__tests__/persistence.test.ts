@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { headers } from 'next/headers'
 import { submitCheckout } from '../actions'
 import { canQuoteLiveRates, courierClient } from '@/lib/couriers'
 import type { CourierOffice, LookupResult, ShipmentRate } from '@/lib/couriers/types'
@@ -31,6 +32,25 @@ vi.mock('@/lib/orders', () => ({
   isOrderStorageReady: vi.fn(() => true),
   createOrder: vi.fn(),
 }))
+
+/**
+ * `submitCheckout` now reads the client's address for its rate limiter (see
+ * "Rate limiting" in `../actions.ts`); `next/headers` throws outside a real
+ * request scope, so every call here needs it mocked. A distinct address per
+ * test, same reasoning as `actions.test.ts`: the limiter's map is module-level
+ * state that outlives any one test, and this file's every test shares the same
+ * fixed `INTENT` token, so nothing here can double as a distinct key on its own.
+ */
+vi.mock('next/headers', () => ({ headers: vi.fn() }))
+
+let ipCounter = 0
+
+beforeEach(() => {
+  ipCounter += 1
+  vi.mocked(headers).mockResolvedValue(
+    new Headers({ 'x-forwarded-for': `10.0.1.${ipCounter}` }) as never
+  )
+})
 
 const INTENT = 'a2ad8e34-0c2f-4d3b-9a1c-6f2f41f0f001'
 
