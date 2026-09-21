@@ -10,8 +10,9 @@ import ProductGallery from '@/components/products/ProductGallery'
 import Price from '@/components/commerce/Price'
 import AddToCartButton from '@/components/cart/AddToCartButton'
 import { isPurchasable } from '@/data/pricing'
-import { locales } from '@/i18n/locales'
+import { locales, localeAlternates } from '@/i18n/locales'
 import type { Product } from '@/types/product'
+import { BreadcrumbJsonLd, ProductJsonLd } from '@/components/seo/JsonLd'
 
 export async function generateStaticParams() {
   return locales.flatMap((locale) =>
@@ -42,14 +43,21 @@ export async function generateMetadata({
     description,
     alternates: {
       canonical: `/${locale}${path}`,
-      languages: Object.fromEntries(locales.map((l) => [l, `/${l}${path}`])),
+      languages: localeAlternates(path),
     },
     openGraph: {
       type: 'website',
       title: `${product.name} — 55° candles`,
       description,
       url: `/${locale}${path}`,
-      images: [{ url: product.imagePath, alt: product.name }],
+      images: [
+        {
+          url: product.imagePath,
+          width: product.imageWidth,
+          height: product.imageHeight,
+          alt: product.name,
+        },
+      ],
     },
   }
 }
@@ -83,6 +91,16 @@ function ProductDetailContent({
 
   return (
     <div className="pt-36 pb-24 px-6 bg-cream-base min-h-screen">
+      <BreadcrumbJsonLd
+        items={[
+          { href: `/${locale}`, name: tNav('home') },
+          { href: `/${locale}/products`, name: tNav('products') },
+          { href: `/${locale}/products/${product.slug}`, name: product.name },
+        ]}
+      />
+
+      <ProductJsonLd locale={locale} product={product} description={copy('description')} />
+
       <div className="max-w-5xl mx-auto">
 
         {/* Back */}

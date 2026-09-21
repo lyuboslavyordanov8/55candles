@@ -3,7 +3,8 @@ import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import ProductCard from '@/components/products/ProductCard'
 import { products } from '@/data/products'
-import { locales } from '@/i18n/locales'
+import { localeAlternates } from '@/i18n/locales'
+import { BreadcrumbJsonLd } from '@/components/seo/JsonLd'
 
 export async function generateMetadata({
   params,
@@ -17,18 +18,26 @@ export async function generateMetadata({
     title: t('title'),
     alternates: {
       canonical: `/${locale}/products`,
-      languages: Object.fromEntries(locales.map((l) => [l, `/${l}/products`])),
+      languages: localeAlternates('/products'),
     },
   }
 }
 
 function ProductsContent({ locale }: { locale: string }) {
   const t = useTranslations('collection')
+  const tNav = useTranslations('nav')
 
   const seasonalCount = products.filter(p => p.seasonal !== null).length
 
   return (
     <div className="pt-36 pb-24 px-6 bg-cream-base min-h-screen">
+      <BreadcrumbJsonLd
+        items={[
+          { href: `/${locale}`, name: tNav('home') },
+          { href: `/${locale}/products`, name: tNav('products') },
+        ]}
+      />
+
       <div className="max-w-6xl mx-auto">
 
         {/* Header */}

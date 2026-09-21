@@ -43,6 +43,8 @@ export const products: Product[] = [
     reviewCount: 42,
 
     imagePath: '/images/products/electric-cherry.webp',
+    imageWidth: 1087,
+    imageHeight: 1087,
   },
 
   {
@@ -64,6 +66,8 @@ export const products: Product[] = [
     badge: 'new',
 
     imagePath: '/images/products/sweet-orange.webp',
+    imageWidth: 1088,
+    imageHeight: 1088,
   },
 
   {
@@ -84,6 +88,8 @@ export const products: Product[] = [
     reviewCount: 27,
 
     imagePath: '/images/products/vanilla-egg.webp',
+    imageWidth: 1087,
+    imageHeight: 1087,
   },
 
   {
@@ -107,6 +113,8 @@ export const products: Product[] = [
     badge: 'bestseller',
 
     imagePath: '/images/products/strawberry-cake.webp',
+    imageWidth: 1087,
+    imageHeight: 1087,
   },
 
   {
@@ -127,6 +135,8 @@ export const products: Product[] = [
     reviewCount: 19,
 
     imagePath: '/images/products/espresso-martini.webp',
+    imageWidth: 1087,
+    imageHeight: 1087,
   },
 
   {
@@ -144,6 +154,8 @@ export const products: Product[] = [
     seasonal: { active: false },
 
     imagePath: '/images/products/winter-wonderland.webp',
+    imageWidth: 1200,
+    imageHeight: 1200,
   },
 ]
 

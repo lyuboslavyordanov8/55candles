@@ -84,6 +84,18 @@ export type Product = {
   hoverImagePath?: string
 
   /**
+   * `imagePath`'s real pixel dimensions, measured from the file (`sharp(...).metadata()`,
+   * not eyeballed). Every `<Image>` using this photo renders with `fill`, so
+   * these are unused there — they exist for the one place that needs a
+   * *declared* size without decoding the file itself: the product page's
+   * `openGraph.images`, where a scraper otherwise has to fetch the photo
+   * before it can lay out a preview. See the homepage's `homeBanner` for the
+   * same pattern applied to the hero image.
+   */
+  imageWidth: number
+  imageHeight: number
+
+  /**
    * Further photographs, in the order they should appear after `imagePath`.
    *
    * Use `productImages()` in `src/data/products.ts` rather than reading this

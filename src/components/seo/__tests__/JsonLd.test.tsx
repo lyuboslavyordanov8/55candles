@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
-import { BreadcrumbJsonLd, OrganizationJsonLd, __serialise } from '../JsonLd'
+import { BreadcrumbJsonLd, OrganizationJsonLd, ProductJsonLd, __serialise } from '../JsonLd'
 import { company } from '@/lib/company'
+import { getProductBySlug } from '@/data/products'
+import type { Product } from '@/types/product'
 
 function parseScripts(container: HTMLElement) {
   return Array.from(container.querySelectorAll('script[type="application/ld+json"]')).map(
@@ -72,6 +74,72 @@ describe('OrganizationJsonLd', () => {
     const { container } = render(<OrganizationJsonLd locale="bg" />)
 
     expect(parseScripts(container)).toHaveLength(1)
+  })
+})
+
+describe('ProductJsonLd', () => {
+  const cherry = getProductBySlug('cherry')!
+  const winterWonderland = getProductBySlug('winter-wonderland')!
+
+  it('emits an Offer in the catalogue currency, in major units, for a purchasable product', () => {
+    const { container } = render(
+      <ProductJsonLd locale="en" product={cherry} description="A cherry candle." />
+    )
+    const [data] = parseScripts(container)
+
+    expect(data['@type']).toBe('Product')
+    expect(data.name).toBe(cherry.name)
+    expect(data.description).toBe('A cherry candle.')
+    expect(data.offers['@type']).toBe('Offer')
+    expect(data.offers.priceCurrency).toBe('EUR')
+    expect(data.offers.price).toBe('19.99')
+    expect(data.offers.availability).toBe('https://schema.org/InStock')
+  })
+
+  it('makes the image and url absolute', () => {
+    const { container } = render(
+      <ProductJsonLd locale="en" product={cherry} description="A cherry candle." />
+    )
+    const [data] = parseScripts(container)
+
+    expect(data.image).toMatch(/^https?:\/\/.+\.webp$/)
+    expect(data.url).toMatch(/^https?:\/\/.+\/en\/products\/cherry$/)
+  })
+
+  it('reports OutOfStock, not InStock, for a priced but out-of-season product', () => {
+    // winter-wonderland has a price but isPurchasable() is false — the season
+    // check, not the pricing table, is what must decide this.
+    const { container } = render(
+      <ProductJsonLd locale="en" product={winterWonderland} description="A winter candle." />
+    )
+    const [data] = parseScripts(container)
+
+    expect(data.offers.availability).toBe('https://schema.org/OutOfStock')
+  })
+
+  it('omits offers entirely for a product with no price, rather than inventing one', () => {
+    const unpriced: Product = { ...cherry, slug: 'not-a-real-product' }
+
+    const { container } = render(
+      <ProductJsonLd locale="en" product={unpriced} description="Unpriced." />
+    )
+    const [data] = parseScripts(container)
+
+    expect(data.offers).toBeUndefined()
+  })
+
+  it('never emits aggregateRating, because product.rating/reviewCount are documented placeholders', () => {
+    // cherry carries a rating in src/data/products.ts — asserting on it directly
+    // (rather than skipping if absent) is what would catch this coming back.
+    expect(cherry.rating).toBeDefined()
+
+    const { container } = render(
+      <ProductJsonLd locale="en" product={cherry} description="A cherry candle." />
+    )
+    const [data] = parseScripts(container)
+
+    expect(data.aggregateRating).toBeUndefined()
+    expect(data.review).toBeUndefined()
   })
 })
 
