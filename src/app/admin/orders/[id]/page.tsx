@@ -7,9 +7,11 @@ import { nextStatuses, STATUS_LABELS, statusRequiresReason } from '@/lib/order-s
 import { formatMoney, money } from '@/lib/money'
 import { defaultBuyerFor, getInvoiceForOrder, invoiceBlocker } from '@/lib/invoices'
 import { waybillBlocker } from '@/lib/waybills'
+import { econtSender, econtShipFrom } from '@/lib/couriers'
 import type { OrderEvent } from '@/db/schema'
 import CopyButton from '@/components/admin/CopyButton'
 import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
+import WaybillPreviewModal from '@/components/admin/WaybillPreviewModal'
 import { addNote, changeStatus, issueInvoice, issueWaybill, undoStatusChange } from '../../actions'
 
 /**
@@ -72,6 +74,28 @@ function labelPdfUrl(events: readonly OrderEvent[]): string | null {
   }
 
   return null
+}
+
+/**
+ * Who the parcel is from, for the preview modal — `null` when the courier has
+ * no ad-hoc sender identity to show.
+ *
+ * Only Econt has one: its sender is a name and phone this shop configures (see
+ * `EcontSender` in `src/lib/couriers/econt.ts`). Speedy takes its sender from
+ * the contract client instead, so there is no name typed anywhere to preview.
+ */
+function senderPreview(courier: string): { name: string; phone: string; from: string } | null {
+  if (courier !== 'econt') return null
+
+  const sender = econtSender()
+  const shipFrom = econtShipFrom()
+  if (!sender || !shipFrom) return null
+
+  const from = shipFrom.officeCode
+    ? `от офис (код ${shipFrom.officeCode})`
+    : `от адрес: ${shipFrom.street}, ${shipFrom.postCode} ${shipFrom.city}`
+
+  return { name: sender.name, phone: sender.phone, from }
 }
 
 /** One address, as one string, for the copy button — shaped for pasting into the courier's own system. */
@@ -370,17 +394,28 @@ export default async function AdminOrderPage({
         ) : blocker ? (
           <p className="text-xs text-stone-500">{blockerText(blocker)}</p>
         ) : (
-          <form action={issueWaybill} className="space-y-2">
-            <input type="hidden" name="orderId" value={order.id} />
+          <div className="space-y-2">
             <p className="text-xs text-stone-600">
-              Econt ще издаде истинска товарителница —{' '}
-              {order.deliveryMethod === 'door'
-                ? `до адрес: ${order.street}, ${order.postCode} ${order.city}`
-                : `до ${methodLabels[order.deliveryMethod] ?? order.deliveryMethod} ${order.officeName} (код ${order.officeId})`}
-              , {order.weightGrams} г, наложен платеж {amount(order.totalMinor)}.
+              Econt ще издаде истинска товарителница на {amount(order.totalMinor)} наложен
+              платеж — прегледай данните преди да я издадеш.
             </p>
-            <ConfirmSubmit expected={order.orderNumber} buttonLabel="Издай товарителница" />
-          </form>
+            <WaybillPreviewModal
+              orderId={order.id}
+              orderNumber={order.orderNumber}
+              courierLabel={order.courier === 'econt' ? 'Econt' : 'Speedy'}
+              sender={senderPreview(order.courier)}
+              recipientName={order.recipientName}
+              recipientPhone={order.phone}
+              destination={
+                order.deliveryMethod === 'door'
+                  ? `${order.street}, ${order.postCode} ${order.city}`
+                  : `${methodLabels[order.deliveryMethod] ?? order.deliveryMethod} ${order.officeName} (код ${order.officeId}), ${order.postCode} ${order.city}`
+              }
+              weightGrams={order.weightGrams}
+              codAmount={amount(order.totalMinor)}
+              issueWaybill={issueWaybill}
+            />
+          </div>
         )}
       </section>
 
