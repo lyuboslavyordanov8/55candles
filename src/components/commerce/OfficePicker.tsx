@@ -63,6 +63,13 @@ interface Props {
    * own record removes a whole class of failed labels.
    */
   onCityChosen: (city: CourierCity) => void
+  /**
+   * Called when an office is chosen, with its id — so the form can react to a
+   * price-relevant change (see the auto-requote effect in `DeliveryForm`)
+   * without needing to know this component picks it via a `<select>` rather
+   * than, say, a text field.
+   */
+  onOfficeChosen?: (officeId: string) => void
   /** True when the office list comes from the courier's demo environment. */
   demoData?: boolean
 }
@@ -72,6 +79,7 @@ export default function OfficePicker({
   kind,
   error,
   onCityChosen,
+  onOfficeChosen,
   demoData = false,
 }: Props) {
   const t = useTranslations('checkout')
@@ -376,7 +384,10 @@ export default function OfficePicker({
                 id={`${domId}-office`}
                 ref={selectRef}
                 value={selectedOfficeId}
-                onChange={(event) => setSelectedOfficeId(event.target.value)}
+                onChange={(event) => {
+                  setSelectedOfficeId(event.target.value)
+                  onOfficeChosen?.(event.target.value)
+                }}
                 required
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error ? `${domId}-error` : undefined}

@@ -974,4 +974,123 @@ describe('DeliveryForm, pricing before ordering', () => {
       expect(screen.queryByText(/Discount/)).not.toBeInTheDocument()
     })
   })
+
+  describe('auto-requote, once a price has been shown at least once', () => {
+    /**
+     * Real time, not fake timers: combining `vi.useFakeTimers()` with
+     * `userEvent`'s own internal timing has hung tests elsewhere in this
+     * codebase. The debounce is 600ms; waiting slightly past it for real is
+     * simple and matches how this file already waits on other async UI
+     * (`findByText(..., { timeout: 5_000 })`).
+     */
+    const PAST_DEBOUNCE_MS = 800
+
+    /**
+     * A quote whose `values` echo what was submitted, matching what the real
+     * action always sends back (`echo(delivery.value)` in
+     * `checkout/actions.ts`, on every outcome). `quotingAction()` above omits
+     * it, which every existing test tolerates because none of them submit a
+     * second time by any means other than a manual, deliberate press on an
+     * already-filled form. An auto-requote does not get that luxury: without
+     * the echo, React's post-action reset would blank the uncontrolled
+     * required fields (name, phone), and `requestSubmit()` — unlike
+     * `submit()` — runs native validation first and would silently refuse to
+     * fire at all.
+     */
+    function quotingActionWithEcho(summary: Partial<typeof QUOTE> = {}) {
+      return vi.mocked(submitCheckout).mockImplementationOnce(async (_previous, data) => ({
+        status: 'quoted' as const,
+        summary: { ...QUOTE, ...summary },
+        values: valuesFrom(data),
+        messageKey: 'reviewBeforeConfirming',
+      }))
+    }
+
+    it('reprices automatically when the promo code changes, with no second press', async () => {
+      const user = userEvent.setup()
+      quotingActionWithEcho()
+      renderForm({ promoCodesEnabled: true })
+      await fillIn(user)
+
+      await user.click(submitButton())
+      await screen.findByRole('heading', { name: /order summary/i }, { timeout: 5_000 })
+
+      vi.mocked(submitCheckout).mockImplementationOnce(async (_previous, data) => ({
+        status: 'quoted' as const,
+        summary: { ...QUOTE, discountMinor: 200, promoCode: '55CANDLES10', totalMinor: 2298 },
+        promo: { status: 'applied' as const, code: '55CANDLES10' },
+        values: valuesFrom(data),
+        messageKey: 'reviewBeforeConfirming',
+      }))
+
+      await user.type(screen.getByRole('textbox', { name: /promo code/i }), '55CANDLES10')
+
+      // Nothing was pressed after typing the code.
+      expect(await screen.findByText(/code 55CANDLES10 applied/i, {}, { timeout: 2_000 }))
+        .toBeInTheDocument()
+    })
+
+    it('only ever auto-submits step=quote, never step=confirm', async () => {
+      // The safety property this whole feature depends on: a background
+      // submission must never be the one that places the order.
+      const user = userEvent.setup()
+      quotingActionWithEcho()
+      renderForm({ promoCodesEnabled: true })
+      await fillIn(user)
+
+      await user.click(submitButton())
+      await screen.findByRole('heading', { name: /order summary/i }, { timeout: 5_000 })
+
+      let capturedStep: string | null = null
+      vi.mocked(submitCheckout).mockImplementationOnce(async (_previous, data) => {
+        capturedStep = String(data.get('step'))
+        return {
+          status: 'quoted' as const,
+          summary: QUOTE,
+          values: valuesFrom(data),
+          messageKey: 'reviewBeforeConfirming',
+        }
+      })
+
+      await user.type(screen.getByRole('textbox', { name: /promo code/i }), 'X')
+      await new Promise((resolve) => setTimeout(resolve, PAST_DEBOUNCE_MS))
+
+      expect(capturedStep).toBe('quote')
+    })
+
+    it('does not auto-requote before any quote has ever succeeded', async () => {
+      // Before that point a background submission would re-validate every
+      // field, including ones the customer has not finished with yet, and
+      // flash "required" errors while they are still typing.
+      const user = userEvent.setup()
+      renderForm({ promoCodesEnabled: true })
+      // The mock's call history is shared across every test in this file and
+      // is not reset automatically; only this test cares about the absolute
+      // count, so it clears it itself rather than relying on isolation
+      // nothing else in the file provides.
+      vi.mocked(submitCheckout).mockClear()
+
+      await user.type(screen.getByRole('textbox', { name: /promo code/i }), '55CANDLES10')
+      await new Promise((resolve) => setTimeout(resolve, PAST_DEBOUNCE_MS))
+
+      expect(submitCheckout).not.toHaveBeenCalled()
+    })
+
+    it('does not auto-requote for a field that has no effect on price', async () => {
+      const user = userEvent.setup()
+      quotingAction()
+      renderForm()
+      await fillIn(user)
+
+      await user.click(submitButton())
+      await screen.findByRole('heading', { name: /order summary/i }, { timeout: 5_000 })
+
+      vi.mocked(submitCheckout).mockClear()
+
+      await user.type(screen.getByLabelText(/note for the courier/i), 'Друг адрес')
+      await new Promise((resolve) => setTimeout(resolve, PAST_DEBOUNCE_MS))
+
+      expect(submitCheckout).not.toHaveBeenCalled()
+    })
+  })
 })

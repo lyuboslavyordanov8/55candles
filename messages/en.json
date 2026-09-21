@@ -627,7 +627,6 @@
     "basketEmpty": "Your basket is empty.",
     "browseProducts": "Browse the candles",
     "lineUnpriced": "Price on request",
-    "shippingAddedAfterMethod": "Econt prices the delivery once you choose a method and an office below. You will see the whole bill before you confirm.",
     "freeDeliveryEarned": "Delivery is free — we are paying it.",
     "freeDeliveryNudge": "{missing, plural, one {# more candle for free delivery — from {from} candles up, we pay the carriage.} other {# more candles for free delivery — from {from} candles up, we pay the carriage.}}",
     "summary": {

@@ -140,7 +140,6 @@ describe('CheckoutPage', () => {
     // law exists to prevent.
     await renderPage('cherry:2')
 
-    expect(screen.getByText(/Econt prices the delivery once you choose/i)).toBeInTheDocument()
     expect(screen.queryByText(/^Total$/)).not.toBeInTheDocument()
   })
 

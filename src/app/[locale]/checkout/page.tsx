@@ -229,9 +229,12 @@ function CheckoutContent({
                 method the customer has not chosen yet, and showing a
                 goods-only "total" that grows at the next step is the pattern
                 consumer law exists to prevent. The form's first press returns
-                the full breakdown, before anything is ordered.
+                the full breakdown, before anything is ordered, and every edit
+                after that reprices automatically (DeliveryForm's auto-requote
+                effect) rather than needing another press — so there is
+                nothing this line could tell the customer that the page does
+                not already show them a moment later.
               */}
-              <p className="text-xs text-ink-ghost">{t('shippingAddedAfterMethod')}</p>
 
               {/*
                 The free-delivery promise, and how far off it this basket is

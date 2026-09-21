@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useRef, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { submitCheckout, type CheckoutState } from '@/app/[locale]/checkout/actions'
 import { phoneProblem, PHONE_EXAMPLE, type PhoneProblem } from '@/lib/phone'
@@ -43,6 +43,17 @@ import OrderSummary from './OrderSummary'
  */
 
 const INITIAL: CheckoutState = { status: 'idle' }
+
+/**
+ * How long to wait, after the last price-relevant change, before asking Econt
+ * for a fresh quote automatically.
+ *
+ * Long enough that a promo code typed character by character settles once
+ * before it fires (matching the debounce `OfficePicker` already uses for its
+ * city search, `src/components/commerce/OfficePicker.tsx`), short enough that
+ * it still reads as "the price just updated" rather than a stall.
+ */
+const AUTO_REQUOTE_DEBOUNCE_MS = 600
 
 const inputClass =
   'w-full rounded-sm px-4 py-3 text-sm bg-cream-base border border-border focus:border-clay focus:outline-none transition-colors duration-200 text-charcoal'
@@ -184,6 +195,13 @@ export default function DeliveryForm({
   const [method, setMethod] = useState<DeliveryMethod>('office')
   const [courier, setCourier] = useState<Courier>('econt')
 
+  /**
+   * The chosen office's id, tracked here only so the auto-requote effect below
+   * has something to depend on — `OfficePicker` (or the free-text fallback)
+   * already owns the value that is actually submitted.
+   */
+  const [officeId, setOfficeId] = useState('')
+
   // Controlled so the office picker can fill them from the courier's own city
   // record. A post code that disagrees with the city is one of the few things
   // both couriers reject outright.
@@ -230,6 +248,69 @@ export default function DeliveryForm({
     priced.current = state
     if (edited) setEdited(false)
   }
+
+  /**
+   * Whether the customer has ever seen a real price on this page.
+   *
+   * Mutated during render, not in an effect — the same pattern as `priced`
+   * above, and for the same reason: the very next effect run needs to see the
+   * up-to-date value, not the one from before this render.
+   *
+   * Gates auto-requoting below. Before the first quote, one field can easily
+   * still be incomplete (a half-typed phone number, an address not yet
+   * chosen) and a background submission would surface that as a validation
+   * error while the customer is still filling the form in — the exact
+   * "nagging, not helping" problem the phone field's blur-only check exists
+   * to avoid, just for every field at once. Once a quote has succeeded, the
+   * whole form was valid at least once, so a small edit afterwards is a much
+   * safer thing to reprice without being asked.
+   */
+  const hasQuotedOnce = useRef(false)
+  if (state.status === 'quoted' || state.status === 'placed') {
+    hasQuotedOnce.current = true
+  }
+
+  /**
+   * Auto-requote, debounced, once the customer has seen a price at least once.
+   *
+   * Fires the same submission a manual press would — `formRef.current
+   * .requestSubmit()` runs through the exact same `action={formAction}` path,
+   * so there is only ever one way this form gets priced. It can never place
+   * the order by itself: the hidden `step` input reads `'confirm'` only when
+   * `readyToConfirm` is true, which requires the *current* basket to still
+   * match the last-priced summary (`sameBasket`, above) — precisely the
+   * condition every dependency below invalidates the moment it changes. An
+   * auto-fired submission is therefore always a `step=quote`; placing the
+   * order still needs an explicit press once the customer is looking at a
+   * price they are happy with.
+   *
+   * Deliberately reacts to only the fields that change what Econt charges —
+   * courier, method, the chosen office and the promo code, plus the basket
+   * itself — and not to typing a name, phone, email, street or note, which
+   * would otherwise resubmit (and validate) fields the customer has not
+   * finished with yet.
+   */
+  const formRef = useRef<HTMLFormElement>(null)
+  const skipNextAutoRequote = useRef(true)
+
+  useEffect(() => {
+    if (skipNextAutoRequote.current) {
+      skipNextAutoRequote.current = false
+      return
+    }
+
+    if (!hasQuotedOnce.current || pending || placed) return
+
+    const timer = setTimeout(() => {
+      formRef.current?.requestSubmit()
+    }, AUTO_REQUOTE_DEBOUNCE_MS)
+
+    return () => clearTimeout(timer)
+    // `cart` is compared by its JSON, not its identity: it is a new array on
+    // every render (rebuilt from the URL by the server component above), so
+    // depending on the reference itself would re-run this on every keystroke
+    // in unrelated fields too.
+  }, [JSON.stringify(cart), courier, method, officeId, promoCode])
 
   const errors = state.fieldErrors ?? {}
 
@@ -347,6 +428,7 @@ export default function DeliveryForm({
 
   return (
     <form
+      ref={formRef}
       action={formAction}
       className="space-y-8"
       /*
@@ -472,7 +554,13 @@ export default function DeliveryForm({
                     name="courier"
                     value={option}
                     defaultChecked={courier === option}
-                    onChange={() => setCourier(option)}
+                    onChange={() => {
+                      setCourier(option)
+                      // A different courier has its own offices; a code from
+                      // the last one means nothing here and would auto-requote
+                      // against the wrong nomenclature until a new one is chosen.
+                      setOfficeId('')
+                    }}
                     disabled={!bookable}
                   />
                   <CourierMark
@@ -516,7 +604,13 @@ export default function DeliveryForm({
                 value={option}
                 // See the courier radios above for why this is not `checked`.
                 defaultChecked={method === option}
-                onChange={() => setMethod(option)}
+                onChange={() => {
+                  setMethod(option)
+                  // Door has no office at all; office and locker each key
+                  // their own OfficePicker instance (see the `key` below), so
+                  // either way a previously chosen office no longer applies.
+                  setOfficeId('')
+                }}
                 className="mt-1"
               />
               <span>
@@ -576,6 +670,7 @@ export default function DeliveryForm({
                 setCity(chosen.name)
                 setPostCode(chosen.postCode)
               }}
+              onOfficeChosen={setOfficeId}
             />
 
             {hiddenLocationError && (
@@ -589,7 +684,7 @@ export default function DeliveryForm({
               credentials yet (Q-22). Worse than a picker, far better than a
               picker populated with invented offices.
             */}
-            <Field {...fieldProps('officeId')} />
+            <Field {...fieldProps('officeId')} onEdit={setOfficeId} />
             <p className="text-xs text-ink-ghost">{t('officeLookupPending')}</p>
           </>
         )}
