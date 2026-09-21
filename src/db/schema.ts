@@ -320,6 +320,90 @@ export const consentRecords = pgTable(
 )
 
 // ---------------------------------------------------------------------------
+// Invoices
+// ---------------------------------------------------------------------------
+
+/**
+ * Counters for numbering series that may not have gaps.
+ *
+ * A table and not a `pgSequence`, which is the opposite of the choice made for
+ * order numbers above — and for the opposite reason. `nextval` is deliberately
+ * non-transactional: a rolled-back insert keeps its value, so the series grows
+ * holes. An order number may have holes; a **фактура** number may not. Bulgarian
+ * law requires the invoice series to be ten digits, ascending, without duplicates
+ * and **without gaps**, which means the number and the document it belongs to have
+ * to appear or fail together.
+ *
+ * So the counter is an ordinary row, bumped with `UPDATE … RETURNING` inside the
+ * same statement that inserts the invoice — see `issueInvoiceForOrder()`. The row
+ * lock serialises two admins pressing the button at once, and because it is one
+ * statement, a failed insert takes the bump down with it.
+ *
+ * Keyed by name so a second series (кредитно известие, ако някога потрябва) is a
+ * row and not a migration.
+ */
+export const documentCounters = pgTable('document_counters', {
+  /** e.g. 'invoice'. */
+  name: text('name').primaryKey(),
+  /** Last number handed out. The next invoice is `value + 1`. */
+  value: integer('value').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * One issued invoice (фактура).
+ *
+ * Append-only by intent: an issued invoice is a document that exists in the
+ * outside world, so it is never edited and never deleted. Correcting one means
+ * issuing a credit note against it, which is why there is no `updatedAt` here
+ * and no status column — a row in this table means "this document was issued".
+ *
+ * Everything the document says lives in `snapshot`, including the seller's own
+ * details. Reading the company from `src/lib/company.ts` at render time would
+ * quietly reprint last year's invoices with this year's address the day the seat
+ * changes; an invoice has to keep saying what it said when it was issued.
+ */
+export const invoices = pgTable(
+  'invoices',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /**
+     * The ten-digit series, zero-padded, e.g. `0000000001`. Text, not a number:
+     * the leading zeros are part of the number as printed and as the accountant
+     * enters it.
+     */
+    number: text('number').notNull(),
+    /**
+     * One invoice per order, enforced by the unique index below. That constraint
+     * is also what makes double-clicking the button safe: the second insert
+     * fails, and with it the counter bump in the same statement.
+     */
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'restrict' }),
+    /** Дата на издаване. */
+    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Дата на данъчното събитие — when the goods changed hands, which for a
+     * наложен платеж shop is the delivery and not the order. Nullable because an
+     * invoice may accompany the parcel, and then the date is not yet known.
+     */
+    saleDate: timestamp('sale_date', { withTimezone: true }),
+    /** Denormalised for the admin list, so it need not parse the snapshot. */
+    totalMinor: integer('total_minor').notNull(),
+    currency: text('currency').notNull().default('EUR'),
+    /** The whole document, as issued. See `InvoiceSnapshot` in `src/lib/invoices.ts`. */
+    snapshot: jsonb('snapshot').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('invoices_number_idx').on(table.number),
+    uniqueIndex('invoices_order_id_idx').on(table.orderId),
+    index('invoices_issued_at_idx').on(table.issuedAt),
+  ]
+)
+
+// ---------------------------------------------------------------------------
 // Inferred types
 // ---------------------------------------------------------------------------
 
@@ -330,3 +414,5 @@ export type NewOrderItem = typeof orderItems.$inferInsert
 export type OrderEvent = typeof orderEvents.$inferSelect
 export type NewOrderEvent = typeof orderEvents.$inferInsert
 export type OrderStatus = (typeof orderStatus.enumValues)[number]
+export type Invoice = typeof invoices.$inferSelect
+export type NewInvoice = typeof invoices.$inferInsert

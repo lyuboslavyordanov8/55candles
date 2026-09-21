@@ -34,8 +34,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <html lang="bg" className={fontVariables}>
-      <body className="min-h-screen bg-stone-50 font-sans text-sm text-stone-900 antialiased">
-        <header className="border-b border-stone-200 bg-white">
+      <body className="min-h-screen bg-stone-50 font-sans text-sm text-stone-900 antialiased print:bg-white">
+        {/* Not printed: the фактура page is meant to come out of a printer, and
+            the shop's navigation is not part of the document. */}
+        <header className="border-b border-stone-200 bg-white print:hidden">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
             <Link href="/admin" className="font-medium tracking-wide">
               55° candles <span className="text-stone-400">· поръчки</span>
@@ -54,7 +56,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </header>
 
-        <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 py-6 print:max-w-none print:p-0">{children}</main>
       </body>
     </html>
   )

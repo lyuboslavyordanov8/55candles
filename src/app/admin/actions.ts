@@ -13,6 +13,7 @@ import {
   startAdminSession,
 } from '@/lib/admin-auth'
 import { advanceOrderStatus } from '@/lib/admin-orders'
+import { issueInvoiceForOrder, type InvoiceBuyer } from '@/lib/invoices'
 import { issueWaybillForOrder } from '@/lib/waybills'
 import { orderStatus, type OrderStatus } from '@/db/schema'
 
@@ -145,6 +146,62 @@ export async function issueWaybill(formData: FormData): Promise<void> {
   // lose, so it is written to the order's history instead and the page points
   // there. See `issueWaybillForOrder`.
   redirect(`/admin/orders/${orderId}?error=waybill_${result.status}`)
+}
+
+/**
+ * Issue the фактура for an order.
+ *
+ * Unlike the waybill this one *does* take fields, because the invoice may be made
+ * out to a company the checkout never asked about — a customer who wants the
+ * candles on their firm's books gives фирма, ЕИК and МОЛ afterwards, by email or
+ * on the phone. They default to the person and the address on the order.
+ *
+ * Irreversible in the way the waybill is not: the number it consumes belongs to a
+ * series that may not have gaps, so there is no delete. Everything that could
+ * refuse is decided in `issueInvoiceForOrder`.
+ */
+export async function issueInvoice(formData: FormData): Promise<void> {
+  await requireAdmin()
+
+  const orderId = String(formData.get('orderId') ?? '')
+  if (!orderId) redirect('/admin')
+
+  const field = (name: string) => String(formData.get(name) ?? '').trim().slice(0, 200)
+
+  const name = field('buyerName')
+  if (!name) redirect(`/admin/orders/${orderId}?error=invoice_buyer`)
+
+  const buyer: InvoiceBuyer = {
+    name,
+    ...optional('company', field('buyerCompany')),
+    ...optional('eik', field('buyerEik')),
+    ...optional('vatNumber', field('buyerVatNumber')),
+    ...optional('accountable', field('buyerAccountable')),
+    ...optional('address', field('buyerAddress')),
+  }
+
+  const result = await issueInvoiceForOrder(orderId, buyer)
+
+  if (result.status === 'missing') redirect('/admin?error=missing')
+
+  revalidatePath(`/admin/orders/${orderId}`)
+
+  if (result.status === 'ok') {
+    redirect(`/admin/orders/${orderId}?invoice=${encodeURIComponent(result.number)}`)
+  }
+
+  redirect(`/admin/orders/${orderId}?error=invoice_${result.status}`)
+}
+
+/**
+ * An optional field, present only when filled.
+ *
+ * `{ eik: '' }` and no `eik` at all are different things on a document: the first
+ * prints an empty label. See `prunedBuyer` in `src/lib/invoices.ts`, which is the
+ * same rule enforced again where the snapshot is built.
+ */
+function optional<K extends string>(key: K, value: string): Partial<Record<K, string>> {
+  return value ? ({ [key]: value } as Record<K, string>) : {}
 }
 
 /** A status the enum actually contains, or undefined. Never a cast. */

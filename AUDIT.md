@@ -617,6 +617,12 @@ These cannot be determined from the code. **Nothing below has been guessed.**
 ### Tax & invoicing — all `[VERIFY WITH ACCOUNTANT]`
 
 - **Q-27** Do you issue фактури for every order, or only on request? What numbering series and who owns the sequence?
+  — **Built as "on request, one press" (2026-09-21).** Not automatic on every order: a sale to a physical person does not
+  require an invoice, and issuing one nobody asked for consumes a number in a series that may not have gaps. The series
+  is ours and lives in `document_counters` — ten digits from `0000000001`, never reset, one invoice per order. A company
+  buyer's фирма/ЕИК/ДДС №/МОЛ are typed into the admin form, because the checkout deliberately does not collect them.
+  Still open for the accountant: whether the series must restart each calendar year, and whether a copy has to be kept
+  in any form other than the row in `invoices`.
 - **Q-28** **Наредба Н-18 / НАП e-shop obligations:** does this shop need to be registered with НАП as an e-shop, and
   what software declaration applies? Since every order is COD collected by the courier (whose fiscal device is
   typically involved), this is the *only* receipt path there is, which raises rather than lowers its importance. I am
@@ -868,8 +874,8 @@ it later. Add an automated check that no analytics script tag can be injected be
 
 ### Phase 7 — Admin & invoicing (~1 week)
 
-1. **PARTIAL (2026-09-21)** — `/admin` has the order list, the order detail and enforced status transitions. Still
-   owed: waybill creation, label download, refund trigger and COD reconciliation import.
+1. **PARTIAL (2026-09-21)** — `/admin` has the order list, the order detail, enforced status transitions, real Econt
+   waybills with the label PDF, and фактури. Still owed: refund trigger and COD reconciliation import.
 2. **PARTIAL (2026-09-21)** — one shared password (`ADMIN_PASSWORD`) with an `HttpOnly`+`Secure`+`SameSite=Lax` signed
    session cookie and a per-IP throttle on the login form. Password *hashing* is moot while there is no users table —
    the comparison is constant-time against the environment variable, and the hashing requirement returns with the
@@ -878,7 +884,14 @@ it later. Add an automated check that no analytics script tag can be injected be
 3. **Authorization on every single route** — the default answer to "can user A read user B's order?" must be no,
    enforced server-side per request, not by hiding UI. Guest order lookup by opaque token only.
 4. Rate limiting on login, checkout, contact and any courier-quote endpoint.
-5. Invoice generation and numbering (Q-27) — sequential, gapless, immutable once issued. `[VERIFY WITH ACCOUNTANT]`
+5. **DONE (2026-09-21)** — invoice generation and numbering (Q-27): ten digits, sequential, gapless, immutable once
+   issued. `src/lib/invoices.ts`, one button per order, one invoice per order enforced by a unique index. The number is
+   minted by the same single SQL statement that inserts the row — `document_counters` bumped in a CTE the insert selects
+   from — so a failed insert takes the bump down with it and no number is ever burnt. A sequence would not do: `nextval`
+   is non-transactional by design and leaves holes. Everything the document says is frozen in `invoices.snapshot`, the
+   seller's own details included, and rendered by a print-ready A4 page rather than a generated PDF (the built-in PDF
+   fonts cannot render Cyrillic, and the browser already prints). The **wording** of the no-VAT basis and whether the
+   series should restart per year are still `[VERIFY WITH ACCOUNTANT]`; that no VAT is charged is settled (Q-03).
 6. **Наредба Н-18 / НАП** obligations (Q-28) — resolve *before* launch, not after the first sale.
    `[VERIFY WITH ACCOUNTANT]`
 

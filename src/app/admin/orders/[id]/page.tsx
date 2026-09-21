@@ -5,9 +5,10 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { getOrderDetail } from '@/lib/admin-orders'
 import { nextStatuses, STATUS_LABELS } from '@/lib/order-status'
 import { formatMoney, money } from '@/lib/money'
+import { defaultBuyerFor, getInvoiceForOrder, invoiceBlocker } from '@/lib/invoices'
 import { waybillBlocker } from '@/lib/waybills'
 import type { OrderEvent } from '@/db/schema'
-import { changeStatus, issueWaybill } from '../../actions'
+import { changeStatus, issueInvoice, issueWaybill } from '../../actions'
 
 /**
  * One order: everything needed to pack it, ship it and settle it.
@@ -35,6 +36,10 @@ const notices: Record<string, string> = {
     'Econt не издаде товарителница. Точната причина е записана в историята по-долу.',
   waybill_busy: 'Товарителницата за тази поръчка се издава в момента. Изчакай и презареди.',
   waybill_blocked: 'Товарителница не може да се издаде за тази поръчка — виж по-долу защо.',
+  invoice_buyer: 'Фактурата не беше издадена: липсва име на получателя.',
+  invoice_blocked: 'Фактура не може да се издаде за тази поръчка — виж по-долу защо.',
+  invoice_failed:
+    'Фактурата не беше издадена и номер не е изразходван. Опитай отново; ако пак не стане, провери логовете.',
 }
 
 /**
@@ -62,7 +67,12 @@ export default async function AdminOrderPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ error?: string; changed?: string; waybill?: string }>
+  searchParams: Promise<{
+    error?: string
+    changed?: string
+    waybill?: string
+    invoice?: string
+  }>
 }) {
   await requireAdmin()
 
@@ -71,12 +81,16 @@ export default async function AdminOrderPage({
   if (!detail) notFound()
 
   const { order, items, events } = detail
-  const { error, changed, waybill } = await searchParams
+  const { error, changed, waybill, invoice } = await searchParams
 
   const currency = order.currency as 'EUR'
   const amount = (minor: number) => formatMoney(money(minor, currency), 'bg')
   const blocker = waybillBlocker(order)
   const pdfUrl = labelPdfUrl(events)
+
+  const issued = await getInvoiceForOrder(order.id)
+  const invoiceStop = invoiceBlocker(order, issued)
+  const buyer = defaultBuyerFor(order)
 
   return (
     <div className="space-y-6">
@@ -105,6 +119,16 @@ export default async function AdminOrderPage({
       {waybill && (
         <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
           Товарителница {waybill} е издадена. Разпечатай етикета и подай пратката на Econt.
+        </p>
+      )}
+
+      {invoice && (
+        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+          Фактура № {invoice} е издадена.{' '}
+          <Link href={`/admin/orders/${order.id}/invoice`} className="underline">
+            Отвори за печат
+          </Link>
+          .
         </p>
       )}
 
@@ -289,6 +313,53 @@ export default async function AdminOrderPage({
 
       <section className="rounded-sm border border-stone-200 bg-white p-4">
         <h2 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">
+          Фактура
+        </h2>
+
+        {issued ? (
+          <p className="text-xs text-stone-600">
+            Издадена: <span className="font-medium">№ {issued.number}</span> ·{' '}
+            {dateFormat.format(issued.issuedAt)} ·{' '}
+            <Link href={`/admin/orders/${order.id}/invoice`} className="underline">
+              за печат
+            </Link>
+            <span className="mt-1 block text-stone-400">
+              Фактурата не се редактира и не се изтрива — номерът вече е част от редовна поредица.
+              Грешка се коригира с кредитно известие, което се прави ръчно.
+            </span>
+          </p>
+        ) : invoiceStop ? (
+          <p className="text-xs text-stone-500">{invoiceBlockerText(invoiceStop)}</p>
+        ) : (
+          <form action={issueInvoice} className="space-y-3">
+            <input type="hidden" name="orderId" value={order.id} />
+            <p className="text-xs text-stone-600">
+              Фактура на {amount(order.totalMinor)} без ДДС (дружеството не е регистрирано по ЗДДС).
+              По подразбиране на физическото лице от поръчката — попълни полетата само ако клиентът
+              иска фактура на фирма.
+            </p>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field name="buyerName" label="Получател" defaultValue={buyer.name} required />
+              <Field name="buyerAddress" label="Адрес" defaultValue={buyer.address ?? ''} />
+              <Field name="buyerCompany" label="Фирма (ако е на фирма)" />
+              <Field name="buyerEik" label="ЕИК / Булстат" />
+              <Field name="buyerVatNumber" label="ДДС № (ако има)" />
+              <Field name="buyerAccountable" label="МОЛ" />
+            </div>
+
+            <button
+              type="submit"
+              className="rounded-sm bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-700"
+            >
+              Издай фактура
+            </button>
+          </form>
+        )}
+      </section>
+
+      <section className="rounded-sm border border-stone-200 bg-white p-4">
+        <h2 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">
           Следваща стъпка
         </h2>
 
@@ -391,6 +462,18 @@ function blockerText(blocker: NonNullable<ReturnType<typeof waybillBlocker>>): s
   }
 }
 
+/** The same, for the фактура. */
+function invoiceBlockerText(blocker: NonNullable<ReturnType<typeof invoiceBlocker>>): string {
+  switch (blocker.reason) {
+    case 'alreadyIssued':
+      return `Вече има фактура № ${blocker.number}.`
+    case 'wrongStatus':
+      return `Фактура се издава от „потвърдена“ нататък (сега е „${STATUS_LABELS[blocker.status]}“). За отказана или върната поръчка не се издава фактура.`
+    case 'sellerIncomplete':
+      return `Данните на продавача не са пълни, а фактурата ги носи. Липсва: ${blocker.missing.join(', ')}.`
+  }
+}
+
 /** Statuses the parcel has already left the shop in, for the message above. */
 const BOOKABLE_AFTER: readonly string[] = [
   'shipped',
@@ -424,6 +507,31 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <dt className="w-28 shrink-0 text-stone-500">{label}</dt>
       <dd>{children}</dd>
     </div>
+  )
+}
+
+function Field({
+  name,
+  label,
+  defaultValue,
+  required = false,
+}: {
+  name: string
+  label: string
+  defaultValue?: string
+  required?: boolean
+}) {
+  return (
+    <label className="text-xs">
+      <span className="mb-1 block text-stone-500">{label}</span>
+      <input
+        name={name}
+        defaultValue={defaultValue}
+        required={required}
+        maxLength={200}
+        className="w-full rounded-sm border border-stone-300 px-2 py-1.5"
+      />
+    </label>
   )
 }
 
