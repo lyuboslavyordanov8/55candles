@@ -106,13 +106,16 @@ describe('whether an order may be booked', () => {
     expect(allowed).toEqual([...BOOKABLE_ORDER_STATUSES])
   })
 
-  it('refuses Speedy and names what is missing', () => {
+  it('refuses Speedy and names its own variables, not Econt’s', () => {
+    // `configured()` sets up Econt. Speedy has a real client now, so the reason
+    // it cannot book is its own missing configuration — and the admin needs to be
+    // told which variables those are, not that "Speedy" is unavailable.
     configured()
 
     expect(waybillBlocker(order({ courier: 'speedy' }))).toEqual({
       reason: 'notBookable',
       courier: 'speedy',
-      missing: ['a Speedy client'],
+      missing: ['SPEEDY_USERNAME', 'SPEEDY_PASSWORD', 'SPEEDY_SENDER_CLIENT_ID'],
     })
   })
 

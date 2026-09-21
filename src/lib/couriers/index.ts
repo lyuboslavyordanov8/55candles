@@ -9,7 +9,8 @@ import {
   type EcontSender,
   type EcontShipFrom,
 } from './econt'
-import type { CourierClient, LookupResult } from './types'
+import { createSpeedyClient, type SpeedyCodProcessing, type SpeedySender } from './speedy'
+import type { CourierClient } from './types'
 
 /**
  * Courier client resolution (AUDIT.md Q-22, Q-25).
@@ -38,6 +39,8 @@ export type {
 } from './types'
 export type { EcontCodPayout, EcontSender, EcontShipFrom } from './econt'
 export { econtTrackingUrl } from './econt'
+export type { SpeedyCodProcessing, SpeedySender } from './speedy'
+export { speedyTrackingUrl } from './speedy'
 
 /**
  * Which Econt nomenclature to read.
@@ -84,6 +87,18 @@ const PAYOUT_VARS = {
   template: 'ECONT_COD_PAY_TEMPLATE',
   iban: 'ECONT_COD_IBAN',
   bic: 'ECONT_COD_BIC',
+} as const
+
+/**
+ * Speedy's equivalents. There is no sender *address* among them: Speedy takes
+ * the sender from the contract client, so the only thing to configure is which
+ * client we are and where we hand parcels in. See `speedySender()`.
+ */
+const SPEEDY_VARS = {
+  clientId: 'SPEEDY_SENDER_CLIENT_ID',
+  dropoffOffice: 'SPEEDY_DROPOFF_OFFICE_ID',
+  serviceId: 'SPEEDY_SERVICE_ID',
+  codProcessing: 'SPEEDY_COD_PROCESSING',
 } as const
 
 /**
@@ -180,35 +195,103 @@ export function econtCodPayout(): EcontCodPayout | null {
 }
 
 /**
+ * Who the parcel is from, for Speedy. `null` while no client id is configured.
+ *
+ * The whole of the requirement, and it cannot be defaulted: Speedy will not
+ * price a parcel whose payer is not a contract client — it answers *"Ваш обект
+ * или обект по договор трябва да е платец или подател"* — so there is no
+ * anonymous mode to fall back to the way Econt has one. The id is the merchant's
+ * own object under their contract, read from `POST /v1/client/contract`.
+ *
+ * `dropoffOfficeId` is optional and changes the tariff line: with it Speedy
+ * prices a drop-off at that office, without it a collection from the client's
+ * registered address.
+ */
+export function speedySender(): SpeedySender | null {
+  const clientId = positiveInteger(process.env[SPEEDY_VARS.clientId])
+  if (clientId === null) return null
+
+  const dropoffOfficeId = positiveInteger(process.env[SPEEDY_VARS.dropoffOffice])
+
+  return { clientId, ...(dropoffOfficeId === null ? {} : { dropoffOfficeId }) }
+}
+
+/**
+ * A configured whole number, or `null` for anything else.
+ *
+ * Silent on a malformed value rather than throwing: a typo in a client id makes
+ * Speedy `unconfigured`, which falls back to the placeholder tariff, where an
+ * exception would take the checkout down. The launch checklist names the
+ * variable, so the typo is still reported — just not by crashing.
+ */
+function positiveInteger(value: string | undefined): number | null {
+  const trimmed = value?.trim()
+  if (!trimmed) return null
+
+  const parsed = Number(trimmed)
+
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+/**
+ * Which Speedy tariff to price and book on, or `undefined` for the client's own
+ * default (`505`, „СТАНДАРТ 24 ЧАСА“). Which services a contract includes
+ * differs, so this is configurable — see `DEFAULT_SERVICE_ID` in `speedy.ts`.
+ */
+export function speedyServiceId(): number | undefined {
+  return positiveInteger(process.env[SPEEDY_VARS.serviceId]) ?? undefined
+}
+
+/**
+ * How Speedy hands the наложен платеж money over.
+ *
+ * `CASH` — collect it at a Speedy counter — is the default, for the same reason
+ * Econt's payout defaults to the profile's own arrangement: it works without a
+ * COD annex. `POSTAL_MONEY_TRANSFER` wires it to the account on the contract and
+ * is the better answer once that annex exists. An unrecognised value falls back
+ * to `CASH` rather than being sent on to be rejected at booking time.
+ */
+export function speedyCodProcessing(): SpeedyCodProcessing {
+  return process.env[SPEEDY_VARS.codProcessing]?.trim() === 'POSTAL_MONEY_TRANSFER'
+    ? 'POSTAL_MONEY_TRANSFER'
+    : 'CASH'
+}
+
+/**
  * Whether this courier can quote a real price.
  *
  * Separate from `isCourierConfigured`, which only asks about credentials: a
- * quote also needs to know where the parcel starts. Both are required, so both
- * are checked in one place rather than at each call site.
+ * quote also needs to know where the parcel starts, and each courier says that
+ * differently — an address for Econt, a contract client for Speedy.
  */
 export function canQuoteLiveRates(courier: Courier): boolean {
-  if (courier !== 'econt') return false
+  if (!isCourierConfigured(courier)) return false
 
-  return isCourierConfigured(courier) && econtShipFrom() !== null
+  return courier === 'econt' ? econtShipFrom() !== null : speedySender() !== null
 }
 
 /**
  * Whether this courier can issue a real waybill.
  *
- * Everything pricing needs, plus a sender to put on the label. Strictly stronger
- * than `canQuoteLiveRates`, and kept separate because the shop can legitimately
- * run with live prices and hand-written labels — which is exactly where it stood
- * before this was built.
+ * Everything pricing needs, plus whatever the label itself requires. Strictly
+ * stronger than `canQuoteLiveRates` for Econt, which will not print a label
+ * without a phone to ring; the same for Speedy, which takes the sender's name,
+ * address and phone from the contract client and so needs nothing more.
+ *
+ * Kept separate because the shop can legitimately run with live prices and
+ * hand-written labels — which is exactly where it stood before this was built.
  */
 export function canBookWaybills(courier: Courier): boolean {
-  return canQuoteLiveRates(courier) && econtSender() !== null
+  if (!canQuoteLiveRates(courier)) return false
+
+  return courier === 'econt' ? econtSender() !== null : true
 }
 
 /** What waybill creation is still waiting on, for the launch checklist. */
-export function missingWaybillRequirements(): string[] {
-  const missing = missingLiveRateRequirements()
+export function missingWaybillRequirements(courier: Courier): string[] {
+  const missing = missingLiveRateRequirements(courier)
 
-  if (econtSender() === null) missing.push(IDENTITY_VARS.phone)
+  if (courier === 'econt' && econtSender() === null) missing.push(IDENTITY_VARS.phone)
 
   return missing
 }
@@ -217,11 +300,15 @@ export function missingWaybillRequirements(): string[] {
  * What live pricing is still waiting on, for the launch checklist and the
  * checkout's own "these rates are placeholders" notice.
  */
-export function missingLiveRateRequirements(): string[] {
-  const missing = CREDENTIAL_VARS.econt.filter((name) => !process.env[name])
+export function missingLiveRateRequirements(courier: Courier): string[] {
+  const missing = CREDENTIAL_VARS[courier].filter((name) => !process.env[name])
 
-  if (econtShipFrom() === null) {
-    missing.push(`${SENDER_VARS.officeCode} or the registered address in company.ts`)
+  if (courier === 'econt') {
+    if (econtShipFrom() === null) {
+      missing.push(`${SENDER_VARS.officeCode} or the registered address in company.ts`)
+    }
+  } else if (speedySender() === null) {
+    missing.push(SPEEDY_VARS.clientId)
   }
 
   return missing
@@ -261,28 +348,6 @@ export function econtEnvironment(): CourierEnvironment {
 }
 
 /**
- * A client that answers `unconfigured` for everything.
- *
- * Deliberately not a client that returns fake offices. Plausible test data in
- * a delivery picker is worse than an empty one: it produces an order addressed
- * to an office that does not exist, and nobody notices until the parcel is
- * refused.
- */
-function unconfiguredClient(courier: Courier): CourierClient {
-  const result = <T,>(): Promise<LookupResult<T>> =>
-    Promise.resolve({ status: 'unconfigured' as const, courier })
-
-  return {
-    courier,
-    searchCities: result,
-    officesIn: result,
-    findOffice: result,
-    priceShipment: result,
-    createWaybill: result,
-  }
-}
-
-/**
  * Clients are cached per environment because each holds the office-list cache.
  * A fresh client per request would re-download 1.7 MB every lookup.
  *
@@ -313,16 +378,34 @@ function econtClient(): CourierClient {
 }
 
 /**
- * Client for a courier.
- *
- * Speedy is still the unconfigured stub: its API needs credentials issued by
- * hand (`api@speedy.bg`), with no public demo environment, so there is nothing
- * to build against yet. `/location/site`, `/location/office` and `/calculate`
- * are the endpoints it will need — see AUDIT.md Phase 4.
+ * Speedy has one environment. There is no demo host: the test credentials Speedy
+ * issues point at the real system through a fictitious client, which is why the
+ * base URL is the production one and a test user's waybills are recognised as
+ * test ones by the API rather than by the address they were sent to.
  */
+const SPEEDY_BASE_URL = 'https://api.speedy.bg/v1'
+
+function speedyClient(): CourierClient {
+  const key = 'speedy'
+  const existing = clients.get(key)
+  if (existing) return existing
+
+  const created = createSpeedyClient({
+    baseUrl: process.env.SPEEDY_BASE_URL ?? SPEEDY_BASE_URL,
+    credentials: () => credentialsFor('speedy'),
+    sender: speedySender,
+    serviceId: speedyServiceId,
+    codProcessing: speedyCodProcessing,
+  })
+
+  clients.set(key, created)
+
+  return created
+}
+
+/** Client for a courier. Both are real; each answers `unconfigured` on its own. */
 export function courierClient(courier: Courier): CourierClient {
-  // [TODO: Q-22 — return a SpeedyClient once test credentials exist.]
-  return courier === 'econt' ? econtClient() : unconfiguredClient('speedy')
+  return courier === 'econt' ? econtClient() : speedyClient()
 }
 
 /**
@@ -331,12 +414,11 @@ export function courierClient(courier: Courier): CourierClient {
  * The checkout page passes this to the delivery form so the picker appears only
  * where it works, and the free-text fallback appears everywhere else.
  *
- * Econt is unconditional because its nomenclature is public. Speedy is absent
- * because its client is a stub — and note this is *not* `isCourierConfigured`:
- * Speedy credentials can be present while it still cannot answer, and offering
- * an empty picker on the strength of an environment variable would be the lie
- * this whole module avoids.
+ * Econt is unconditional because its nomenclature is *public* — no credentials,
+ * so nothing can make the picker stop working. Speedy's is not: `/location/
+ * office/` authenticates like every other Speedy call, so without credentials
+ * there is no office list at all and the picker would render empty.
  */
 export function couriersWithOfficeLookup(): Courier[] {
-  return ['econt']
+  return isCourierConfigured('speedy') ? ['econt', 'speedy'] : ['econt']
 }

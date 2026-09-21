@@ -74,7 +74,7 @@ export function waybillBlocker(order: Order): WaybillBlocker | null {
     return {
       reason: 'notBookable',
       courier: order.courier,
-      missing: order.courier === 'econt' ? missingWaybillRequirements() : ['a Speedy client'],
+      missing: missingWaybillRequirements(order.courier),
     }
   }
 

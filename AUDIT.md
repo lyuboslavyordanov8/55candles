@@ -201,7 +201,8 @@ guessed.
 | Q-37 promo codes | **Machinery done — table is one example code** | `src/lib/promo.ts`, `import 'server-only'` so the browser bundle can never carry the list. Percent or fixed amount, optional minimum and end date (inclusive, Europe/Sofia). Discounts the **goods only** — never the carriage or the наложен платеж fee, which are somebody else's invoice. Clamped to the goods total, so no code can produce a negative bill. Ships `55CANDLES10` at 10%: replace it before it is worth guessing |
 | Delivery form | Done | `/[locale]/checkout` + `DeliveryForm`. Fields switch on method; `useActionState` per the Next 16 forms guide |
 | Order totals | Done | `src/lib/order-total.ts` — re-priced server-side, shipping and COD fee as separate line items |
-| Courier office lookup | Done, and needs no credentials | `src/lib/couriers/` — Econt's nomenclature is public, so the picker shows the real 632 production offices out of the box. Speedy is still a stub that answers `unconfigured` |
+| Courier office lookup | Done. Econt needs no credentials, Speedy does | `src/lib/couriers/` — Econt's nomenclature is public, so the picker shows the real 632 production offices out of the box. Speedy's `/location/office/` authenticates like every other Speedy call (1311 offices, 3.3 MB, 254 settlements), so `couriersWithOfficeLookup()` offers it only once `SPEEDY_USERNAME`/`_PASSWORD` are set — otherwise the picker would render empty. Cities are derived from the offices rather than from `/location/site/`, so every settlement offered has somewhere to collect from |
+| Q-22 Speedy client | **Built and verified live, but it cannot launch without a contract** | `src/lib/couriers/speedy.ts` — the same `CourierClient` contract as Econt: search, offices, price, book. Every request shape in it was sent against the live API with Speedy's test credentials on 2026-09-21, including three real test waybills (a test user's are recognised as test by the API and need no cancelling). Three habits differ from Econt and each is load-bearing: credentials travel **in the body**, an application error arrives as **HTTP 200 with an `error` object** (so `response.ok` proves nothing), and nothing is public. The blocker is structural, not configuration: Speedy will not price a parcel whose payer is not a contract client — *"Ваш обект или обект по договор трябва да е платец или подател"* — and `courierServicePayer: 'RECIPIENT'` prices nothing at all, so Q-23's merchant-pays policy is also the only workable setting. Econt launched on a personal account; Speedy will not. `BOOKABLE_COURIERS` in `src/lib/shipping.ts` is therefore still `['econt']`, and adding `'speedy'` is the one switch once a contract exists |
 | Q-20 card payments | **Closed by decision — not happening** | No provider, no keys, no webhook, no `paid` status. Reversing it is new work, not configuration |
 
 **Money is never a float.** `0.1 + 0.2` is `0.30000000000000004`, and a shop that sums prices as floats eventually
@@ -604,7 +605,7 @@ These cannot be determined from the code. **Nothing below has been guessed.**
 
 - ~~**Q-20** Stripe account country and default currency~~ — **ANSWERED 2026-09-20: no card payments at all.**
 - ~~**Q-21** Card *and* COD from day one, or COD first?~~ — **ANSWERED: наложен платеж only, indefinitely.**
-- **Q-22** Do you have Speedy and/or Econt merchant contracts yet, and API credentials for their test environments? Econt's are now the one thing standing between the checkout and real delivery prices — `ECONT_USERNAME`, `ECONT_PASSWORD` and `ECONT_SENDER_OFFICE_CODE`. Until they are set the checkout charges the stand-in card and says so.
+- **Q-22** Do you have Speedy and/or Econt merchant contracts yet, and API credentials for their test environments? **Partly answered 2026-09-21.** Econt: a personal account is set and live, so the checkout quotes real prices and the admin books real waybills — no contract was needed, but the tariff is list price rather than contracted. Speedy: test credentials are in hand and the client is written and exercised against the live API, but **a signed contract is required before it can be switched on**, because Speedy prices nothing unless the payer is a contract client (`SPEEDY_SENDER_CLIENT_ID`). `telesales@speedy.bg` for the contract, `api.support@speedy.bg` for the API.
 - **Q-23** Who absorbs the COD fee — you or the customer? It must be shown as a line item before the customer confirms.
 - ~~**Q-24** Free-shipping threshold, if any?~~ — **ANSWERED 2026-09-20: free delivery from 3 candles up, at the shop's
   expense.** Counted in candles rather than order value, and rendered on the basket as "one more candle for free
@@ -767,7 +768,12 @@ What I can say with confidence, and what needs checking:
   `[VERIFY the current widget embed contract and the callback payload shape]`
 - **Speedy** publishes a REST API covering rate calculation, shipment creation, label printing, tracking and *
   *office/APS listing**. There is no official widget, so you render the picker yourself from their office list.
-  `[VERIFY endpoints, auth scheme and whether a sandbox is available]`
+  **Verified live 2026-09-21** (`https://api.speedy.bg/v1`, built in `src/lib/couriers/speedy.ts`): auth is
+  `userName`/`password` **in every request body**, there is **no sandbox host** — test credentials point at the real
+  system through a fictitious client, and their waybills are flagged as test by the API rather than needing to be
+  cancelled — and the authoritative field list is the JSON Schema ZIP at `https://api.speedy.bg/v1/schema`, not the HTML
+  docs, which omit fields. `POST /calculate/` prices and `POST /shipment/` books; `serviceIds` is mandatory and one
+  configured service is priced, never a cheapest-of (the same parcel was 2.45 EUR on service 505 and 36.82 on 515).
 - Do **not** install an unofficial npm wrapper for either. Write a thin internal client per courier behind one shared
   interface.
 

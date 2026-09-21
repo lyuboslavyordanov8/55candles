@@ -13,6 +13,9 @@ import {
   missingCourierCredentials,
   missingLiveRateRequirements,
   missingWaybillRequirements,
+  speedyCodProcessing,
+  speedySender,
+  speedyServiceId,
 } from '..'
 
 /**
@@ -90,21 +93,38 @@ describe('couriersWithOfficeLookup', () => {
     expect(couriersWithOfficeLookup()).toEqual(['econt'])
   })
 
-  it('does not offer Speedy on the strength of its credentials alone', () => {
-    // Its client is still a stub, so listing it would render a picker that can
-    // only ever say "unavailable".
+  it('does not offer Speedy without credentials, because its office list needs them', () => {
+    // The one real difference from Econt: Speedy's `/location/office/`
+    // authenticates like every other Speedy call, so listing it here unconfigured
+    // would render a picker that can only ever say "unavailable".
+    expect(couriersWithOfficeLookup()).not.toContain('speedy')
+  })
+
+  it('offers Speedy once it has credentials', () => {
     vi.stubEnv('SPEEDY_USERNAME', 'merchant')
     vi.stubEnv('SPEEDY_PASSWORD', 'secret')
 
-    expect(couriersWithOfficeLookup()).not.toContain('speedy')
+    expect(couriersWithOfficeLookup()).toEqual(['econt', 'speedy'])
+  })
+
+  it('offers Speedy on credentials alone, without a contract client', () => {
+    // Deliberately *not* `canQuoteLiveRates`. Looking offices up and pricing a
+    // parcel are different permissions: the nomenclature needs only a password,
+    // while a price needs a contract client to bill. Withholding the picker until
+    // pricing works would hide a lookup that does work.
+    vi.stubEnv('SPEEDY_USERNAME', 'merchant')
+    vi.stubEnv('SPEEDY_PASSWORD', 'secret')
+
+    expect(canQuoteLiveRates('speedy')).toBe(false)
+    expect(couriersWithOfficeLookup()).toContain('speedy')
   })
 })
 
 describe('courierClient', () => {
-  it('answers unconfigured for Speedy, credentials or not', async () => {
-    vi.stubEnv('SPEEDY_USERNAME', 'merchant')
-    vi.stubEnv('SPEEDY_PASSWORD', 'secret')
-
+  it('answers unconfigured for Speedy while it has no credentials', async () => {
+    // Its nomenclature is not public, so with nothing configured there is no
+    // office list to offer — and saying so is not the same as saying the lookup
+    // failed. See `LookupResult`.
     const speedy = courierClient('speedy')
 
     expect(speedy.courier).toBe('speedy')
@@ -307,13 +327,13 @@ describe('whether a courier can quote a real price', () => {
     // The registered seat supplies the hand-over point, so credentials are the
     // last thing needed.
     expect(canQuoteLiveRates('econt')).toBe(true)
-    expect(missingLiveRateRequirements()).toEqual([])
+    expect(missingLiveRateRequirements('econt')).toEqual([])
 
     // Without one, credentials alone buy an authenticated call for a parcel posted
     // from nowhere.
     withSeat({ city: '[TODO: city]' }, () => {
       expect(canQuoteLiveRates('econt')).toBe(false)
-      expect(missingLiveRateRequirements()).toEqual([
+      expect(missingLiveRateRequirements('econt')).toEqual([
         'ECONT_SENDER_OFFICE_CODE or the registered address in company.ts',
       ])
     })
@@ -322,20 +342,39 @@ describe('whether a courier can quote a real price', () => {
   it('names the credentials that are missing while the sender is set', () => {
     vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
 
-    expect(missingLiveRateRequirements()).toEqual(['ECONT_USERNAME', 'ECONT_PASSWORD'])
+    expect(missingLiveRateRequirements('econt')).toEqual(['ECONT_USERNAME', 'ECONT_PASSWORD'])
   })
 
-  it('is false for Speedy however much is configured', () => {
-    // Its client is a stub, so there is nothing to ask.
+  it('is false for Speedy on credentials alone, because it prices nothing without a payer', () => {
+    // Speedy refuses to price a parcel whose payer is not a contract client:
+    // "Ваш обект или обект по договор трябва да е платец или подател". So the
+    // client id is a requirement, not a nicety.
     vi.stubEnv('SPEEDY_USERNAME', 'merchant')
     vi.stubEnv('SPEEDY_PASSWORD', 'secret')
-    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
 
     expect(canQuoteLiveRates('speedy')).toBe(false)
+    expect(missingLiveRateRequirements('speedy')).toEqual(['SPEEDY_SENDER_CLIENT_ID'])
+  })
+
+  it('is true for Speedy once the contract client is configured', () => {
+    vi.stubEnv('SPEEDY_USERNAME', 'merchant')
+    vi.stubEnv('SPEEDY_PASSWORD', 'secret')
+    vi.stubEnv('SPEEDY_SENDER_CLIENT_ID', '88888888888000')
+
+    expect(canQuoteLiveRates('speedy')).toBe(true)
+    expect(missingLiveRateRequirements('speedy')).toEqual([])
+  })
+
+  it('names both halves for Speedy while nothing is configured', () => {
+    expect(missingLiveRateRequirements('speedy')).toEqual([
+      'SPEEDY_USERNAME',
+      'SPEEDY_PASSWORD',
+      'SPEEDY_SENDER_CLIENT_ID',
+    ])
   })
 })
 
-describe('the Speedy stub', () => {
+describe('Speedy, unconfigured', () => {
   it('answers unconfigured when asked for a price, rather than a number', async () => {
     expect(await courierClient('speedy').priceShipment({
       method: 'office',
@@ -343,6 +382,86 @@ describe('the Speedy stub', () => {
       weightGrams: 550,
       codAmount: null,
     })).toEqual({ status: 'unconfigured', courier: 'speedy' })
+  })
+
+  it('still answers unconfigured with credentials but no contract client', async () => {
+    // The half-configured state, and the one worth a test: credentials alone
+    // would let the request leave, and Speedy would answer 200 with an error
+    // that reads like a bug in our pricing rather than a missing variable.
+    vi.stubEnv('SPEEDY_USERNAME', 'merchant')
+    vi.stubEnv('SPEEDY_PASSWORD', 'secret')
+
+    expect(await courierClient('speedy').priceShipment({
+      method: 'office',
+      officeId: '1012',
+      weightGrams: 550,
+      codAmount: null,
+    })).toEqual({ status: 'unconfigured', courier: 'speedy' })
+  })
+})
+
+describe('the Speedy sender', () => {
+  it('is nobody without a client id, because there is nothing to bill', () => {
+    expect(speedySender()).toBeNull()
+  })
+
+  it('is the configured contract client', () => {
+    vi.stubEnv('SPEEDY_SENDER_CLIENT_ID', '88888888888000')
+
+    expect(speedySender()).toEqual({ clientId: 88888888888000 })
+  })
+
+  it('carries the drop-off office when one is configured, because it changes the tariff', () => {
+    vi.stubEnv('SPEEDY_SENDER_CLIENT_ID', '88888888888000')
+    vi.stubEnv('SPEEDY_DROPOFF_OFFICE_ID', '1')
+
+    expect(speedySender()).toEqual({ clientId: 88888888888000, dropoffOfficeId: 1 })
+  })
+
+  it('ignores a client id that is not a whole number, rather than sending it', () => {
+    // A typo makes Speedy `unconfigured`, which falls back to the placeholder
+    // tariff. The launch checklist still names the variable.
+    for (const value of ['', '  ', 'abc', '-1', '0', '1.5']) {
+      vi.stubEnv('SPEEDY_SENDER_CLIENT_ID', value)
+      expect(speedySender()).toBeNull()
+    }
+  })
+
+  it('ignores an unusable drop-off office instead of dropping the sender', () => {
+    vi.stubEnv('SPEEDY_SENDER_CLIENT_ID', '88888888888000')
+    vi.stubEnv('SPEEDY_DROPOFF_OFFICE_ID', 'nope')
+
+    expect(speedySender()).toEqual({ clientId: 88888888888000 })
+  })
+})
+
+describe('the Speedy tariff and payout', () => {
+  it('leaves the service to the client default when unset', () => {
+    expect(speedyServiceId()).toBeUndefined()
+  })
+
+  it('takes a configured service id', () => {
+    vi.stubEnv('SPEEDY_SERVICE_ID', '515')
+
+    expect(speedyServiceId()).toBe(515)
+  })
+
+  it('collects наложен платеж in cash by default, which needs no COD annex', () => {
+    expect(speedyCodProcessing()).toBe('CASH')
+  })
+
+  it('wires the money instead when the contract allows it', () => {
+    vi.stubEnv('SPEEDY_COD_PROCESSING', 'POSTAL_MONEY_TRANSFER')
+
+    expect(speedyCodProcessing()).toBe('POSTAL_MONEY_TRANSFER')
+  })
+
+  it('falls back to cash on a value Speedy would reject', () => {
+    // Sending an unknown processing type on would fail the booking at the
+    // counter, where falling back merely means collecting the cash ourselves.
+    vi.stubEnv('SPEEDY_COD_PROCESSING', 'BANK')
+
+    expect(speedyCodProcessing()).toBe('CASH')
   })
 })
 
@@ -413,35 +532,46 @@ describe('whether a courier can issue a real waybill', () => {
     // this one stood before booking was built.
     expect(canQuoteLiveRates('econt')).toBe(true)
     expect(canBookWaybills('econt')).toBe(false)
-    expect(missingWaybillRequirements()).toEqual(['ECONT_SENDER_PHONE'])
+    expect(missingWaybillRequirements('econt')).toEqual(['ECONT_SENDER_PHONE'])
 
     vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
 
     expect(canBookWaybills('econt')).toBe(true)
-    expect(missingWaybillRequirements()).toEqual([])
+    expect(missingWaybillRequirements('econt')).toEqual([])
   })
 
   it('reports the pricing gaps too, so the checklist is one list', () => {
     vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
 
-    expect(missingWaybillRequirements()).toEqual([
+    expect(missingWaybillRequirements('econt')).toEqual([
       'ECONT_USERNAME',
       'ECONT_PASSWORD',
       'ECONT_SENDER_PHONE',
     ])
   })
 
-  it('is false for Speedy, whose labels are still made by hand', () => {
+  it('is false for Speedy while it cannot even price', () => {
     vi.stubEnv('SPEEDY_USERNAME', 'merchant')
     vi.stubEnv('SPEEDY_PASSWORD', 'secret')
-    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
-    vi.stubEnv('ECONT_SENDER_PHONE', '+359888123456')
 
     expect(canBookWaybills('speedy')).toBe(false)
+    expect(missingWaybillRequirements('speedy')).toEqual(['SPEEDY_SENDER_CLIENT_ID'])
+  })
+
+  it('needs nothing beyond pricing for Speedy, which reads the sender off the contract', () => {
+    // Econt wants a phone on the label; Speedy takes the sender's name, address
+    // and phone from the client id, so there is no separate identity to configure
+    // and nothing left to be missing.
+    vi.stubEnv('SPEEDY_USERNAME', 'merchant')
+    vi.stubEnv('SPEEDY_PASSWORD', 'secret')
+    vi.stubEnv('SPEEDY_SENDER_CLIENT_ID', '88888888888000')
+
+    expect(canBookWaybills('speedy')).toBe(true)
+    expect(missingWaybillRequirements('speedy')).toEqual([])
   })
 })
 
-describe('the Speedy stub, asked to book', () => {
+describe('Speedy, unconfigured and asked to book', () => {
   it('answers unconfigured rather than booking nothing and reporting success', async () => {
     expect(
       await courierClient('speedy').createWaybill({
