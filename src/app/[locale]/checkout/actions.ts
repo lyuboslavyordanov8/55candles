@@ -405,6 +405,12 @@ export async function submitCheckout(
     return { status: 'error', ...priced, messageKey: 'orderNotSaved' }
   }
 
+  // Whether the customer's own confirmation email actually went out — read
+  // below to choose between two honest messages, never assumed. `undefined`
+  // on a replay, where nothing is (re)sent this time and the answer to
+  // "did they get one" belongs to the first request, not this one.
+  let notifications: Awaited<ReturnType<typeof sendOrderNotifications>> | undefined
+
   if (!placed.duplicate) {
     /**
      * Confirmation to the customer, notification to the shop (B-17).
@@ -418,7 +424,7 @@ export async function submitCheckout(
      * Skipped for a replay. The order already exists, so the customer already has
      * their confirmation, and a second one would read as a second parcel.
      */
-    await sendOrderNotifications({
+    notifications = await sendOrderNotifications({
       orderNumber: placed.orderNumber,
       locale: localeOf(raw.locale),
       delivery: delivery.value,
@@ -434,8 +440,12 @@ export async function submitCheckout(
     order: { number: placed.orderNumber },
     // Confirmed, and unpaid until the courier collects — the message says both,
     // because "your order is placed" alone would leave the customer unsure whether
-    // they still owe anything.
-    messageKey: 'orderPlacedCod',
+    // they still owe anything. Which of the two also depends on whether an email
+    // actually reached them: claiming one was sent when it was not (no address, no
+    // provider configured, the provider refused it) would send a customer looking
+    // for a confirmation that is not coming.
+    messageKey:
+      notifications?.customer.status === 'sent' ? 'orderPlacedEmailSent' : 'orderPlacedCod',
   }
 }
 

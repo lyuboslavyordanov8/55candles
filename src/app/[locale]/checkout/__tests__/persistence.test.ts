@@ -4,6 +4,7 @@ import { submitCheckout } from '../actions'
 import { canQuoteLiveRates, courierClient } from '@/lib/couriers'
 import type { CourierOffice, LookupResult, ShipmentRate } from '@/lib/couriers/types'
 import { createOrder, isOrderStorageReady } from '@/lib/orders'
+import { sendOrderNotifications } from '@/lib/order-notifications'
 
 /**
  * What the action does once a database exists (AUDIT.md B-01, B-09, Q-34).
@@ -31,6 +32,19 @@ vi.mock('@/lib/orders', () => ({
   INTENT_TOKEN_MAX: 100,
   isOrderStorageReady: vi.fn(() => true),
   createOrder: vi.fn(),
+}))
+
+// Mocked rather than left to hit the real thing: the real one checks
+// `isMailerConfigured()` and, unconfigured (true in every test here unless a
+// test says otherwise), answers `unconfigured` without a network call anyway
+// — but the message-key choice below depends on *which* outcome came back,
+// so it needs to be something a test can control rather than inferred from
+// environment variables nobody sets in this file.
+vi.mock('@/lib/order-notifications', () => ({
+  sendOrderNotifications: vi.fn(async () => ({
+    customer: { status: 'unconfigured' as const },
+    shop: { status: 'unconfigured' as const },
+  })),
 }))
 
 /**
@@ -143,6 +157,49 @@ describe('submitCheckout, once orders can be stored', () => {
     expect(state.order?.number).toBe('55C-2026-000123')
     expect(state.messageKey).toBe('orderPlacedCod')
     expect(createOrder).toHaveBeenCalledTimes(1)
+  })
+
+  it('says the confirmation was emailed, once it actually was', async () => {
+    // Claiming an email was sent when it was not would send the customer
+    // looking for a confirmation that never arrives; the reverse (silence
+    // about a real one) is just as wrong, so the message has to follow what
+    // sendOrderNotifications actually reports, not assume either way.
+    vi.mocked(sendOrderNotifications).mockResolvedValueOnce({
+      customer: { status: 'sent' },
+      shop: { status: 'sent' },
+    })
+
+    const state = await submitCheckout(IDLE, formData())
+
+    expect(state.messageKey).toBe('orderPlacedEmailSent')
+  })
+
+  it('falls back to the phone-call message when the shop\'s copy sent but the customer\'s did not', async () => {
+    // The two emails are independent (order-notifications.ts sends the
+    // customer's copy and the shop's separately, so one provider failure
+    // cannot lose both) -- only the customer's own delivery is what decides
+    // which message they are shown.
+    vi.mocked(sendOrderNotifications).mockResolvedValueOnce({
+      customer: { status: 'failed', reason: 'provider down' },
+      shop: { status: 'sent' },
+    })
+
+    const state = await submitCheckout(IDLE, formData())
+
+    expect(state.messageKey).toBe('orderPlacedCod')
+  })
+
+  it('does not ask whether an email was sent on a replayed intent', async () => {
+    // A replay does not call sendOrderNotifications at all -- the customer
+    // already has whatever the first attempt sent them, and a second message
+    // would read as a second parcel. The mock itself proves this: it is
+    // never invoked, so its queued answer is never read either.
+    stubCreateOrder({ duplicate: true })
+
+    const state = await submitCheckout(IDLE, formData())
+
+    expect(sendOrderNotifications).not.toHaveBeenCalled()
+    expect(state.messageKey).toBe('orderPlacedCod')
   })
 
   it('never puts the order token in the state the browser receives', async () => {

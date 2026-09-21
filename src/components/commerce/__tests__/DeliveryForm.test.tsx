@@ -676,9 +676,12 @@ describe('DeliveryForm', () => {
       expect(screen.getByText(/pay the courier on delivery/i)).toBeInTheDocument()
     })
 
-    it('stops offering to submit, since this form can no longer change the order', async () => {
-      // Pressing again replays the same intent token and returns the same order,
-      // so an edited address would go nowhere while looking accepted.
+    it('removes the submit button entirely, since this form can no longer change the order', async () => {
+      // Pressing again would replay the same intent token and return the same
+      // order, so an edited address would go nowhere while looking accepted.
+      // Not merely disabled: there is nothing left to press, and a button
+      // reading "order placed" under a page that already says so is clutter,
+      // not a safeguard.
       const user = userEvent.setup()
       placedAction()
       renderForm()
@@ -687,7 +690,43 @@ describe('DeliveryForm', () => {
       await user.click(submitButton())
       await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })
 
-      expect(screen.getByRole('button', { name: /order placed/i })).toBeDisabled()
+      expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    })
+
+    it('shows what was ordered and what it cost, and hides the now-pointless form', async () => {
+      // The bug this answers: the confirmation used to be a small box at the
+      // bottom of a full address-and-payment form that was still entirely
+      // visible, with nothing about the page actually saying "you are done".
+      const user = userEvent.setup()
+      vi.mocked(submitCheckout).mockImplementationOnce(async () => ({
+        status: 'placed' as const,
+        order: { number: '55C-2026-000123' },
+        messageKey: 'orderPlacedCod',
+        summary: {
+          lines: [{ slug: 'cherry', quantity: 1, unitPriceMinor: 1999, lineTotalMinor: 1999 }],
+          goodsMinor: 1999,
+          discountMinor: null,
+          promoCode: null,
+          shippingMinor: 499,
+          freeShipping: false,
+          codFeeMinor: null,
+          totalMinor: 2498,
+          weightGrams: 400,
+        },
+      }))
+      renderForm()
+      await fillIn(user)
+
+      await user.click(submitButton())
+      await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })
+
+      // What was ordered, and what it cost — the actual ask, not just a number.
+      expect(screen.getByText(/electric cherry/i)).toBeInTheDocument()
+      expect(document.body.querySelector('[data-amount="2498"]')).toBeInTheDocument()
+
+      // The form that decided all this is gone, not just its button.
+      expect(screen.queryByLabelText(/full name/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/payment/i)).not.toBeInTheDocument()
     })
 
     it('submits the intent token the page minted, unchanged', async () => {

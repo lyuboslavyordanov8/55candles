@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { submitCheckout, type CheckoutState } from '@/app/[locale]/checkout/actions'
 import { phoneProblem, PHONE_EXAMPLE, type PhoneProblem } from '@/lib/phone'
@@ -456,6 +457,15 @@ export default function DeliveryForm({
       */}
       <input type="hidden" name="step" value={readyToConfirm ? 'confirm' : 'quote'} />
 
+      {/*
+        Everything below, up to the summary, is how the order got decided —
+        once it exists there is nothing left to decide, and leaving a full
+        address form sitting above "your order is placed" reads as unfinished
+        business rather than a receipt. See the confirmation block near
+        `summary`, below, for what replaces it.
+      */}
+      {!placed && (
+        <>
       {!shippingConfigured && (
         <p role="note" className="rounded-sm bg-cream-surface p-4 text-xs text-ink-secondary">
           {t('shippingNotConfigured')}
@@ -758,35 +768,51 @@ export default function DeliveryForm({
           )}
         </section>
       )}
+        </>
+      )}
 
       {/*
-        The priced breakdown, shown only once the server has produced one — and
-        only while it still describes the basket in front of the customer.
-      */}
-      {summary && <OrderSummary summary={summary} locale={locale} />}
-
-      {/*
-        The order number, and the only place the customer is told it — there is no
-        confirmation email yet (B-17) and no confirmation page, so this is the
-        record they have. Hence the size and the `aria-live`: a screen-reader user
-        must hear it, not have to go looking for it.
+        The confirmation, first — before the summary, not after it. It used to
+        sit below the breakdown, with the whole (by then pointless) address
+        form still above both: technically present, but nothing about the page
+        said "you are done", so the one thing every customer wants to know
+        after paying got the same visual weight as a form field. Folds the
+        outcome message in directly (was a separate paragraph near the button)
+        rather than repeating "your order is placed" two different ways.
       */}
       {placed && state.order && (
         <div
           role="status"
           aria-live="polite"
-          className="space-y-2 rounded-sm border border-clay/40 bg-cream-surface p-6"
+          className="space-y-4 rounded-sm border border-clay/40 bg-cream-surface p-8 text-center"
         >
-          <p className="font-serif text-lg text-charcoal">{t('orderPlaced.heading')}</p>
-          <p className="text-xs text-ink-secondary">{t('orderPlaced.numberLabel')}</p>
-          <p className="font-mono text-base tracking-wide text-charcoal">{state.order.number}</p>
+          <p className="font-serif text-2xl text-charcoal">{t('orderPlaced.heading')}</p>
+          {state.messageKey && (
+            <p className="mx-auto max-w-sm text-sm text-ink-secondary">
+              {t(`message.${state.messageKey}`)}
+            </p>
+          )}
+          <div className="mx-auto w-fit rounded-sm bg-cream-base px-6 py-3">
+            <p className="text-xs text-ink-ghost">{t('orderPlaced.numberLabel')}</p>
+            <p className="font-mono text-xl tracking-wide text-charcoal">{state.order.number}</p>
+          </div>
         </div>
       )}
 
       {/*
-        The collection point as the courier describes it, not as the form does.
-        Worth showing: it is the customer's last chance to notice they picked the
-        office two streets from the one they meant.
+        The priced breakdown — what was ordered, and what it cost. Shown once
+        the server has produced one, and (before an order exists) only while it
+        still describes the basket in front of the customer. After placing, it
+        is simply the receipt: the basket cannot change any more, so it always
+        still matches.
+      */}
+      {summary && <OrderSummary summary={summary} locale={locale} />}
+
+      {/*
+        The collection point as the courier describes it, not as the form did.
+        Worth showing both before confirming (the customer's last chance to
+        notice they picked the office two streets from the one they meant) and
+        after (the record of where the parcel is actually headed).
       */}
       {state.collectionPoint && (
         <p className="rounded-sm border border-border bg-cream-surface p-4 text-xs leading-relaxed text-ink-secondary">
@@ -798,7 +824,16 @@ export default function DeliveryForm({
         </p>
       )}
 
-      {state.status !== 'idle' && state.messageKey && (
+      {placed && (
+        <Link
+          href={`/${locale}/products`}
+          className="block text-center text-xs uppercase tracking-widest text-clay hover:opacity-70"
+        >
+          {t('browseProducts')}
+        </Link>
+      )}
+
+      {!placed && state.status !== 'idle' && state.messageKey && (
         <p
           role={informational ? 'status' : 'alert'}
           className={`text-xs ${informational ? 'text-ink-secondary' : 'text-red-700'}`}
@@ -808,29 +843,28 @@ export default function DeliveryForm({
       )}
 
       {/*
-        Disabled once an order exists, because this form can no longer change it.
-        Pressing again would replay the same intent token and return the same
-        order — harmless, but it would look like an edit had been accepted when a
-        corrected address went nowhere. A new order needs a reloaded page, which
-        mints a new token.
+        Gone entirely once an order exists, not just disabled: there is
+        nothing left to press, and a button reading "order placed" sitting
+        under a page that already says so twice is not a confirmation, it is
+        clutter.
       */}
-      <button
-        type="submit"
-        disabled={pending || placed}
-        className="w-full rounded-sm bg-charcoal px-6 py-3 text-xs font-medium uppercase tracking-wide text-cream-base transition-opacity duration-200 hover:opacity-80 disabled:opacity-50"
-      >
-        {pending
-          ? // Which wait this is matters: "pricing" and "placing your order" are
-            // very different things to be told while a button is disabled.
-            readyToConfirm
-            ? t('submitting')
-            : t('pricing')
-          : placed
-            ? t('submitted')
+      {!placed && (
+        <button
+          type="submit"
+          disabled={pending}
+          className="w-full rounded-sm bg-charcoal px-6 py-3 text-xs font-medium uppercase tracking-wide text-cream-base transition-opacity duration-200 hover:opacity-80 disabled:opacity-50"
+        >
+          {pending
+            ? // Which wait this is matters: "pricing" and "placing your order" are
+              // very different things to be told while a button is disabled.
+              readyToConfirm
+              ? t('submitting')
+              : t('pricing')
             : readyToConfirm
               ? t('confirm')
               : t('submit')}
-      </button>
+        </button>
+      )}
 
       {/*
         Said under the button, where the decision is made, and only while the press
