@@ -456,3 +456,295 @@ describe('failure', () => {
     }
   })
 })
+
+/**
+ * Pricing (AUDIT.md Q-22).
+ *
+ * The fixtures are the demo service's own responses, recorded 2026-09-20: a
+ * 0.4 kg parcel office-to-office with наложен платеж came back as 3.74 EUR made
+ * of `C` 3.44 and `CD` 0.30. These tests are about the *allocation* of that
+ * breakdown, because the two halves are charged to different people.
+ */
+
+const CREDENTIALS = { username: 'merchant', password: 'secret' }
+const SHIP_FROM = { officeCode: '1120' }
+
+/** A client that can price, with whatever is not overridden. */
+function pricingClient(
+  overrides: Partial<Parameters<typeof createEcontClient>[0]> = {}
+): CourierClient {
+  return createEcontClient({
+    ...CONFIG,
+    credentials: () => CREDENTIALS,
+    shipFrom: () => SHIP_FROM,
+    ...overrides,
+  })
+}
+
+/** The priced-label response, as Econt sends it. */
+function quoted(overrides: Record<string, unknown> = {}) {
+  return {
+    label: {
+      totalPrice: 3.74,
+      currency: 'EUR',
+      senderDueAmount: 0,
+      receiverDueAmount: 3.74,
+      services: [
+        {
+          type: 'C',
+          description: 'Куриерска услуга - между офисите на куриера до 1 кг',
+          count: 1,
+          paymentSide: 'RECEIVER',
+          price: 3.44,
+          currency: 'EUR',
+        },
+        {
+          type: 'CD',
+          description: 'Такса наложен платеж',
+          count: 19.99,
+          paymentSide: 'RECEIVER',
+          price: 0.3,
+          currency: 'EUR',
+        },
+      ],
+      ...overrides,
+    },
+  }
+}
+
+function respondWithQuote(payload: unknown, status = 200) {
+  fetchMock.mockImplementation(
+    async () =>
+      new Response(JSON.stringify(payload), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+  )
+}
+
+const OFFICE_PARCEL = {
+  method: 'office' as const,
+  officeId: '4015',
+  weightGrams: 550,
+  codAmount: { amountMinor: 1999, currency: 'EUR' as const },
+}
+
+describe('pricing a parcel', () => {
+  it('asks for a calculation, not a waybill', async () => {
+    // `mode` is the whole safety property of this call: `create` would book a
+    // real parcel every time someone pressed submit.
+    respondWithQuote(quoted())
+
+    await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    const [url, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+
+    expect(url).toBe('https://demo.example/services/Shipments/LabelService.createLabel.json')
+    expect(body.mode).toBe('calculate')
+  })
+
+  it('authenticates, unlike every other call in this client', async () => {
+    respondWithQuote(quoted())
+
+    await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    const [, init] = fetchMock.mock.calls[0]
+    const headers = init.headers as Record<string, string>
+
+    expect(headers.Authorization).toBe(
+      `Basic ${Buffer.from('merchant:secret').toString('base64')}`
+    )
+  })
+
+  it('sends the parcel in kilograms, the hand-over point, and the amount to collect', async () => {
+    respondWithQuote(quoted())
+
+    await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+
+    expect(body.label.weight).toBe(0.55)
+    expect(body.label.senderOfficeCode).toBe('1120')
+    expect(body.label.receiverOfficeCode).toBe('4015')
+    expect(body.label.services).toMatchObject({ cdAmount: 19.99, cdCurrency: 'EUR' })
+  })
+
+  it('sends no personal data, because a price does not depend on any', async () => {
+    // The customer's name and phone go to the courier when there is a parcel to
+    // deliver. A quote is not that moment, and the same figure comes back
+    // without them — verified against the live service.
+    respondWithQuote(quoted())
+
+    await pricingClient().priceShipment({
+      method: 'door',
+      address: { city: 'Пловдив', postCode: '4000', street: 'ул. Христо Ботев 15, ап. 9' },
+      weightGrams: 550,
+      codAmount: { amountMinor: 1999, currency: 'EUR' },
+    })
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+
+    expect(body.label.receiverClient).toBeUndefined()
+    expect(body.label.receiverAddress).toEqual({
+      city: { name: 'Пловдив', postCode: '4000' },
+      // The post code alone is ambiguous — Econt refuses it where several
+      // settlements share one — so the name travels with it.
+      fullAddress: 'ул. Христо Ботев 15, ап. 9',
+    })
+  })
+
+  it('omits the COD service when there is nothing to collect', async () => {
+    respondWithQuote(quoted({ totalPrice: 3.44, services: [quoted().label.services[0]] }))
+
+    await pricingClient().priceShipment({ ...OFFICE_PARCEL, codAmount: null })
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+
+    expect(body.label.services).toBeUndefined()
+    expect(body.label.paymentReceiverMethod).toBeUndefined()
+  })
+
+  it('splits the courier service from the наложен платеж fee', async () => {
+    // The two are charged to different people (Q-23), so a lump sum would force
+    // one policy on both.
+    respondWithQuote(quoted())
+
+    const result = await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    expect(result).toEqual({
+      status: 'ok',
+      data: {
+        delivery: { amountMinor: 344, currency: 'EUR' },
+        codFee: { amountMinor: 30, currency: 'EUR' },
+        total: { amountMinor: 374, currency: 'EUR' },
+        description: 'Куриерска услуга - между офисите на куриера до 1 кг',
+      },
+    })
+  })
+
+  it('counts an unrecognised surcharge as delivery rather than dropping it', async () => {
+    // A cost we absorb silently is a loss per parcel that nothing would report.
+    respondWithQuote(
+      quoted({
+        totalPrice: 4.34,
+        services: [
+          ...quoted().label.services,
+          { type: 'X', description: 'Гориво', price: 0.6, currency: 'EUR' },
+        ],
+      })
+    )
+
+    const result = await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    expect(result).toMatchObject({
+      status: 'ok',
+      data: { delivery: { amountMinor: 404 }, codFee: { amountMinor: 30 } },
+    })
+  })
+
+  it('makes the breakdown reconcile with the total the courier stands behind', async () => {
+    // `totalPrice` is authoritative; a difference goes on delivery and is logged
+    // rather than left to make the order not add up.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    respondWithQuote(quoted({ totalPrice: 4.04 }))
+
+    const result = await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    expect(result).toMatchObject({
+      status: 'ok',
+      data: {
+        delivery: { amountMinor: 374 },
+        codFee: { amountMinor: 30 },
+        total: { amountMinor: 404 },
+      },
+    })
+    expect(warn).toHaveBeenCalled()
+  })
+
+  it('prices a parcel with no breakdown when nothing is being collected', async () => {
+    respondWithQuote({ label: { totalPrice: 3.44, currency: 'EUR' } })
+
+    const result = await pricingClient().priceShipment({ ...OFFICE_PARCEL, codAmount: null })
+
+    expect(result).toMatchObject({
+      status: 'ok',
+      data: { delivery: { amountMinor: 344 }, codFee: { amountMinor: 0 } },
+    })
+  })
+})
+
+describe('refusing to price', () => {
+  it('is unconfigured without credentials', async () => {
+    const result = await pricingClient({ credentials: () => null }).priceShipment(OFFICE_PARCEL)
+
+    expect(result).toEqual({ status: 'unconfigured', courier: 'econt' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('is unconfigured without a hand-over point, because that changes the price', async () => {
+    // Office-to-office was 3.44 EUR where collection from an address was 4.55 for
+    // the same parcel. Guessing it would be guessing the price.
+    const result = await pricingClient({ shipFrom: () => null }).priceShipment(OFFICE_PARCEL)
+
+    expect(result).toEqual({ status: 'unconfigured', courier: 'econt' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('fails rather than converting a quote in another currency', async () => {
+    // The BGN rate is fixed and converting would still put a number on the
+    // checkout that the courier's invoice does not contain.
+    respondWithQuote(quoted({ currency: 'BGN' }))
+
+    const result = await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    expect(result).toMatchObject({ status: 'failed', courier: 'econt' })
+  })
+
+  it('fails when a COD parcel comes back with no breakdown to split', async () => {
+    // The fee is in the total and there is no way to tell how much of it.
+    respondWithQuote({ label: { totalPrice: 3.74, currency: 'EUR' } })
+
+    const result = await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    expect(result).toMatchObject({ status: 'failed' })
+  })
+
+  it('fails on a price it cannot use rather than rounding a guess', async () => {
+    respondWithQuote(quoted({ totalPrice: null, services: [] }))
+
+    const result = await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    expect(result).toMatchObject({ status: 'failed' })
+  })
+
+  it('does not retry Econt’s 517, and keeps what it said', async () => {
+    // 517 is how Econt reports an application error — a wrong password, an
+    // unknown office. It is permanent, and in the 5xx range, so the retry policy
+    // has to know about it by name. The body is the only thing that says which.
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ type: 'ExInvalidParam', message: 'Невалидно потребителско име' }), {
+        status: 517,
+      })
+    )
+
+    const result = await pricingClient().priceShipment(OFFICE_PARCEL)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toMatchObject({ status: 'failed' })
+    expect(result.status === 'failed' && result.reason).toContain('ExInvalidParam')
+  })
+
+  it('reports a parcel it cannot address instead of asking about one', async () => {
+    const result = await pricingClient().priceShipment({
+      method: 'office',
+      // What a hand-built submission looks like; the action validates first.
+      officeId: '',
+      weightGrams: 550,
+      codAmount: null,
+    })
+
+    expect(result).toMatchObject({ status: 'failed' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})

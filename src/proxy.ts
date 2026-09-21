@@ -11,5 +11,8 @@ export const config = {
   // like /robots.txt never reach this proxy and are matched by the [locale]
   // segment instead. The layout validates the locale and 404s, which is what
   // stops those from rendering the homepage. See src/app/[locale]/layout.tsx.
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  // `admin` is excluded because the admin is not a localised part of the site: it
+  // lives outside `[locale]`, is Bulgarian only, and being rewritten to
+  // /bg/admin would 404 it.
+  matcher: ['/((?!api|admin|_next|_vercel|.*\\..*).*)'],
 }

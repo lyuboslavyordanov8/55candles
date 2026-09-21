@@ -28,7 +28,7 @@ function Script({ data }: { data: unknown }) {
 /**
  * Identifies the trader. Uses the *legal* entity name with the brand as
  * `alternateName`, which is what B-16 requires and what lets search engines
- * connect "55candles" to ВиреонЛабс ЕООД.
+ * connect "55° candles" to ВиреонЛабс ЕООД.
  *
  * Unresolved identity fields are omitted rather than emitted as `[TODO: …]` —
  * structured data is machine-read, so a placeholder there is worse than
@@ -48,6 +48,19 @@ export function OrganizationJsonLd({ locale }: { locale: string }) {
     ).filter(([, value]) => !value.startsWith('[TODO:'))
   )
 
+  const email = company.contact.email.startsWith('[TODO:') ? undefined : company.contact.email
+
+  const contactChannel =
+    company.contact.phone || email
+      ? {
+          '@type': 'ContactPoint' as const,
+          ...(company.contact.phone ? { telephone: company.contact.phone } : {}),
+          ...(email ? { email } : {}),
+          contactType: 'customer service',
+          availableLanguage: locales.map((l) => (l === 'bg' ? 'Bulgarian' : 'English')),
+        }
+      : undefined
+
   return (
     <Script
       data={{
@@ -61,26 +74,25 @@ export function OrganizationJsonLd({ locale }: { locale: string }) {
         alternateName:
           locale === 'bg' ? company.legalNameLatin : company.legalName,
         url: absoluteUrl(`/${locale}`),
-        logo: absoluteUrl('/images/hero.webp'),
+        // The wordmark, not the banner. This field pointed at the homepage
+        // banner, which is a photograph of a table — Google shows `logo` as the
+        // organisation's mark in knowledge panels, so it has to be the mark.
+        logo: absoluteUrl('/images/logo-ink.png'),
         // taxID doubles as the company registration number in schema.org's
         // vocabulary; there is no dedicated ЕИК field.
         taxID: company.eik,
-        ...(company.contact.email.startsWith('[TODO:')
-          ? {}
-          : { email: company.contact.email }),
-        telephone: company.contact.phone,
+        ...(email ? { email } : {}),
+        ...(company.contact.phone ? { telephone: company.contact.phone } : {}),
         sameAs: [company.contact.instagramUrl],
         address: {
           '@type': 'PostalAddress',
           ...address,
           addressCountry: countryCode,
         },
-        contactPoint: {
-          '@type': 'ContactPoint',
-          telephone: company.contact.phone,
-          contactType: 'customer service',
-          availableLanguage: locales.map((l) => (l === 'bg' ? 'Bulgarian' : 'English')),
-        },
+        // A ContactPoint needs a way to be contacted. With no published phone the
+        // email is it — and if neither exists the whole node is dropped, because a
+        // contact point with no channel is noise in machine-read data.
+        ...(contactChannel ? { contactPoint: contactChannel } : {}),
       }}
     />
   )

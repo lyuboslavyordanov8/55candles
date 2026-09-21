@@ -37,9 +37,14 @@ function ProductsContent({ locale }: { locale: string }) {
             {t('title')}
           </h1>
 
+          {/*
+            Both counts are ICU plurals in the catalogues, not interpolated
+            English: this line read "6 scents · 1 seasonal" to Bulgarian
+            visitors too (AUDIT.md B-22).
+          */}
           <p className="text-sm text-ink-ghost">
-            {products.length} scents
-            {seasonalCount > 0 && ` · ${seasonalCount} seasonal`}
+            {t('scentCount', { count: products.length })}
+            {seasonalCount > 0 && ` · ${t('seasonalCount', { count: seasonalCount })}`}
           </p>
         </div>
 

@@ -1,41 +1,44 @@
+/**
+ * The ingredients a candle can be made of, as translation keys.
+ *
+ * Every entry needs wording under `product.ingredient.<key>` in **both**
+ * message catalogues; `src/data/__tests__/product-copy.test.ts` fails if one is
+ * missing. Keys rather than text because the list used to be English prose in
+ * the data, so Bulgarian customers read "Soy wax, Cotton wick" on the one page
+ * where the law expects their own language (AUDIT.md B-22).
+ */
+export const INGREDIENT_KEYS = ['soyWax', 'cottonWick', 'fragranceOil', 'waxDetail'] as const
+
+export type IngredientKey = (typeof INGREDIENT_KEYS)[number]
+
+/**
+ * A candle, minus its prose.
+ *
+ * **No translatable text lives on this type** beyond `name`, which is the same
+ * wordmark in both languages. The mood, descriptor, description and scent notes
+ * are in `product.copy.<slug>` in `messages/bg.json` and `messages/en.json`;
+ * the ingredient list here is keys into `product.ingredient.*`. Adding a
+ * candle therefore means adding its copy to both catalogues — the test named
+ * above is what tells you, rather than a Bulgarian visitor.
+ */
 export type Product = {
   slug: string
   scent: string
+  /** The wordmark on the tin. Not translated: it reads the same in both. */
   name: string
 
-  // ✨ More expressive, but still guided
-  mood:
-  | 'Playful'
-  | 'Bright'
-  | 'Comforting'
-  | 'Juicy'
-  | 'Deep'
-  | 'Seasonal'
-  | string // fallback for future expansion
-
-  descriptor: string
-  description: string
-
-  scentNotes: {
-    top: string
-    heart: string
-    base: string
-  }
-
-  ingredients: string[]
+  /**
+   * What the candle is made of, in the order shown.
+   *
+   * Keys, not text — see `INGREDIENT_KEYS`. A candle that differs from the
+   * standard four lists its own.
+   */
+  ingredients: readonly IngredientKey[]
 
   accentColor: string
   glowColor?: string
 
   emoji: string
-
-  // ✨ Brand-first, not ecommerce-first
-  highlight?:
-  | 'Signature'
-  | 'Just added'
-  | 'Limited release'
-  | 'Evening favourite'
-  | string // allow custom labels
 
   seasonal: null | { active: boolean }
 
@@ -58,8 +61,10 @@ export type Product = {
    *
    * This is a **translation key**, not display text: the card renders it as
    * `collection.badge.<value>`, so add the Bulgarian and English wording to
-   * both message catalogues when introducing a new one. `highlight` above is
-   * the older, untranslated field and is why the badge is not just a string.
+   * both message catalogues when introducing a new one.
+   *
+   * Only one candle should carry `bestseller` at a time — it is a claim about
+   * the shop, not a decoration.
    *
    * Rendered on a pastel chip — never a dark or black one.
    */

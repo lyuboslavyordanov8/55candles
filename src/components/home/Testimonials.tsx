@@ -8,10 +8,12 @@ import StarRating from '@/components/products/StarRating'
  * No card borders or shadows: the quotation itself is the object, and boxing
  * it added chrome without adding meaning.
  *
- * The quotes are placeholders. They live in `messages/bg.json` and
- * `messages/en.json` under `testimonials`, marked with a TODO — replace them
- * with real, attributable reviews before launch. Invented testimonials on a
- * live shop are a consumer-protection problem, not just a copy one.
+ * The quotes are the owner's own — customer reviews she supplied, in
+ * `messages/bg.json` and `messages/en.json` under `testimonials`. They are no
+ * longer placeholders, so do not edit them for tone: a testimonial on a live
+ * shop has to be something the customer actually said, which is a
+ * consumer-protection matter rather than a copy one. The Bulgarian is the
+ * original; the English is a translation of it.
  *
  * Server Component (AUDIT.md S-14).
  */

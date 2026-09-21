@@ -1,3 +1,5 @@
+import { notFound } from 'next/navigation'
+import { isLocale } from '@/i18n/locales'
 import Hero from '@/components/home/Hero'
 import ScentGrid from '@/components/home/ScentGrid'
 import StoryTeaser from '@/components/home/StoryTeaser'
@@ -28,6 +30,24 @@ export default async function HomePage({
   params: Promise<{ locale: string }>
 }) {
   const { locale } = await params
+
+  /*
+    The same guard as the locale layout, repeated here on purpose.
+    `app/[locale]` is one dynamic segment and the proxy skips paths containing a
+    dot, so a request for a static file that is not there — `/site.webmanifest`,
+    `/apple-touch-icon.png` — routes *here* with that filename as the locale.
+    The layout's `notFound()` gives the right 404, but layouts and pages render
+    in parallel (`fetching-data` guide, "layouts and pages are rendered in
+    parallel"), so it cannot stop this page from rendering the whole homepage
+    with a locale that is not a locale. That is what produced five
+    `RangeError: Incorrect locale information provided` per missing-icon request.
+
+    Bailing out here means no section runs at all. `formatMoney` also tolerates a
+    malformed tag, for the routes that have no guard of their own.
+  */
+  if (!isLocale(locale)) {
+    notFound()
+  }
 
   return (
     <>

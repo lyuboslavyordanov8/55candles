@@ -32,7 +32,13 @@ export interface OrderSummaryData {
   /** The lines the server priced, in catalogue order. */
   lines: OrderSummaryLine[]
   goodsMinor: number
+  /** A promo discount on the goods, or null. Positive; rendered as a deduction. */
+  discountMinor: number | null
+  /** The code that produced it, named on the line so it is visibly accounted for. */
+  promoCode: string | null
   shippingMinor: number
+  /** True when the shop is paying the carriage (AUDIT.md Q-24). */
+  freeShipping: boolean
   /** Null when the merchant absorbs it, or the method is not COD. */
   codFeeMinor: number | null
   totalMinor: number
@@ -85,7 +91,35 @@ export default function OrderSummary({
       {summary.lines.length > 1 && (
         <Row label={t('summary.goods')} minor={summary.goodsMinor} locale={locale} />
       )}
-      <Row label={t('summary.delivery')} minor={summary.shippingMinor} locale={locale} />
+
+      {/*
+        The discount, named by its code and signed. `−2,00 €` rather than a
+        quietly smaller goods figure: the customer agreed to a price, and they
+        should be able to see both it and what came off it.
+      */}
+      {summary.discountMinor !== null && (
+        <Row
+          label={
+            summary.promoCode
+              ? t('summary.discountWithCode', { code: summary.promoCode })
+              : t('summary.discount')
+          }
+          minor={-summary.discountMinor}
+          locale={locale}
+        />
+      )}
+
+      {/*
+        Free delivery is shown as a zero on the delivery line, not as a missing
+        line: the customer is owed the fact that delivery was charged at nothing,
+        and a line that disappears reads as an omission.
+      */}
+      <Row
+        label={t('summary.delivery')}
+        minor={summary.shippingMinor}
+        locale={locale}
+        valueText={summary.freeShipping ? t('summary.deliveryFree') : undefined}
+      />
 
       {summary.codFeeMinor !== null && (
         <Row label={t('summary.codFee')} minor={summary.codFeeMinor} locale={locale} />
@@ -111,11 +145,18 @@ function Row({
   minor,
   locale,
   emphasis = false,
+  valueText,
 }: {
   label: string
   minor: number
   locale: string
   emphasis?: boolean
+  /**
+   * Shown instead of the formatted amount, for a line whose number needs a word
+   * — "free" on a delivery charged at nothing. `data-amount` still carries the
+   * figure, so the tests and the arithmetic are unaffected by the wording.
+   */
+  valueText?: string
 }) {
   return (
     <p
@@ -125,7 +166,7 @@ function Row({
     >
       <span>{label}</span>
       <span data-amount={minor} className="text-charcoal">
-        {formatMoney(money(minor), locale)}
+        {valueText ?? formatMoney(money(minor), locale)}
       </span>
     </p>
   )

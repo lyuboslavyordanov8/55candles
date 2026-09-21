@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import messages from '../../../../../messages/en.json'
 import { CartProvider } from '@/components/cart/CartProvider'
+import { PRICING_IS_PROVISIONAL } from '@/data/pricing'
 import CheckoutPage from '../page'
 
 // The action is a server function; the page's own rendering is what is under
@@ -52,6 +53,43 @@ describe('CheckoutPage', () => {
     expect(screen.getByText(/delivery rates are placeholders/i)).toBeInTheDocument()
   })
 
+  it('does not call the prices or the weight stand-ins, now that they are real', async () => {
+    // They were, and one notice covered both; when the owner supplied the real
+    // price and weight the sentence kept calling them placeholders — a claim the
+    // customer cannot check and has no reason to disbelieve. The two notices are
+    // gated separately now, so this fails if they are merged again.
+    expect(PRICING_IS_PROVISIONAL).toBe(false)
+    await renderPage('cherry:1')
+
+    expect(screen.queryByText(/stand-ins/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/does not affect the candle prices/i)).toBeInTheDocument()
+  })
+
+  it('stops calling the rates illustrative once Econt prices them', async () => {
+    // The other half of the notice above, and the half that is easy to forget:
+    // once the courier quotes each parcel, telling the customer their delivery
+    // cost is a placeholder is false in the opposite direction. Credentials plus
+    // a hand-over point are what flips it, so both are set here.
+    const saved = { ...process.env }
+    process.env.ECONT_USERNAME = 'iasp-dev'
+    process.env.ECONT_PASSWORD = '1Asp-dev'
+    process.env.ECONT_SENDER_OFFICE_CODE = '1120'
+
+    try {
+      await renderPage('cherry:1')
+
+      expect(screen.queryByText(/delivery rates are placeholders/i)).not.toBeInTheDocument()
+      // The order flow is still not live for its own reasons — no confirmation
+      // email, draft legal pages — so that notice stays.
+      expect(screen.getByText(/not live yet/i)).toBeInTheDocument()
+    } finally {
+      for (const key of Object.keys(process.env)) {
+        if (!(key in saved)) delete process.env[key]
+      }
+      Object.assign(process.env, saved)
+    }
+  })
+
   it('shows an empty basket and a way out, rather than a dead form', async () => {
     await renderPage()
 
@@ -81,7 +119,7 @@ describe('CheckoutPage', () => {
     // law exists to prevent.
     await renderPage('cherry:2')
 
-    expect(screen.getByText(/delivery is added once you choose/i)).toBeInTheDocument()
+    expect(screen.getByText(/Econt prices the delivery once you choose/i)).toBeInTheDocument()
     expect(screen.queryByText(/^Total$/)).not.toBeInTheDocument()
   })
 
@@ -89,7 +127,9 @@ describe('CheckoutPage', () => {
     await renderPage('cherry:1')
 
     expect(screen.getByLabelText(/full name/i)).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /cash on delivery/i })).toBeInTheDocument()
+    // Payment is stated, not offered as a choice — cash on delivery is the only
+    // method (`src/lib/payments.ts`), so the form has no radio to click.
+    expect(screen.getByText(/cash on delivery/i)).toBeInTheDocument()
   })
 
   it('searches real offices with no configuration, and says nothing about test data', async () => {
@@ -120,5 +160,37 @@ describe('CheckoutPage', () => {
     await renderPage('not-a-candle:3')
 
     expect(screen.getByText(/basket is empty/i)).toBeInTheDocument()
+  })
+})
+
+describe('the free-delivery promise on the checkout page', () => {
+  it('says how many more candles would earn it, beside the basket', async () => {
+    // Next to the ± buttons, because a customer one candle short can only act on
+    // it while they are still looking at the basket. Told at the summary, it is
+    // told too late.
+    await renderPage('cherry:1')
+
+    expect(screen.getByText(/2 more candles for free delivery/i)).toBeInTheDocument()
+  })
+
+  it('counts in candles, so two of one scent is two', async () => {
+    await renderPage('cherry:2')
+
+    expect(screen.getByText(/1 more candle for free delivery/i)).toBeInTheDocument()
+  })
+
+  it('says it has been earned once the basket is there', async () => {
+    await renderPage('cherry:3')
+
+    expect(screen.getByText(/delivery is free/i)).toBeInTheDocument()
+    expect(screen.queryByText(/more candles? for free delivery/i)).not.toBeInTheDocument()
+  })
+
+  it('offers the promo code field, since the shop has codes', async () => {
+    // Whether to show it is a server-side question — `promoCodesConfigured()` —
+    // because the codes themselves must never reach the browser bundle.
+    await renderPage('cherry:1')
+
+    expect(screen.getByRole('textbox', { name: /promo code/i })).toBeInTheDocument()
   })
 })

@@ -4,7 +4,7 @@ import { z } from 'zod'
  * Server-side environment, validated once at module load.
  *
  * The point is to fail loudly and early. Every other secret in this codebase
- * is optional by design — no Stripe key hides the card option, no courier
+ * is optional by design — no email key makes the contact form say so, no courier
  * credentials fall back to a free-text office field — because a feature that
  * is visibly absent beats one that fails after the customer has committed.
  *

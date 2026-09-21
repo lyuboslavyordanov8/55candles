@@ -10,8 +10,14 @@ import { HOMEPAGE_PRODUCT_SLUGS } from '@/data/products'
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
 }))
+// The real notFound() throws to halt rendering, so the mock must too.
+const NOT_FOUND = new Error('NEXT_NOT_FOUND')
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en',
+  notFound: vi.fn(() => {
+    throw NOT_FOUND
+  }),
 }))
 
 async function renderPage() {
@@ -32,6 +38,15 @@ describe('HomePage', () => {
   it('renders the banner heading from the content file', async () => {
     await renderPage()
     expect(screen.getByRole('heading', { level: 1, name: homeBanner.heading.en })).toBeInTheDocument()
+  })
+
+  // The banner picture has been a 0-byte file and has been left out by a
+  // refactor before, and both times the page still rendered and still passed —
+  // it is the one image on the site whose absence is the whole first screen.
+  it('renders the banner photograph with its described alt text', async () => {
+    await renderPage()
+    const photo = screen.getByAltText(homeBanner.alt.en)
+    expect(photo).toHaveAttribute('src', homeBanner.image)
   })
 
   it('points the banner CTA at the configured link', async () => {
@@ -72,5 +87,20 @@ describe('HomePage', () => {
   it('does not show the out-of-season candle on the homepage', async () => {
     await renderPage()
     expect(screen.queryByText('Winter Wonderland')).not.toBeInTheDocument()
+  })
+
+  /*
+    A request for a static file that does not exist reaches this page with the
+    filename as the locale — `[locale]` is a single segment and the proxy skips
+    paths containing a dot. The layout 404s, but it renders in parallel with this
+    page, so without a guard here the whole homepage still renders under a locale
+    that Intl cannot parse, and every price throws.
+  */
+  it('404s instead of rendering under a segment that is not a locale', async () => {
+    for (const junk of ['apple-touch-icon.png', 'site.webmanifest', '']) {
+      await expect(
+        HomePage({ params: Promise.resolve({ locale: junk }) })
+      ).rejects.toThrow(NOT_FOUND)
+    }
   })
 })

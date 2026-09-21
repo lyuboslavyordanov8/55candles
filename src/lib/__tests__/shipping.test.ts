@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { eur, ZERO } from '../money'
+import { eur, ZERO, type Money } from '../money'
 import {
   allDeliveryOptions,
   assertValidTariff,
   billableWeight,
+  candlesUntilFreeDelivery,
+  codFeeFor,
   COURIERS,
   DELIVERY_METHODS,
+  deliveryIsFree,
+  FREE_DELIVERY_FROM_ITEMS,
   isShippingConfigured,
   LOCKER_MAX_GRAMS,
   PACKAGING_WEIGHT_GRAMS,
@@ -14,8 +18,20 @@ import {
   TariffError,
   tariffs,
   TARIFFS_ARE_PLACEHOLDER,
+  type BasketForDelivery,
+  type DeliveryOption,
   type Tariff,
 } from '../shipping'
+
+/**
+ * A basket below the free-delivery threshold, so the tariff cases below test the
+ * rate card alone. Written as a helper rather than inline objects so that the
+ * item count is explicit at every call site — a default of zero would have made
+ * these tests pass for the wrong reason once free delivery arrived.
+ */
+function basket(goods: Money, itemCount = 1): BasketForDelivery {
+  return { goods, itemCount }
+}
 
 const SAMPLE: Tariff = {
   bands: [
@@ -103,7 +119,7 @@ describe('quote', () => {
     const installed = tariffs[key]
     delete tariffs[key]
     try {
-      expect(quote(option, 900, eur(50))).toEqual({
+      expect(quote(option, 900, basket(eur(50)))).toEqual({
         status: 'unconfigured',
         reason: 'noTariff',
       })
@@ -113,14 +129,14 @@ describe('quote', () => {
   })
 
   it('quotes the installed placeholder card by weight band', () => {
-    expect(quote(option, 650, eur(20))).toMatchObject({ status: 'quoted', free: false })
+    expect(quote(option, 650, basket(eur(20)))).toMatchObject({ status: 'quoted', free: false })
   })
 
   it('refuses a locker parcel over the size limit', () => {
     const result = quote(
       { courier: 'speedy', method: 'locker' },
       LOCKER_MAX_GRAMS + 1,
-      eur(50)
+      basket(eur(50))
     )
 
     expect(result).toEqual({ status: 'unavailable', reason: 'tooHeavyForLocker' })
@@ -129,7 +145,7 @@ describe('quote', () => {
   it('checks the locker limit before the tariff, so the reason is the real one', () => {
     // Both conditions hold; the customer needs to know the parcel is too big,
     // not that a rate card is missing.
-    const result = quote({ courier: 'econt', method: 'locker' }, LOCKER_MAX_GRAMS + 1, ZERO)
+    const result = quote({ courier: 'econt', method: 'locker' }, LOCKER_MAX_GRAMS + 1, basket(ZERO))
 
     expect(result.status).toBe('unavailable')
   })
@@ -152,26 +168,156 @@ describe('quote', () => {
 
     it('picks the band the weight falls in, inclusive of the upper bound', () => {
       withTariff(SAMPLE, () => {
-        expect(quote(option, 1000, eur(10))).toMatchObject({ price: eur(3.5) })
-        expect(quote(option, 1001, eur(10))).toMatchObject({ price: eur(4.2) })
-        expect(quote(option, 50_000, eur(10))).toMatchObject({ price: eur(6) })
+        expect(quote(option, 1000, basket(eur(10)))).toMatchObject({ price: eur(3.5) })
+        expect(quote(option, 1001, basket(eur(10)))).toMatchObject({ price: eur(4.2) })
+        expect(quote(option, 50_000, basket(eur(10)))).toMatchObject({ price: eur(6) })
       })
     })
 
-    it('does not apply free shipping when no threshold is set', () => {
+    it('does not give free shipping on order value alone', () => {
       withTariff(SAMPLE, () => {
-        // FREE_DELIVERY_OVER is null: no free delivery, not "free above zero".
-        expect(quote(option, 500, eur(10_000))).toMatchObject({ free: false })
+        // FREE_DELIVERY_OVER is null: no free delivery *by value*, not "free
+        // above zero". One expensive candle still pays carriage.
+        expect(quote(option, 500, basket(eur(10_000), 1))).toMatchObject({ free: false })
       })
+    })
+
+    it('charges nothing for the carriage from the third candle up (Q-24)', () => {
+      withTariff(SAMPLE, () => {
+        expect(quote(option, 500, basket(eur(30), 2))).toMatchObject({
+          free: false,
+          price: eur(3.5),
+        })
+
+        // The shop pays it: zero to the customer, and the list price kept so the
+        // absorbed amount can be recorded on the order rather than vanishing.
+        expect(quote(option, 500, basket(eur(45), 3))).toEqual({
+          status: 'quoted',
+          price: ZERO,
+          free: true,
+          listPrice: eur(3.5),
+        })
+      })
+    })
+
+    it('still needs a real price before it can give the delivery away', () => {
+      // A qualifying basket does not paper over a courier outage: without a
+      // price there is no figure to absorb, and an order whose carriage cost
+      // nobody knows must not be creatable.
+      const installed = tariffs[key]
+      delete tariffs[key]
+      try {
+        expect(quote(option, 500, basket(eur(45), 5))).toEqual({
+          status: 'unconfigured',
+          reason: 'noTariff',
+        })
+      } finally {
+        tariffs[key] = installed
+      }
     })
 
     it('reports no band when the card is closed below the parcel weight', () => {
       withTariff({ bands: [{ upToGrams: 1000, price: eur(3.5) }] }, () => {
-        expect(quote(option, 5000, eur(10))).toEqual({
+        expect(quote(option, 5000, basket(eur(10)))).toEqual({
           status: 'unavailable',
           reason: 'noBandForWeight',
         })
       })
     })
+  })
+})
+
+describe('a price the courier quoted', () => {
+  const option: DeliveryOption = { courier: 'econt', method: 'office' }
+
+  it('is used exactly as given, in place of the rate card', () => {
+    // The card is a stand-in for a contract that is not signed yet. Once Econt
+    // prices the parcel itself, its figure is the one the customer is charged —
+    // rounding it towards a band, or averaging the two, would invent a third
+    // number that neither we nor the courier can honour.
+    const installed = tariffs[tariffKey(option)]
+    tariffs[tariffKey(option)] = SAMPLE
+
+    try {
+      expect(quote(option, 500, basket(eur(10)), eur(3.44))).toEqual({
+        status: 'quoted',
+        price: eur(3.44),
+        free: false,
+        listPrice: eur(3.44),
+      })
+    } finally {
+      tariffs[tariffKey(option)] = installed
+    }
+  })
+
+  it('prices a parcel no card covers', () => {
+    // Weight bands and configured couriers are properties of the stand-in table.
+    // A real quote has already accounted for the weight, so neither
+    // `noBandForWeight` nor `unconfigured` can apply to it.
+    const installed = tariffs[tariffKey(option)]
+    delete tariffs[tariffKey(option)]
+
+    try {
+      expect(quote(option, 50_000, basket(eur(10)), eur(9.9))).toEqual({
+        status: 'quoted',
+        price: eur(9.9),
+        free: false,
+        listPrice: eur(9.9),
+      })
+    } finally {
+      tariffs[tariffKey(option)] = installed
+    }
+  })
+
+  it('does not get a parcel into a locker it does not fit in', () => {
+    // The limit is the locker's, not the tariff's, so a courier price cannot buy
+    // its way past it. Econt would accept the booking and the parcel would be
+    // rejected at the machine.
+    expect(quote({ courier: 'econt', method: 'locker' }, LOCKER_MAX_GRAMS + 1, basket(eur(10)), eur(3.44)))
+      .toEqual({ status: 'unavailable', reason: 'tooHeavyForLocker' })
+  })
+})
+
+describe('the free-delivery promise', () => {
+  it('is counted in candles, not in lines', () => {
+    // Three of one scent is three candles. Counting lines would have made the
+    // promise depend on how the customer happened to split the basket.
+    expect(deliveryIsFree({ goods: eur(45), itemCount: 3 })).toBe(true)
+    expect(deliveryIsFree({ goods: eur(45), itemCount: 2 })).toBe(false)
+  })
+
+  it('holds from the threshold upwards, not only at it', () => {
+    expect(deliveryIsFree({ goods: eur(150), itemCount: 10 })).toBe(true)
+  })
+
+  it('counts how many candles are still missing, for the basket to say so', () => {
+    expect(candlesUntilFreeDelivery(1)).toBe(2)
+    expect(candlesUntilFreeDelivery(2)).toBe(1)
+  })
+
+  it('says nothing for a basket that has already earned it', () => {
+    // null is "no nudge to show", which is also the answer for an empty basket:
+    // "add 3 candles for free delivery" next to nothing is not a nudge.
+    expect(candlesUntilFreeDelivery(3)).toBeNull()
+    expect(candlesUntilFreeDelivery(4)).toBeNull()
+    expect(candlesUntilFreeDelivery(0)).toBeNull()
+  })
+
+  it('is the threshold the checkout page advertises', () => {
+    // The page prints FREE_DELIVERY_FROM_ITEMS in its nudge. If this changes,
+    // the message and this test change together — deliberately.
+    expect(FREE_DELIVERY_FROM_ITEMS).toBe(3)
+  })
+})
+
+describe('the наложен платеж fee', () => {
+  const option: DeliveryOption = { courier: 'econt', method: 'office' }
+
+  it('is absorbed even when the courier itemises it (Q-23)', () => {
+    // Econt quotes the fee as its own line, and we are told what it is — but who
+    // pays it is our decision, not the courier's. While COD_FEE_PAID_BY is
+    // 'merchant' the customer is charged nothing for it, and null (not zero)
+    // records that there is no such line on this order.
+    expect(codFeeFor(option, eur(0.3))).toBeNull()
   })
 })

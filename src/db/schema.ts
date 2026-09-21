@@ -4,6 +4,7 @@ import {
   integer,
   jsonb,
   pgEnum,
+  pgSequence,
   pgTable,
   text,
   timestamp,
@@ -36,35 +37,33 @@ import {
 // ---------------------------------------------------------------------------
 
 /**
- * The full order lifecycle, card and наложен платеж alike.
+ * The order lifecycle of a наложен платеж shop.
  *
- * The COD branch is modelled separately on purpose. A COD order is *not* paid
- * at checkout — the courier collects on delivery and remits later — so
- * collapsing it into `paid` would misstate the books and hide unreconciled
- * money. See AUDIT.md B-14.
+ * There is no `paid` state, and that is deliberate. Cash on delivery is the only
+ * payment method (`src/lib/payments.ts`), so money never arrives at checkout: the
+ * courier collects it on delivery and remits it later. Calling a delivered order
+ * "paid" would misstate the books and hide money that is owed to the shop but not
+ * yet in its account, so settlement is its own two steps — the courier says it
+ * collected, and the remittance is then reconciled against the statement (B-14).
  *
- *   draft ─┬─ pending_payment ─ paid ─┬─ packed ─ shipped ─ delivered
- *          │        └ payment_failed  │
- *          └─ awaiting_cod ─ confirmed┘
+ *   draft ─ awaiting_cod ─ confirmed ─ packed ─ shipped ─ delivered
+ *                                                            └ cod_collected ─ reconciled
+ *   shipped ─ refused_at_delivery ─ returned
+ *   any     ─ cancelled | refunded | partially_refunded
  *
- *   delivered ─ cod_collected ─ reconciled     (COD only)
- *   shipped   ─ refused_at_delivery ─ returned
- *   any       ─ cancelled | refunded | partially_refunded
+ * `refunded` survives without card payments: a return after the cash has been
+ * collected is repaid by bank transfer, and it is still a refund.
  */
 export const orderStatus = pgEnum('order_status', [
   'draft',
-  // Card
-  'pending_payment',
-  'payment_failed',
-  'paid',
-  // COD
+  // Placed
   'awaiting_cod',
   'confirmed',
   // Fulfilment
   'packed',
   'shipped',
   'delivered',
-  // COD settlement
+  // Settlement
   'cod_collected',
   'reconciled',
   // Unhappy endings
@@ -75,9 +74,44 @@ export const orderStatus = pgEnum('order_status', [
   'partially_refunded',
 ])
 
-export const paymentMethod = pgEnum('payment_method', ['card', 'cod'])
+/**
+ * One value today, kept as an enum rather than dropped.
+ *
+ * The order records how it was to be paid, so the books do not depend on
+ * remembering that there was only ever one way. A second method is then
+ * `ALTER TYPE … ADD VALUE`, which touches no existing row.
+ */
+export const paymentMethod = pgEnum('payment_method', ['cod'])
 export const courier = pgEnum('courier', ['econt', 'speedy'])
 export const deliveryMethod = pgEnum('delivery_method', ['door', 'office', 'locker'])
+
+// ---------------------------------------------------------------------------
+// Order numbers
+// ---------------------------------------------------------------------------
+
+/**
+ * Counter behind the human-facing order number, e.g. 55C-2026-000123.
+ *
+ * A sequence rather than `max(order_number) + 1` or a row count: `nextval` is
+ * atomic and never blocks, so two customers submitting in the same second
+ * cannot be handed the same number. The cost is that it is *not* gap-free —
+ * a rolled-back insert consumes its value — which is the right trade here,
+ * because the number is a reference for humans and the paperwork, not a legal
+ * numbering series. (An invoice series, if one is ever issued, has its own
+ * gap-free requirement under Наредба Н-18 and must not reuse this.)
+ *
+ * It does not restart each year either: the year in the printed number comes
+ * from the order's date, while the counter keeps climbing, so a number is
+ * unique on its own and `55C-2027-000500` can follow `55C-2026-000499`.
+ * Per-year restarts would need one sequence per year and buy nothing.
+ *
+ * Read through `nextOrderNumber()` in `src/lib/orders.ts`; nothing else should
+ * call `nextval` on it.
+ */
+export const orderNumberSeq = pgSequence('order_number_seq', {
+  startWith: 1,
+  increment: 1,
+})
 
 // ---------------------------------------------------------------------------
 // Orders
@@ -143,6 +177,21 @@ export const orders = pgTable(
     // --- Money, all integer minor units ---
     currency: text('currency').notNull().default('EUR'),
     goodsMinor: integer('goods_minor').notNull(),
+    /**
+     * Promo discount taken off the goods (AUDIT.md Q-37). Zero on most orders.
+     *
+     * Its own column, not folded into `goods_minor`: the invoice has to show the
+     * price the customer agreed to and the discount off it as separate lines, and
+     * a net figure cannot be reconciled against the price they were shown.
+     */
+    discountMinor: integer('discount_minor').notNull().default(0),
+    /**
+     * The code that produced the discount, canonical and empty when none. Kept so
+     * a campaign can be counted afterwards — the discount alone does not say which
+     * promotion paid for itself.
+     */
+    promoCode: text('promo_code').notNull().default(''),
+    /** What the customer pays for delivery. Zero on a free-delivery order. */
     shippingMinor: integer('shipping_minor').notNull(),
     /** Null when the merchant absorbs it (Q-23). */
     codFeeMinor: integer('cod_fee_minor'),
@@ -153,12 +202,12 @@ export const orders = pgTable(
     // --- Payment ---
     paymentMethod: paymentMethod('payment_method').notNull(),
     /**
-     * Set only from the Stripe webhook, never from the client redirect — a
-     * customer can navigate to the success URL directly (AUDIT.md B-11).
+     * When the courier reported collecting the cash — not when it was delivered,
+     * and not when the money reached the shop's account. Reconciliation against
+     * the courier's remittance is the `reconciled` status, and until then this is
+     * a claim by the courier rather than a receipt (AUDIT.md B-14).
      */
-    stripePaymentIntentId: text('stripe_payment_intent_id'),
-    stripeCheckoutSessionId: text('stripe_checkout_session_id'),
-    paidAt: timestamp('paid_at', { withTimezone: true }),
+    codCollectedAt: timestamp('cod_collected_at', { withTimezone: true }),
 
     // --- Fulfilment ---
     waybillNumber: text('waybill_number'),
@@ -230,7 +279,7 @@ export const orderEvents = pgTable(
     fromStatus: orderStatus('from_status'),
     toStatus: orderStatus('to_status').notNull(),
 
-    /** Who caused it: 'system', 'webhook:stripe', 'admin', 'courier'. */
+    /** Who caused it: 'system', 'admin', 'courier'. */
     actor: text('actor').notNull().default('system'),
     /** Free-form context — decline code, courier response, admin note. */
     detail: jsonb('detail'),
@@ -238,29 +287,6 @@ export const orderEvents = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('order_events_order_id_idx').on(table.orderId)]
-)
-
-// ---------------------------------------------------------------------------
-// Stripe webhook replay protection
-// ---------------------------------------------------------------------------
-
-/**
- * Stripe retries deliveries and can send the same event more than once. The
- * handler inserts the event id first; a unique violation means "already
- * processed", so it returns 200 and stops rather than marking an order paid
- * twice or refunding twice (AUDIT.md B-11).
- */
-export const webhookEvents = pgTable(
-  'webhook_events',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    /** Stripe's `evt_…` id. */
-    eventId: text('event_id').notNull(),
-    eventType: text('event_type').notNull(),
-    payload: jsonb('payload'),
-    processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [uniqueIndex('webhook_events_event_id_idx').on(table.eventId)]
 )
 
 // ---------------------------------------------------------------------------

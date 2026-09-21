@@ -36,11 +36,15 @@ describe('LegalPage', () => {
     await expect(renderDoc('not-a-document')).rejects.toThrow('NEXT_NOT_FOUND')
   })
 
-  it('shows the draft warning while the documents are unreviewed', async () => {
+  it('shows no draft warning now that the documents are published', async () => {
+    // The banner came down with `LEGAL_IS_DRAFT` on 2026-09-21. Asserted from the
+    // rendered page rather than from the flag, because the flag is only useful if
+    // it actually reaches the markup — and if the texts are ever reopened this
+    // test is the one that has to be flipped back with it.
     await renderDoc('terms')
 
-    expect(screen.getByRole('note')).toBeInTheDocument()
-    expect(screen.getByText(/not yet been reviewed|not yet reviewed/i)).toBeInTheDocument()
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    expect(screen.queryByText(/not yet been reviewed|not yet reviewed/i)).not.toBeInTheDocument()
   })
 
   it('identifies the trader on every document (B-16)', async () => {

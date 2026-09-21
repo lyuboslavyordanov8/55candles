@@ -39,10 +39,16 @@ export function legalPath(locale: string, slug: LegalSlug): string {
 }
 
 /**
- * Every document is still a draft until a Bulgarian lawyer has reviewed it.
- * While this is true each page renders a visible warning banner, so a draft
- * cannot be mistaken for reviewed terms by a customer or by the owner.
- * Flip to `false` once review is done — `src/__tests__/legal.test.ts` checks
- * that no `[TODO:` markers remain when you do.
+ * Whether the documents still carry the "unreviewed draft" banner.
+ *
+ * Cleared on 2026-09-21 by the owner's decision, after the last placeholder was
+ * answered: the pages are now published as the shop's actual terms, they are
+ * indexable, and they appear in the sitemap. No Bulgarian lawyer has read them —
+ * that is the owner's accepted risk, not something this flag can record, and
+ * setting it back to `true` is all it takes to put the banner back if the texts
+ * are ever reopened.
+ *
+ * `src/__tests__/legal.test.ts` keeps the guard that gave this flag its point:
+ * no `[TODO` marker may exist in any document, banner or no banner.
  */
-export const LEGAL_IS_DRAFT = true
+export const LEGAL_IS_DRAFT = false

@@ -32,7 +32,7 @@ npm audit --omit=dev      # 0 vulnerabilities
 ```
 
 The trading company is **„ВиреонЛабс“ ЕООД, ЕИК 208907603**, trading as
-55candles. It lives in `src/lib/company.ts` — one place, used by the footer
+55° candles. It lives in `src/lib/company.ts` — one place, used by the footer
 impressum, the legal pages and the `Organization` JSON-LD.
 
 Two things to know before changing code:
@@ -62,8 +62,8 @@ Two things to know before changing code:
    tests assert the flags match the data, so a stale flag fails the build.
 
    The machinery underneath still refuses rather than guessing: an unpriced
-   product says "price on request", a missing rate card returns `unconfigured`
-   instead of quoting free, card payment stays hidden while Stripe is unset.
+   product says "price on request", and a missing rate card returns
+   `unconfigured` instead of quoting free.
 
 ## Starting a new session
 
@@ -99,7 +99,7 @@ needs `experimental.globalNotFound`.
 | 9 | **Q-12 packed weight** — the price is set (19,99 € for all six, your figure). The **weight** is still a guess: every product carries `PLACEHOLDER_WEIGHT_GRAMS = 500`. Weight is what selects a courier rate band, so this is the number that decides what shipping costs you. | Weigh one finished candle **in its shipping box** (grams) and put the real figure on each slug in `src/data/pricing.ts`. When none is left at 500, `provisionallyWeighedSlugs()` empties — set `PRICING_IS_PROVISIONAL = false` in the same commit. If scents differ in weight, give each its own number. |
 | 10 | **Q-22 courier rate cards** — `tariffs` in `src/lib/shipping.ts` now ships `PLACEHOLDER_BANDS` on all 6 keys (econt/speedy × door/office/locker) so the flow can be tested. They are **not** your rates, and the same card is reused for door, office and locker, which real cards never do. | Get the signed rate card from each merchant contract and replace each entry with its real ascending weight bands, open-ended last band (`upToGrams: null`). Then set `TARIFFS_ARE_PLACEHOLDER = false` — until you do, the checkout page tells customers the delivery cost is illustrative. Also decide **Q-23: who pays the наложен платеж fee** — currently `COD_FEE_PAID_BY = 'merchant'`, i.e. absorbed, not added to the customer's total. |
 | 11 | **Q-22 courier API credentials** — separate from the rate cards. Without them the office/locker picker is a free-text box, because a picker full of invented offices produces orders addressed to offices that do not exist. | Set `ECONT_USERNAME` / `ECONT_PASSWORD` and `SPEEDY_USERNAME` / `SPEEDY_PASSWORD` per `.env.example`, then implement the client in `src/lib/couriers/` against the interface already defined there. |
-| 12 | **Q-20 Stripe account** — the card option is hidden at checkout while `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET` is unset, and the server action refuses `card` even if someone posts it directly. Only наложен платеж is offered today. | Open the Stripe account under „ВиреонЛабс“ ЕООД, set both keys plus `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, and decide **Q-26: the statement descriptor** — what customers see on their bank statement. `55CANDLES` is more recognisable than the legal name; it must be set deliberately, so `STATEMENT_DESCRIPTOR` is `null` until you choose. |
+| ~~12~~ | **Q-20 card payments — closed by decision, 2026-09-20: there will be none.** Наложен платеж is the only payment method. The card path, the Stripe keys, the webhook table and the `paid`/`pending_payment` statuses have been removed from the code and the database rather than left dormant. | Nothing. If this is ever reversed it is new work, not a key: see the note at the top of `src/lib/payments.ts`. |
 | 13 | **Q-24 free-delivery threshold** — `FREE_DELIVERY_OVER` is `null`, so no order ever ships free. This is a margin decision, not a technical one. | Either give an amount in EUR, or confirm there is no threshold and leave it `null`. The quote logic already handles both and flags `free: true` when it applies. |
 
 ## What to do next
@@ -107,11 +107,13 @@ needs `experimental.globalNotFound`.
 **The order flow can now be walked end to end.** Open a product page, click
 "Order now", and you land on `/{locale}/checkout?items=cherry:1` with a priced
 basket, a delivery form, and a server-side breakdown of goods + delivery +
-total. It stops at "orders can't be saved yet" — Q-34, no database.
+total. Submitting it stores the order and hands back a number like
+`55C-2026-000001` (Q-34); what is still missing is a confirmation email (B-17)
+and a confirmation page.
 
-Four decisions are already made and encoded: **EUR only**, **Stripe + наложен
-платеж**, **all three delivery methods** (door / office / locker), and **19,99 €
-per candle**.
+Four decisions are already made and encoded: **EUR only**, **наложен платеж as
+the only payment method** (no cards, decided 2026-09-20), **all three delivery
+methods** (door / office / locker), and **19,99 € per candle**.
 
 What Phase 1b still needs from you is blockers **9–13** above — the remaining
 numbers. Nothing in that list is development time; each one is a table entry.

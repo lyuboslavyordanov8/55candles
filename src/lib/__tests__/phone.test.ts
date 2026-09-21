@@ -55,8 +55,11 @@ describe('normaliseBulgarianPhone', () => {
     }
   })
 
-  it("validates the shop's own published number", () => {
-    // If this ever fails, either the number is wrong or the rules are.
+  it("validates the shop's own number, whenever it publishes one again", () => {
+    // Unpublished by the owner's decision, so there is nothing to check — but the
+    // assertion stays: put a number back in `company.ts` and this guards it, so
+    // the site cannot start advertising a number these rules would reject.
+    if (company.contact.phone === null) return
     expect(phoneProblem(company.contact.phone)).toBeNull()
   })
 

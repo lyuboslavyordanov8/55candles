@@ -103,8 +103,14 @@ export default function Footer() {
 
         {/* Copyright + trader identification (AUDIT.md B-16) */}
         <div className="flex flex-col items-center gap-2">
+          {/*
+            The brand is written "55° candles" — the owner's spelling, and the
+            same one on the wordmark and in `company.tradingName`. Not
+            upper-cased here: the degree sign makes the shouty form read as a
+            different mark from the logo directly above it.
+          */}
           <p className="text-center text-xs text-ink-secondary">
-            © {new Date().getFullYear()} 55CANDLES. {tf('rights')}.
+            © {new Date().getFullYear()} 55° candles. {tf('rights')}.
           </p>
 
           <Impressum locale={locale} />

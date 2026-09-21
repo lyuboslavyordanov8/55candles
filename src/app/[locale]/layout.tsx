@@ -9,8 +9,9 @@ import { CartProvider } from '@/components/cart/CartProvider'
 import CartDrawer from '@/components/cart/CartDrawer'
 import MotionProvider from '@/components/providers/MotionProvider'
 import { OrganizationJsonLd } from '@/components/seo/JsonLd'
+import { homeBanner, bannerText } from '@/content/home-banner'
 import { fontVariables } from '@/fonts'
-import { isLocale, locales } from '@/i18n/locales'
+import { defaultLocale, isLocale, locales } from '@/i18n/locales'
 import { pickClientMessages } from '@/i18n/client-namespaces'
 import { siteUrl, isSiteUrlConfigured } from '@/lib/site'
 
@@ -38,15 +39,17 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>
 }): Promise<Metadata> {
   const { locale } = await params
-  const description = descriptions[locale] ?? descriptions.en
+  // Falls back to the default locale rather than to a hardcoded language, so
+  // the fallback follows `defaultLocale` instead of quietly disagreeing with it.
+  const description = descriptions[locale] ?? descriptions[defaultLocale]
 
   return {
     metadataBase: new URL(siteUrl),
     // `default` applies to pages that set no title; `template` wraps those
-    // that do, so a product page becomes "Cherry — 55candles".
+    // that do, so a product page becomes "Cherry — 55° candles".
     title: {
-      default: '55candles',
-      template: '%s — 55candles',
+      default: '55° candles',
+      template: '%s — 55° candles',
     },
     description,
     alternates: {
@@ -55,18 +58,28 @@ export async function generateMetadata({
     },
     openGraph: {
       type: 'website',
-      siteName: '55candles',
+      siteName: '55° candles',
       locale: locale === 'bg' ? 'bg_BG' : 'en_GB',
       url: `/${locale}`,
-      title: '55candles',
+      title: '55° candles',
       description,
-      images: [{ url: '/images/hero.webp', width: 1200, height: 630, alt: '55candles' }],
+      // The homepage banner, at its real pixel size. The previous entry claimed
+      // 1200×630 for a 1379×271 file; a scraper that trusts the declared size
+      // reserves the wrong box and some crop the difference off.
+      images: [
+        {
+          url: homeBanner.image,
+          width: homeBanner.imageWidth,
+          height: homeBanner.imageHeight,
+          alt: bannerText(homeBanner.alt, locale),
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
-      title: '55candles',
+      title: '55° candles',
       description,
-      images: ['/images/hero.webp'],
+      images: [homeBanner.image],
     },
     // Keep previews and local builds out of the index until a real domain is
     // configured (AUDIT.md Q-06).
@@ -124,7 +137,7 @@ export default async function LocaleLayout({
               href="#main"
               className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:rounded-sm focus:bg-charcoal focus:px-4 focus:py-2 focus:text-cream-base focus:text-xs focus:tracking-widest focus:uppercase"
             >
-              {skipToContent[locale] ?? skipToContent.en}
+              {skipToContent[locale] ?? skipToContent[defaultLocale]}
             </a>
 
             {/*

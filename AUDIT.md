@@ -147,7 +147,7 @@ That unblocked the identity layer, which is what the rest of this phase is built
 | B-15 legal pages | **Scaffolded, not reviewed** | Six documents, both locales, at `/[locale]/legal/[slug]`. See the warning below |
 | B-20 fake contact form | Done | Real endpoint; the form can no longer claim success it did not achieve |
 | S-12 structured data | Partial | `Organization` + `BreadcrumbList`. `Product`/`Offer` still gated on prices (B-03) |
-| B-17 transactional email | Foundation only | `src/lib/mailer.ts` defines the contract and returns `unconfigured`; no provider chosen |
+| B-17 transactional email | **Done (2026-09-21)** | Resend over `fetch`; order confirmation to the customer and a packing notification to the shop. See the 2026-09-21 section |
 | N-12 `.env.example` | Done | Documents what is required now and what each later phase will add |
 
 **The legal pages are drafts and are not safe to rely on.** `LEGAL_IS_DRAFT` in `src/lib/legal.ts` is `true`, which
@@ -180,7 +180,9 @@ hreflang pairing that `sitemap.ts` and every page's `alternates.languages` depen
 `tsc` clean, **240/240 tests pass across 26 files** (up from 145/18), build green, 0 production-dependency
 vulnerabilities. The owner asked to start prices, payment integration and the Econt/Speedy delivery form, and
 confirmed on 2026-08-06: **Stripe for cards plus наложен платеж**, **all three delivery methods** (door, office,
-locker), **EUR-only display**, and that **prices and weights are not available yet**.
+locker), **EUR-only display**, and that **prices and weights are not available yet**. The payment half of that was
+**reversed on 2026-09-20 — no cards, наложен платеж only**; the card path has since been removed from the code, the
+database and this document.
 
 This phase builds the *machinery* and leaves every business number empty. That split is the whole point: the arithmetic,
 validation and failure handling are testable now, and each unknown is one table entry away from working. Nothing is
@@ -190,12 +192,17 @@ guessed.
 |---|---|---|
 | B-12 money model | Done | `src/lib/money.ts` — integer minor units, currency-checked arithmetic, `Intl` formatting |
 | B-03 prices | **Machinery only — table empty** | `src/data/pricing.ts`. Price *and* packed weight per slug; a test fails if either is invented |
-| Q-25 delivery methods | Done; rates are placeholders | `src/lib/shipping.ts` — 2 couriers × 3 methods, weight-banded tariffs. All 6 cards now carry `PLACEHOLDER_BANDS` so the flow is walkable; the real cards are still owed (Q-22) |
-| Q-21 payment methods | **COD ready, card scaffolded** | `src/lib/payments.ts`. COD needs no provider; card is hidden until Stripe keys exist |
+| Q-25 delivery methods | Done; the card is now only a fallback | `src/lib/shipping.ts` — 2 couriers × 3 methods, weight-banded tariffs. All 6 cards carry `PLACEHOLDER_BANDS`, and with Econt credentials set they are never read: the courier prices each parcel (row below) |
+| Q-21 payment methods | **Settled: наложен платеж only** | `src/lib/payments.ts`. Decided 2026-09-20; the card path has been removed rather than left dormant |
+| Q-22 couriers at launch | **Settled: Еконт only, Спиди "очаквайте скоро"** | `BOOKABLE_COURIERS` in `src/lib/shipping.ts`. Decided 2026-09-20. Speedy keeps its place in the type, the enum and the tariff table; the checkout greys it out and `validateDelivery` returns `courier: 'unavailable'`, so a hand-built POST cannot store an order nobody can label. One flag flips it back when the contract exists |
+| Q-22 delivery prices | **Live from Econt, with no silent fallback** | `src/lib/shipping-rates.ts` decides; `econt.ts` asks `LabelService.createLabel` in `mode: 'calculate'`. Needs credentials **and** a hand-over point (`ECONT_SENDER_OFFICE_CODE`, or the registered seat in `company.ts`) — measured on the live account 2026-09-20, the same 650 g parcel is 4.03 EUR office-to-office, 3.62 to an еконтомат and 5.32 to the door, and collection *from* an address adds ~2.55 — so there is no default. Econt's office-to-office price is flat nationwide, which is why the destination does not appear in that list. Nothing configured → the stand-in card, with the notice on the page. Configured but the quote failed → the order stops; substituting the card there would store an order at a price nobody can honour, indistinguishable from a real one. The quote carries no customer name or phone. `rateSource` on the creation event records which it was |
+| Q-23 who is billed, on the waybill | **Open — verified gap, not yet live** | Measured against the real account 2026-09-20: with the label we build today Econt bills *both* the carriage and the наложен платеж fee to the RECEIVER, while the checkout shows only the carriage and `COD_FEE_PAID_BY = 'merchant'`. And the fee is **3.24% of the collected sum, uncapped** — 0.65 EUR on a 19.99 order, 3.24 on a 100 — not the flat 0.60 the stand-in card assumes, so whoever ends up bearing it bears a percentage of revenue rather than a rounding error. The customer would hand over 0.65 EUR more at the office than the page said — an undisclosed charge at delivery. Nobody is affected yet because no waybill is created (Phase 4); `mode: 'calculate'` only prices. The fix is one field: `paymentReceiverAmount` set to the quoted carriage, which returns `SHARE+`/`SHARE-` lines and leaves `senderDueAmount` at the fee — verified, it expresses exactly the split the code already assumes. Do this in the same commit as label creation |
+| Q-24 free delivery | **Settled: free from 3 candles, merchant-paid** | `FREE_DELIVERY_FROM_ITEMS = 3` in `src/lib/shipping.ts`. Decided 2026-09-20. Counted in **candles, not lines**, and judged on the goods *before* any promo discount, so a code cannot take back carriage the basket had already earned. `FREE_DELIVERY_OVER` stays `null` — no threshold by order value. A qualifying basket still needs a real courier price to exist: the customer is charged zero, and the list price is recorded as `shippingAbsorbedMinor` on the creation event, so "what is this promotion costing" has an answer |
+| Q-37 promo codes | **Machinery done — table is one example code** | `src/lib/promo.ts`, `import 'server-only'` so the browser bundle can never carry the list. Percent or fixed amount, optional minimum and end date (inclusive, Europe/Sofia). Discounts the **goods only** — never the carriage or the наложен платеж fee, which are somebody else's invoice. Clamped to the goods total, so no code can produce a negative bill. Ships `55CANDLES10` at 10%: replace it before it is worth guessing |
 | Delivery form | Done | `/[locale]/checkout` + `DeliveryForm`. Fields switch on method; `useActionState` per the Next 16 forms guide |
 | Order totals | Done | `src/lib/order-total.ts` — re-priced server-side, shipping and COD fee as separate line items |
-| Courier office lookup | **Interface only** | `src/lib/couriers/` returns `unconfigured` until credentials exist (Q-22) |
-| Q-20 Stripe | Not implemented | `initiate()` throws for `card`; needs an account, keys, webhook secret and a descriptor (Q-26) |
+| Courier office lookup | Done, and needs no credentials | `src/lib/couriers/` — Econt's nomenclature is public, so the picker shows the real 632 production offices out of the box. Speedy is still a stub that answers `unconfigured` |
+| Q-20 card payments | **Closed by decision — not happening** | No provider, no keys, no webhook, no `paid` status. Reversing it is new work, not configuration |
 
 **Money is never a float.** `0.1 + 0.2` is `0.30000000000000004`, and a shop that sums prices as floats eventually
 charges a cent too much or issues a фактура that will not reconcile. Every amount is integer cents, arithmetic refuses
@@ -211,18 +218,21 @@ a browser that can name its own total can name zero. A test submits a forged car
 field and asserts the computed total is unchanged. Per the Next 16 Server Actions guide, the action is a POST endpoint
 reachable by anyone, so validation runs there regardless of what the form already checked.
 
-**Card payment is hidden rather than broken while Stripe is unconfigured**, and the action refuses a `card` submission
-even so, since the UI is not a security boundary. COD is always offered because it needs no provider — but note it is
-not obligation-free: НАП receipt rules differ for courier-collected cash (Q-28, still `[VERIFY WITH ACCOUNTANT]`).
+**Наложен платеж is the only payment method** (decided 2026-09-20), so the checkout *states* how the customer will pay
+instead of asking. There is no payment provider to configure, no card option to hide and no `paid` state that can
+disagree with the bank. It is not obligation-free, though: the courier holds the money until it remits, so a delivered
+order is not a settled one (B-14), and НАП receipt rules for courier-collected cash are still
+`[VERIFY WITH ACCOUNTANT]` (Q-28).
 
 **`Product.price` was removed from the type.** It was optional and unused; leaving it beside `pricing.ts` would have
 been two competing sources of price that win or lose depending on which the caller reads.
 
 **What is still missing, and from whom:** price and packed weight per product (Q-11/Q-12, owner — the price landed in
-Phase 1b, the weight has not); Econt and Speedy rate cards and API credentials (Q-22, merchant contracts); Stripe
-account and keys (Q-20); free-delivery threshold (Q-24); who bears the COD fee (Q-23 — currently modelled as the
-merchant, the safer default); and a database, without which checkout validates and prices an order but cannot store one
-(Q-34). The checkout page is `noindex` until it can.
+Phase 1b, the weight has not); Econt API credentials plus a hand-over point (Q-22 — these now buy *real* delivery prices, not just waybills; no rate cards need transcribing);
+who bears the COD fee (Q-23 — currently modelled as the merchant, the safer default). The free-delivery threshold (Q-24) has since been settled: free from three candles, paid by the shop.
+Card payments are no longer on the list: Q-20 is closed, there will be none. Order storage has since landed (Q-34/B-01): checkout writes the order and returns its
+number. The checkout page stays `noindex` while the rates are placeholders, the legal pages are drafts and nothing can
+email a confirmation.
 
 ## Phase 1b status (partial) — the flow is walkable, on one real number and two placeholders
 
@@ -255,13 +265,120 @@ Two supporting pieces landed with it:
 
 **The checkout page deliberately shows no total until a delivery method is chosen.** A goods-only "total" that grows at
 the next step is precisely the pattern consumer law exists to prevent; the priced breakdown (goods, delivery, COD fee
-where applicable, total, parcel weight) appears once the action can compute it, as separate lines.
+where applicable, total, parcel weight) appears once the action can compute it, as separate lines. Since 2026-09-20 that
+breakdown arrives **before** the order rather than with it — see "Pricing before the order" below.
 
 `OrderSummary` is its own component rather than a block inside `DeliveryForm` because the form's summary only exists
 after a Server Action round trip, which jsdom cannot perform — the breakdown was untestable until it was extracted.
 
-Where the flow still stops: **`readyToPay`, then nothing.** No order storage (Q-34), so the customer is told plainly
-that nothing was placed and no payment was taken.
+Where the flow stopped when this was written: **`readyToPay`, then nothing.** That is no longer the end — the action now
+writes the order, its lines and its first status event, and answers with an order number (see "Order storage" below).
+`readyToPay` survives for the one case that still deserves it: no `DATABASE_URL`, where the customer is told plainly that
+nothing was placed and no payment was taken.
+
+### Order storage (B-01, B-09, Q-34) — done
+
+A valid submission is persisted before anything else happens, because an order without a payment can be chased while a
+payment without an order is money received against nothing. Three pieces:
+
+- **`src/lib/orders.ts`** — the only writer. One batched transaction inserts the order, its snapshotted lines and the
+  `order_events` row recording the status it was created in, always `awaiting_cod`. There is no `paid` status to reach:
+  the courier collects the cash and the remittance is reconciled afterwards (B-14).
+- **Idempotency** — the checkout page mints an intent token per render, the form replays it, and the unique index on
+  `orders.intent_token` makes the second insert lose. The loser reads the winner and returns it, so a double-click, a
+  refresh or two racing requests all answer with one order number. Verified against the live database, including the
+  concurrent case.
+- **Order numbers** — `55C-2026-000123`, from a Postgres sequence (`nextval` is atomic, gaps are acceptable for a
+  human reference). Separate from the primary key, and not to be confused with an invoice series under Наредба Н-18.
+
+What is still missing after it: no payment step (Q-20), no confirmation email (B-17) and no confirmation page, so the
+number shown on the form is the customer's only record — which is why the checkout page keeps its "not live" notice and
+stays `noindex`.
+
+### Pricing before the order, a promo code, free delivery from three candles (2026-09-20)
+
+Four changes the owner asked for, in one pass. The first is a defect fix, the other three are new rules.
+
+**The customer could not see the bill until the order existed.** `OrderSummary` was correct and complete — goods,
+delivery, COD fee, total, weight — but the only press that produced it was the press that *wrote the order*. So the
+figures a customer is entitled to read before committing were shown to them a moment after they had committed. That is
+the same objection as a goods-only total, one step later, and no amount of copy fixes it.
+
+The fix is a **two-step checkout**, `step=quote` → `step=confirm`, on one form:
+
+- The first press validates, asks Econt to price *this* parcel, and renders the breakdown with the button now reading
+  "confirm the order". Nothing is written.
+- The second press re-runs the same validation and pricing on the server and stores the order. The quote is not carried
+  in a hidden field, because a figure the browser holds is a figure the browser can edit.
+- Changing any field after a quote drops the form back to `step=quote`, so an order can never be confirmed against a
+  price computed for a different basket or a different office.
+- `stepOf()` is a whitelist — `value === 'confirm' ? 'confirm' : 'quote'` — so a missing, misspelt or hostile `step`
+  quotes instead of ordering. A hand-built POST cannot skip the price.
+
+A two-step flow is the only honest shape here: Econt prices the actual parcel to the actual office, so the delivery
+charge *cannot* exist before the form has been sent once. Pricing on every keystroke would mean calling a courier API
+from an unauthenticated endpoint on each edit.
+
+**Promo codes** (`src/lib/promo.ts`, Q-37) — see the Phase 1a row for the mechanism. Three decisions worth recording:
+the module is `server-only`, so the code list is not in the browser bundle and the page receives only a boolean saying
+whether to render the field; the discount applies to the **goods** and is clamped to them, so no code touches the
+carriage or the COD fee and no basket can total below zero; and an unrecognised code answers exactly as a non-existent
+one does, so the field cannot be used to enumerate the table.
+
+**Free delivery from three candles** (Q-24) — counted in candles, not lines, and earned on the goods total *before* the
+discount. The order of those two operations is the whole decision: judging it afterwards would let a promo code silently
+revoke free shipping a customer had already qualified for, at the moment they typed the code. The basket nudges ("one
+more candle and the delivery is free") because a threshold nobody is told about does not sell anything. What it costs is
+recorded per order as `shippingAbsorbedMinor` — 4.03 EUR office-to-office today, a fifth of one candle's price.
+
+Both new columns went onto `orders` in `drizzle/0003_secret_thor_girl.sql` (`discount_minor`, `promo_code`), applied to
+the live database. `tsc` clean, **740/740 tests across 44 files**.
+
+### Order email and the admin panel (2026-09-21)
+
+Three things the shop could not do: be told an order had arrived, tell the customer it had, and look up an order
+afterwards. All three are now done, and the honesty rule from B-20 is carried through all of them.
+
+**The provider is Resend, called with `fetch`** (`src/lib/mailer.ts`). No SDK: one POST does not need one, and a
+dependency here is a dependency in the bundle of every route that sends. The `SendResult` contract is unchanged, so the
+contact form needed no rewrite — the only thing that changed under it is that `deliver()` now exists. `sent` still means
+the provider accepted the message; a 4xx is `failed` and carries the provider's own reason, which is the only thing that
+makes "the domain is not verified" fixable. Configuration is `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (on a
+DKIM-verified domain), plus `CONTACT_EMAIL_TO` and optionally `ORDER_EMAIL_TO`.
+
+**A placed order sends two emails, not one with a Bcc** (`src/lib/order-email.ts`). The customer's copy confirms the
+order, itemises it, shows the same breakdown they approved at `step=quote`, and says what to have ready for the courier.
+The shop's copy is a packing slip: items, weight, phone, the delivery point, and a warning when the office code was
+**not** confirmed by the courier. Two messages because they say different things, and because one provider failure must
+not lose both. The copy lives beside the builders rather than in `messages/*.json` — email renders from a Server Action
+today and from a cron job tomorrow, where there is no request and so no `next-intl` context to ask, and none of these
+strings should ship to a customer's browser in either catalogue. The customer's language comes from a hidden `locale`
+field on the form, because a Server Action is a bare POST and carries no locale of its own.
+
+**An email can never fail an order** (`src/lib/order-notifications.ts`). By the time it sends, the order is stored and
+the customer is about to be shown its number, so every failure is caught and returned as data. It is equally never
+silent: an unsent shop notification is a parcel nobody knows to pack, so it is logged with the order number, and the
+admin shows a banner while email is unconfigured. A replayed intent sends nothing — the customer already has their
+confirmation, and a second one reads as a second parcel.
+
+**The admin is at `/admin`, outside `[locale]`** — its own root layout, Bulgarian only, `noindex`, excluded from the
+proxy matcher so next-intl cannot rewrite it to `/bg/admin`. One shared password (`ADMIN_PASSWORD`), because the shop is
+one or two people and a users table would be machinery with nothing to hold; `src/lib/admin-auth.ts` is the only file
+that changes when that stops being true. The session cookie is a signed expiry — `HttpOnly`, `SameSite=Lax`, `Secure` in
+production — with no session store to read, and changing the password invalidates every session, which is how you log
+everyone out. `requireAdmin()` is called in every page **and** in every action, because an action is its own POST
+endpoint and a page-level check does not guard it.
+
+The list (`/admin`) defaults to the orders that need doing rather than to everything, searches by number, name, phone or
+email, and shows warnings when email is misconfigured. The detail page carries what is needed to pack, ship and settle,
+plus the whole `order_events` trail. Status moves go through `advanceOrderStatus`, which enforces
+`ALLOWED_TRANSITIONS` (`src/lib/order-status.ts`): **`cod_collected` is reachable only from `delivered` and
+`reconciled` only from `cod_collected`**, so money the courier has not reported collecting cannot be booked as
+collected (B-14). The move is checked against the status in the database, not the one the form claimed, and the event
+and the cached `orders.status` column are written in one batch so the audit trail cannot disagree with the column that
+summarises it.
+
+No migration: nothing new is stored. `tsc` clean.
 
 ### Corrections to this audit
 
@@ -368,23 +485,23 @@ glowColor?, emoji, highlight?, seasonal, price?, imagePath, hoverImagePath?
 
 | ID       | Area            | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                               | Evidence                                                                                                                                                                                                                                                  | Risk                                                                      | Effort                  |
 |----------|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|-------------------------|
-| **B-01** | Commerce core   | **No persistence layer of any kind.** No database, ORM, migrations or env vars. Nothing can store an order, a customer, a cart or a payment. Every other commerce item below depends on this.                                                                                                                                                                                                                                                         | `package.json:11-18`; no `.env*`; no `process.env` reference in `src/`                                                                                                                                                                                    | Cannot transact at all                                                    | **L**                   |
+| **B-01** | Commerce core   | **DONE (Q-34).** ~~No persistence layer of any kind.~~ Neon Postgres via drizzle, migrations in `drizzle/`, connection validated in `src/lib/env.ts`. Orders, their snapshotted lines and an append-only status log are written by `src/lib/orders.ts`. Carts and customers are still not stored: the cart travels in the URL (B-05) and checkout is guest-only by decision (Q-31).                                                                                                                                                                                                                                                         | `package.json:11-18`; no `.env*`; no `process.env` reference in `src/`                                                                                                                                                                                    | Cannot transact at all                                                    | **L**                   |
 | **B-02** | Commerce core   | **No API routes.** `src/app/api/` does not exist. There is no server-side surface to create orders, take payments, receive webhooks or talk to couriers.                                                                                                                                                                                                                                                                                              | verified — no `route.ts` in repo                                                                                                                                                                                                                          | Cannot transact                                                           | **L**                   |
 | **B-03** | Commerce core   | **DONE for price (Phase 1b) — every scent is 19,99 €, the owner's real figure; the packed weight beside it is still a 500 g placeholder (Q-12).** ~~No product has a price.~~ Prices live in `src/data/pricing.ts` keyed by slug, in integer EUR cents. `PRICING_IS_PROVISIONAL` is `true` while any weight is a guess, which puts a visible notice on checkout. Unpriced products would render "price on request", never a blank or a zero.                                                                                                                                                                                                                                                                                                       | `src/types/product.ts:42-45`; `src/data/products.ts:3-218`                                                                                                                                                                                                | Cannot sell                                                               | **M**                   |
 | **B-04** | Commerce core   | **PARTIAL (Phase 1a) — packed weight is now modelled** in `src/data/pricing.ts` (`packedWeightGrams`, feeding the courier weight bands), and `isPurchasable()` gates on price + weight + season. Still missing: `id`, `sku`, `stock`/inventory, dimensions, `vatRate`, variants/size options, `active` flag. Only one image per product plus an optional hover image.                                                                                                                                                                                             | `src/types/product.ts:1-49`                                                                                                                                                                                                                               | Cannot price shipping, cannot prevent overselling                         | **M**                   |
 | **B-05** | Commerce core   | **STOPGAP ONLY (Phase 1b) — the basket lives in the query string** (`src/lib/cart-params.ts`, `?items=cherry:2`), enough to walk the order flow. Still no cart state, no storage (cookie/localStorage/server), no guest-vs-logged-in strategy, no "add to basket", no persistence across a session. Safe because the URL carries only slugs and quantities and the server re-prices — but **delete that module when the real cart lands rather than extending it**.                                                                                                                                                                                                                                                                                                                                   | verified — no cart module in `src/`                                                                                                                                                                                                                       | Cannot transact                                                           | **M**                   |
 | **B-06** | Commerce core   | **DONE (Phase 1b).** ~~Add to cart is a permanently disabled button~~ with the label baked into both locale files as "coming soon". A purchasable product now links to `/{locale}/checkout?items={slug}:1`; out-of-season products (`winter-wonderland`) still show a disabled "not available yet" control, because `isPurchasable()` gates on season independently of price.                                                                                                                                                                                                                                                                                                                                        | `src/app/[locale]/products/[slug]/page.tsx:101-106`; `messages/en.json:62`; `messages/bg.json:62`                                                                                                                                                         | Shop is visibly non-functional                                            | **S** (once B-05 lands) |
-| **B-07** | Commerce core   | **PARTIAL (Phase 1a) — address capture, courier and delivery-method selection, payment-method selection and server-side re-pricing exist** at `/[locale]/checkout` with a validated Server Action. It stops at `readyToPay` and says so, because there is no order storage (B-01/B-08) and no Stripe session (Q-20). Still missing: order summary from a real cart (B-05), confirmation page.                                                                                                                                                                                                                                                                                                                                       | verified                                                                                                                                                                                                                                                  | Cannot transact                                                           | **L**                   |
+| **B-07** | Commerce core   | **PARTIAL (Phase 1a) — address capture, courier and delivery-method selection, payment-method selection and server-side re-pricing exist** at `/[locale]/checkout` with a validated Server Action. Orders are now stored and the customer is given an order number (B-01/B-09); `readyToPay` remains only where no database is configured. A confirmation email is now sent (B-17, 2026-09-21). Still missing: a confirmation page, and a real cart behind the summary (B-05). Payment is not missing — наложен платеж needs none (Q-20 closed).                                                                                                                                                                                                                                                                                                                                       | verified                                                                                                                                                                                                                                                  | Cannot transact                                                           | **L**                   |
 | **B-08** | Commerce core   | **No order model or state machine.** No order numbers, no status transitions, no immutable snapshot of prices/items/shipping at time of purchase. Without a snapshot, editing a product price later silently rewrites historical orders and invoices.                                                                                                                                                                                                 | verified                                                                                                                                                                                                                                                  | Financial/legal integrity                                                 | **M**                   |
-| **B-09** | Commerce core   | **No idempotency anywhere** — no order-creation path exists, so no protection against double-submit or refresh creating duplicate orders/charges. Must be designed in, not retrofitted.                                                                                                                                                                                                                                                               | verified                                                                                                                                                                                                                                                  | Duplicate charges, duplicate shipments                                    | **M**                   |
-| **B-10** | Payments        | **Stripe is not integrated.** No `stripe` or `@stripe/*` dependency, no keys, no PaymentIntent/Checkout Session creation, no client integration.                                                                                                                                                                                                                                                                                                      | `package.json:11-18`                                                                                                                                                                                                                                      | Cannot take card payments                                                 | **L**                   |
-| **B-11** | Payments        | **No webhook endpoint.** There is consequently no server-authoritative way to mark an order paid. Combined with B-02 this means any future implementation would be tempted to mark orders paid on the client redirect — which is spoofable. Design the webhook first.                                                                                                                                                                                 | verified                                                                                                                                                                                                                                                  | Fraudulent "paid" orders; missed payments                                 | **M**                   |
+| **B-09** | Commerce core   | **DONE (Q-34).** ~~No idempotency anywhere~~ — the checkout page mints an intent token per render, the form replays it, and the unique index on `orders.intent_token` makes a double-click, a refresh or two racing requests resolve to one order. Verified against the live database.                                                                                                                                                                                                                                                               | verified                                                                                                                                                                                                                                                  | Duplicate charges, duplicate shipments                                    | **M**                   |
+| **B-10** | Payments        | **CLOSED BY DECISION (2026-09-20): there will be no card payments.** ~~Stripe is not integrated.~~ Наложен платеж is the only method (`src/lib/payments.ts`). No payment dependency, no keys, no session creation — and none owed.                                                                                                                                                                                                                                                                                                      | `package.json:11-18`                                                                                                                                                                                                                                      | Cannot take card payments                                                 | **L**                   |
+| **B-11** | Payments        | **CLOSED BY DECISION (2026-09-20).** ~~No webhook endpoint.~~ With no card provider there is no payment webhook to secure and nothing that can mark an order paid: the `paid` and `pending_payment` statuses and the `webhook_events` table have been removed from the schema. What replaces the risk is reconciliation of the courier's COD remittance (B-14), which is bookkeeping rather than an untrusted request.                                                                                                                                                                                 | verified                                                                                                                                                                                                                                                  | Fraudulent "paid" orders; missed payments                                 | **M**                   |
 | **B-12** | Payments        | **DONE (Phase 1a) — `src/lib/money.ts`: EUR, integer minor units, currency-checked arithmetic.** ~~Currency is undefined in code.~~ `Product.price.currency` is a free-form `string` that is never populated, so there is no hardcoded `BGN` to fix — but there is also no decision recorded. Bulgaria adopted the euro on 2026-01-01 (per your brief). Prices must be authored natively in **EUR integer minor units (cents)**, never floats. Any BGN/EUR dual-display obligation still in force, and its end date, is **`[VERIFY]`** — see §5 Q-14.  | `src/types/product.ts:42-45`; no currency literal anywhere in `src/`                                                                                                                                                                                      | Mispricing, rounding drift, non-compliant display                         | **M**                   |
 | **B-13** | Shipping        | **No courier integration.** Nothing for Speedy or Econt: no office/APS picker, no shipping price calculation, no waybill (товарителница) generation, no tracking number storage, no tracking sync, no customer tracking link.                                                                                                                                                                                                                         | verified                                                                                                                                                                                                                                                  | Cannot fulfil orders                                                      | **L**                   |
 | **B-14** | Shipping        | **No наложен платеж (COD) support.** Given COD is the dominant BG payment habit, this is the single largest revenue-path gap after B-01. COD orders are *not* paid at checkout, which the (non-existent) order state machine must model explicitly — see §6 Phase 4.                                                                                                                                                                                  | verified                                                                                                                                                                                                                                                  | Loses the majority of the BG market                                       | **L**                   |
 | **B-15** | Legal           | **PARTIAL — six pages scaffolded in both locales (Phase 0.7); NOT lawyer-reviewed, ~20 `[TODO]` markers remain.** ~~Zero legal pages exist.~~ No Общи условия, no Политика за поверителност, no Политика за бисквитките, no Право на отказ/връщане, no Рекламации, no Delivery information. The footer links only to Home/Products/Our Story/Candle Care/Contact.                                                                                                                                                                                                       | `src/components/layout/Footer.tsx:12-18`; no legal route in `src/app/[locale]/`                                                                                                                                                                           | Regulatory exposure from first sale **`[VERIFY scope with a BG lawyer]`** | **M**                   |
 | **B-16** | Legal           | **DONE (Phase 0.7) — „ВиреонЛабс“ ЕООД, ЕИК 208907603 in the footer site-wide and in full on every legal page. VAT number, address and управител still `[TODO]`.** ~~No trader identification (impressum).~~ The footer shows only the brand name and a copyright line — no legal entity name, ЕИК, VAT number, registered address, email, or supervisory authority (КЗП) contacts. The only contact details on the whole site are a phone number and an Instagram handle.                                                                                                                                               | `src/components/layout/Footer.tsx:62-64`; `src/app/[locale]/contact/page.tsx:66-90`                                                                                                                                                                       | Regulatory exposure; consumer trust                                       | **S**                   |
-| **B-17** | Email           | **FOUNDATION ONLY (Phase 0.7) — `src/lib/mailer.ts` defines the contract and reports `unconfigured`; no provider chosen, nothing sends yet.** ~~No transactional email of any kind.~~ No provider, no templates, no sending domain, no queue. A customer who ordered would receive nothing — no confirmation, no receipt, no tracking.                                                                                                                                                                                                                                                              | `package.json:11-18`                                                                                                                                                                                                                                      | Order confirmation is a legal and practical necessity **`[VERIFY]`**      | **M**                   |
+| **B-17** | Email           | **DONE (2026-09-21) — Resend over `fetch`; a placed order emails the customer a confirmation and the shop a packing notification, and an email can never fail an order.** ~~No transactional email of any kind.~~ ~~FOUNDATION ONLY (Phase 0.7).~~ Still owed: tracking-number email once waybills exist, and a queue (sends are inline, bounded by a 10 s timeout).                                                                                                                                                                                                                                                              | `package.json:11-18`                                                                                                                                                                                                                                      | Order confirmation is a legal and practical necessity **`[VERIFY]`**      | **M**                   |
 | **B-18** | GDPR            | **No customer data handling at all** — no lawful-basis record, no consent capture or timestamps, no retention policy, no deletion/anonymisation, no DSAR export/delete, no sub-processor list. Nothing to fix yet, but all of it must be designed *with* the commerce build rather than after.                                                                                                                                                        | verified                                                                                                                                                                                                                                                  | Compliance exposure once the first order is stored                        | **M**                   |
 | **B-19** | Frontend / data | **Five product images referenced in data do not exist.** Every product except `winter-wonderland` points `hoverImagePath` at `IMG_75xx_alt.webp`; `public/images/candles/` contains only `IMG_7520–7524.webp` with no `_alt` variants. Each is rendered with `priority`, so the browser **preloads** five guaranteed 404s on the homepage and again on the products page.                                                                             | `src/data/products.ts:37,73,109,145,181`; `src/components/products/ProductCard.tsx:49-61`, `:55`; `ls public/images/candles/`                                                                                                                             | Visible defect, wasted bandwidth, console noise                           | **S**                   |
 | **B-20** | Frontend        | **DONE (Phase 0.7) — real `/api/contact` with validation, rate limiting and a honeypot; returns 503 and tells the customer to phone while email is unconfigured, instead of faking success.** ~~The contact form is fake.~~ `handleSubmit` awaits a 1000 ms `setTimeout` and then unconditionally shows "Message sent! We'll get back to you soon." No network call, no persistence, no email. The `catch` branch and the `error` state (`:25`, `:150`) are unreachable. Customer enquiries — including order enquiries — are silently destroyed while the customer is told otherwise.                                                              | `src/app/[locale]/contact/page.tsx:27-39`, `:96-106`                                                                                                                                                                                                      | Data loss + actively misleading the customer                              | **S**                   |
@@ -432,7 +549,7 @@ glowColor?, emoji, highlight?, seasonal, price?, imagePath, hoverImagePath?
 | **N-08** | Frontend      | The hero headline is split on whitespace to italicise the last word. This is fragile across locales and breaks if a translation ends in punctuation or a multi-word phrase.                                                     | `src/components/home/Hero.tsx:55-58`                                                            | Typographic glitch in BG                           | S                          |
 | **N-09** | Accessibility | `prefers-reduced-motion` is not respected anywhere despite heavy `framer-motion` use.                                                                                                                                           | `src/app/globals.css:1-10`; all `motion.*` usages                                               | WCAG 2.3.3 (AAA) / comfort                         | S                          |
 | **N-10** | Frontend      | Image `alt` text is just `product.name` ("Cherry"), and the hero's is `"55candles hero"`. Descriptive alt text would serve both AT users and image search.                                                                      | `src/components/products/ProductCard.tsx:36`, `:53`; `src/components/home/Hero.tsx:20`          | Minor a11y/SEO                                     | S                          |
-| **N-11** | Commerce      | No wishlist, no product reviews, no search/filter by scent or mood, no gift wrapping, no discount codes, no abandoned-cart recovery. All reasonable v2.                                                                         | —                                                                                               | Growth                                             | M–L                        |
+| **N-11** | Commerce      | **Partial (2026-09-20): discount codes now exist** — `src/lib/promo.ts`, entered at checkout, see Q-37. Still absent: wishlist, product reviews, search/filter by scent or mood, gift wrapping, abandoned-cart recovery. All reasonable v2.                                                                         | —                                                                                               | Growth                                             | M–L                        |
 | **N-12** | Ops           | **DONE (Phase 0.7).** ~~No `.env.example`~~ to document required configuration once B-01 lands.                                                                                                                                                           | verified                                                                                        | Onboarding                                         | S                          |
 
 ---
@@ -451,7 +568,7 @@ These cannot be determined from the code. **Nothing below has been guessed.**
   `@55candles.bg` on Instagram (`src/app/[locale]/contact/page.tsx:67`, `:79`).
 - **Q-05** Do you have a Data Protection Officer, or is one required for your scale? `[VERIFY]`
 - **Q-06** What domain will this deploy to? Needed for `metadataBase`, canonicals, cookie scope, email SPF/DKIM/DMARC,
-  and Stripe/courier webhook URLs.
+  and courier webhook URLs. **Answered 2026-09-20: `55candles.com`** (bare domain canonical).
 
 ### Selling scope
 
@@ -485,23 +602,29 @@ These cannot be determined from the code. **Nothing below has been guessed.**
 
 ### Payments & shipping
 
-- **Q-20** Stripe account country and default currency — and is it the same legal entity as Q-01?
-- **Q-21** Card *and* COD from day one, or COD first? This materially changes the launch scope.
-- **Q-22** Do you have Speedy and/or Econt merchant contracts yet, and API credentials for their test environments?
+- ~~**Q-20** Stripe account country and default currency~~ — **ANSWERED 2026-09-20: no card payments at all.**
+- ~~**Q-21** Card *and* COD from day one, or COD first?~~ — **ANSWERED: наложен платеж only, indefinitely.**
+- **Q-22** Do you have Speedy and/or Econt merchant contracts yet, and API credentials for their test environments? Econt's are now the one thing standing between the checkout and real delivery prices — `ECONT_USERNAME`, `ECONT_PASSWORD` and `ECONT_SENDER_OFFICE_CODE`. Until they are set the checkout charges the stand-in card and says so.
 - **Q-23** Who absorbs the COD fee — you or the customer? It must be shown as a line item before the customer confirms.
-- **Q-24** Free-shipping threshold, if any?
+- ~~**Q-24** Free-shipping threshold, if any?~~ — **ANSWERED 2026-09-20: free delivery from 3 candles up, at the shop's
+  expense.** Counted in candles rather than order value, and rendered on the basket as "one more candle for free
+  delivery" so a customer one short can act on it. What this costs per parcel is on the creation event
+  (`shippingAbsorbedMinor`) — 4.03 EUR office-to-office today, which is a fifth of a single candle's price, so it is
+  worth watching on three-candle orders specifically.
 - **Q-25** Do you want to offer address-to-door, office pickup, and APS (автомат), or a subset?
-- **Q-26** Statement descriptor you want on customers' card statements?
+- ~~**Q-26** Statement descriptor you want on customers' card statements?~~ — **moot: no card statements** (Q-20).
 
 ### Tax & invoicing — all `[VERIFY WITH ACCOUNTANT]`
 
 - **Q-27** Do you issue фактури for every order, or only on request? What numbering series and who owns the sequence?
 - **Q-28** **Наредба Н-18 / НАП e-shop obligations:** does this shop need to be registered with НАП as an e-shop, and
-  what software declaration applies? How do receipt obligations differ between card payments and COD collected by the
-  courier (where the courier's fiscal device is typically involved)? I am explicitly not answering this.
+  what software declaration applies? Since every order is COD collected by the courier (whose fiscal device is
+  typically involved), this is the *only* receipt path there is, which raises rather than lowers its importance. I am
+  explicitly not answering it.
   `[VERIFY WITH ACCOUNTANT]`
 - **Q-29** If selling EU-wide, will you register for OSS? `[VERIFY WITH ACCOUNTANT]`
-- **Q-30** Will you use Stripe Tax, or calculate VAT yourself?
+- **Q-30** VAT calculation is yours to do — there is no payment provider's tax service to lean on (Q-20). How will it
+  be calculated and evidenced? `[VERIFY WITH ACCOUNTANT]`
 
 ### Data & operations
 
@@ -522,6 +645,18 @@ These cannot be determined from the code. **Nothing below has been guessed.**
   the hover-swap logic in `ProductCard` — if you supply the `_alt.webp` assets, re-adding `hoverImagePath` to
   `src/data/products.ts` turns the effect back on with no code change. If you have no second shots, say so and I'll
   strip the component logic too.
+
+### Raised during Phase 1b
+
+- **Q-37** **What promo codes do you actually want, and what is each one worth?** The mechanism is built and live
+  (`PROMO_CODES` in `src/lib/promo.ts`): per code, a percentage or a fixed amount off the goods, an optional minimum
+  basket and an optional last day. What is *not* decided is the codes themselves, so the table ships one example —
+  `55CANDLES10`, 10% off, no minimum, no expiry. **It works the moment this deploys and anyone who guesses the string
+  can use it**, which is the argument for replacing it rather than leaving it: a ten-percent discount available to
+  everybody is a price cut, not a campaign. Tell me the codes, their values and their end dates and they go in as data.
+  Two things worth deciding at the same time: whether any code may combine with the free delivery (today it can — the
+  carriage is earned on candle count before the discount is applied), and whether you want per-code usage limits, which
+  would need a counter in the database rather than a table entry.
 
 ---
 
@@ -583,62 +718,35 @@ Do this first; you are about to build pricing logic and need a working test suit
 5. **Idempotency (B-09):** generate an order-intent token when the checkout page loads; `POST /api/orders` carries it; a
    unique DB constraint on the token makes double-click and refresh no-ops that return the existing order.
 6. Order number scheme, separate from the primary key — e.g. `55C-2026-000123`.
-7. **Order state machine (B-08, B-14):** model card and COD as distinct paths from the start.
+7. **Order state machine (B-08, B-14):** one path, because there is one payment method (Q-20 closed 2026-09-20).
    ```
-   draft → pending_payment → paid → packed → shipped → delivered
-                          ↘ payment_failed → cancelled
-   draft → awaiting_cod   → confirmed → packed → shipped → delivered
-                                                        → cod_collected → reconciled
-                                                        → refused_at_delivery → returned
+   draft → awaiting_cod → confirmed → packed → shipped → delivered
+                                                       → cod_collected → reconciled
+                                                       → refused_at_delivery → returned
    any → cancelled | returned | refunded | partially_refunded
    ```
+   No `paid` state: money reaches the shop through the courier's remittance, which is `cod_collected` → `reconciled`.
    Transitions go through one function that writes an `order_event` row. Nothing else mutates `order.status`.
 8. Order confirmation page, addressed by order number + a random token (never a guessable sequential id).
 
 **Gate:** unit tests for cart totals, VAT, shipping and idempotency. This is the code most worth testing.
 
-### Phase 3 — Stripe (~1 week)
+### Phase 3 — Payments: nothing to build (closed 2026-09-20)
 
-**Recommendation: hosted Stripe Checkout Session for v1.**
+**This phase is cancelled by the owner's decision: there will be no card payments.** Наложен платеж is the only method.
 
-Justification for *this* stack: there is no auth and no existing payment UI, so the fastest safe path is one that keeps
-card data entirely off your servers. Checkout gives SCA/3-D Secure handling for free (mandatory in the EU), supports
-local payment methods and wallets with no extra front-end work, and keeps you in the smallest PCI scope (SAQ A). Because
-the session is created server-side from DB-resident line items, the amount is server-computed by construction — the
-client cannot influence it. Use `client_reference_id` to bind the session to your order.
+What that removes from the plan, and from the code: the provider dependency and keys, the Checkout Session endpoint, the
+signed webhook that was to be the payment source of truth, the `webhook_events` replay table, the `pending_payment` /
+`payment_failed` / `paid` statuses, the statement descriptor (Q-26), the decline/retry UX, the provider's tax service
+(Q-30) and the whole PCI conversation. `src/lib/payments.ts` is now a decision record rather than an integration.
 
-Rejected: **Payment Links** — cannot carry a dynamic cart, per-order shipping, or the COD branch. **Payment Element** —
-better long-term if you want card and наложен платеж as radio buttons in one branded page; revisit in v2 once the order
-pipeline is proven. Note that with COD in the mix you need your own order record regardless, which removes most of
-Checkout's usual downside.
+What it does **not** remove, and what carries the weight instead: the money still has to be collected and reconciled, by
+the courier, in Phase 4 — see **B-14**. An order is not settled when it is delivered; it is settled when the courier's
+remittance is matched to it. And the receipt question gets *harder*, not easier: every sale is now courier-collected
+cash under Наредба Н-18 (Q-28, `[VERIFY WITH ACCOUNTANT]`).
 
-Steps:
-
-1. `npm i stripe` (server) + `@stripe/stripe-js` (client redirect only). **`STRIPE_SECRET_KEY` server-side only** —
-   never prefixed `NEXT_PUBLIC_`. Only the publishable key may reach the browser. Verify after build that the secret key
-   does not appear in `.next/static`.
-2. `POST /api/checkout/session` — loads the order from the DB, builds `line_items` from **stored** prices, sets
-   currency, `client_reference_id = order.id`, success/cancel URLs, and an idempotency key derived from the order id.
-3. Order stays `pending_payment`. **The client redirect back is treated as a hint only — it never marks anything paid
-   ** (B-11).
-4. `POST /api/stripe/webhook` — the payment source of truth:
-    - read the **raw** request body (do not let a body parser touch it) and verify the signature with
-      `STRIPE_WEBHOOK_SECRET`
-    - insert `event.id` into `webhook_event` with a unique constraint; on conflict, return 200 and stop →
-      replay/duplicate protection
-    - handle: `checkout.session.completed` (check `payment_status === 'paid'`),
-      `checkout.session.async_payment_succeeded` / `async_payment_failed`, `payment_intent.succeeded`,
-      `payment_intent.payment_failed`, `charge.refunded`, `charge.dispute.created`
-    - transition the order and enqueue the confirmation email
-    - return 2xx fast; do slow work in the queue, not in the handler
-    - exclude `/api` from the i18n proxy matcher — already the case (`src/proxy.ts:9`)
-5. Decline/error UX: friendly BG+EN messaging on `payment_failed`, cart preserved, retry without rebuilding the order.
-6. Refunds: admin-triggered, partial and full, via the Stripe API; reflect the result from the `charge.refunded`
-   webhook, not from the API response.
-7. Configure statement descriptor (Q-26), Stripe receipts, and decide on Stripe Tax vs. own VAT calculation (Q-30).
-8. **Never log** full request/response bodies from Stripe, and never log PAN, CVC or full customer payloads.
-9. Test with Stripe's test cards including 3-D Secure challenge and decline codes; drive webhooks with the Stripe CLI
-   before going live.
+If this is ever reversed, treat it as a fresh design exercise — the superseded plan is in this file's git history
+(`git log -p AUDIT.md`), but any provider, API version and SCA rule in it will need re-checking before it is trusted.
 
 ### Phase 4 — Couriers: Econt & Speedy, incl. наложен платеж (~1.5–2 weeks)
 
@@ -666,10 +774,10 @@ Steps:
    the order a **snapshot**: `courier`, `office_id`, `office_name`, `office_address`, `city`, `postcode`, `captured_at`.
    Re-validate the office id before creating the waybill — offices close.
 4. **Shipping price:** compute server-side from summed product weight (Q-12) + packaging weight, per courier, per
-   delivery type (door vs office vs APS), with the free-shipping threshold (Q-24) applied after. Cache office lists;
+   delivery type (door vs office vs APS), with the free-delivery rule applied after (Q-24, answered: free from 3 candles). Cache office lists;
    never quote from the client.
 5. **COD (наложен платеж):**
-    - order goes to `awaiting_cod`, **not** `paid` — no Stripe object exists for it
+    - order goes to `awaiting_cod`, and there is no `paid` status to skip to (Q-20)
     - amount to collect = goods + shipping + COD fee if passed to the customer (Q-23); show it as an explicit line
       before confirmation
     - set the COD amount on the waybill; store the returned COD reference
@@ -701,7 +809,7 @@ legal advice. **Have a Bulgarian lawyer review before launch.**
 > Controller identity and contacts `[TODO]` · DPO if any `[TODO: see Q-05]` · **a table of purpose → data categories →
 lawful basis → retention**, minimally: order fulfilment (contract), invoicing/accounting (legal obligation, retention
 > per Q-33), marketing (consent), fraud prevention (legitimate interest), essential cookies (necessity) · recipients/*
-*sub-processors** — Stripe, Speedy, Econt, email provider, hosting, and analytics if added
+*sub-processors** — Speedy, Econt, email provider, hosting, and analytics if added (no payment processor: Q-20)
 `[TODO: confirm each provider and whether any transfers data outside the EU/EEA, and on what safeguard]` · data-subject
 > rights incl. access, rectification, erasure, portability, objection, withdrawal of consent · right to complain to **КЗЛД
 ** `[TODO: current contact details]` · whether provision of data is a contractual requirement · no automated
@@ -724,7 +832,7 @@ goods — `[TODO: Q-17, do not state either way until confirmed]`**.
 > timeframe `[TODO]` · **КЗП** contact details `[TODO: current address, phone, website]`.
 
 **Доставка и плащане** — `/legal/delivery`
-> Couriers and methods (door / office / APS) · **cost table by weight and method** `[TODO: Q-12, Q-24]` · timeframes
+> Couriers and methods (door / office / APS) · **cost table by weight and method** `[TODO: Q-12]` · **free delivery from 3 candles** (Q-24, answered — state it here too) · timeframes
 `[TODO]` · **наложен платеж and its fee** `[TODO: Q-23]` · card payment · what happens on a failed delivery · geographic
 > coverage `[TODO: Q-07]`.
 
@@ -748,7 +856,8 @@ it later. Add an automated check that no analytics script tag can be injected be
    financial record intact.
 4. DSAR endpoints in the admin: export a customer's data as JSON, and delete/anonymise on request with an audit trail.
 5. **PII hygiene:** structured logging with an explicit allowlist of loggable fields; redact email, phone, address and
-   any Stripe payload before it reaches logs or the error monitor; scrub PII in the error-monitoring SDK's `beforeSend`.
+   any courier payload before it reaches logs or the error monitor; scrub PII in the error-monitoring SDK's
+   `beforeSend`.
 6. Email provider (Q-34) with **SPF, DKIM and DMARC** on the sending domain (Q-06). Warm the domain before launch.
 7. Templates in BG and EN: order confirmation, payment receipt / фактура, shipment + tracking link, cancellation,
    refund, COD reminder, password reset (only if accounts exist).
@@ -759,10 +868,13 @@ it later. Add an automated check that no analytics script tag can be injected be
 
 ### Phase 7 — Admin & invoicing (~1 week)
 
-1. Minimal authenticated admin: order list and detail, status transitions, waybill creation, label download, refund
-   trigger, COD reconciliation import.
-2. Auth for it: strong password hashing (argon2id or bcrypt ≥12 rounds), `httpOnly`+`secure`+`sameSite` session cookies,
-   rate-limited login with lockout, and CSRF protection on every mutating route.
+1. **PARTIAL (2026-09-21)** — `/admin` has the order list, the order detail and enforced status transitions. Still
+   owed: waybill creation, label download, refund trigger and COD reconciliation import.
+2. **PARTIAL (2026-09-21)** — one shared password (`ADMIN_PASSWORD`) with an `HttpOnly`+`Secure`+`SameSite=Lax` signed
+   session cookie and a per-IP throttle on the login form. Password *hashing* is moot while there is no users table —
+   the comparison is constant-time against the environment variable, and the hashing requirement returns with the
+   table. Still owed: lockout (the throttle is in-process and resets on deploy) and explicit CSRF tokens; Server
+   Actions carry Next's own origin check, and the session cookie is `SameSite=Lax`.
 3. **Authorization on every single route** — the default answer to "can user A read user B's order?" must be no,
    enforced server-side per request, not by hiding UI. Guest order lookup by opaque token only.
 4. Rate limiting on login, checkout, contact and any courier-quote endpoint.
@@ -780,9 +892,9 @@ it later. Add an automated check that no analytics script tag can be injected be
    priorities). What remains here is measurement: Core Web Vitals on a throttled mobile connection, and a re-check
    after the cart and checkout add their own client code.
 4. Ops: error monitoring, structured logging, `/api/health`, **database backups with a tested restore**, staging
-   environment with Stripe test keys and courier demo credentials, and a written rollback plan (S-15, S-16).
-5. Full end-to-end rehearsal on staging: browse → cart → checkout → **card** → webhook → email → waybill → tracking,
-   then the same for **COD**, then a refund, then a withdrawal/return.
+   environment with courier demo credentials, and a written rollback plan (S-15, S-16).
+5. Full end-to-end rehearsal on staging: browse → cart → checkout → order stored → email → waybill → tracking → cash
+   collected → remittance reconciled, then a refused delivery, then a refund, then a withdrawal/return.
 6. Final sweep: confirm no secret key in the client bundle, no PII in logs, no tracker firing before consent, and legal
    pages reachable from every page.
 
