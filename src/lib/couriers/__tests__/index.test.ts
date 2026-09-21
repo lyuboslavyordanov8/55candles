@@ -212,14 +212,36 @@ describe('the launch checklist', () => {
   })
 })
 
+/**
+ * Runs `body` with the registered seat overridden, then restores it.
+ *
+ * Mutating the frozen-by-convention constant is the only way to model "the seat is
+ * not filled in", which is no longer the default state — and the restore matters,
+ * because a leaked override would silently change every later test's sender.
+ */
+function withSeat(patch: Record<string, string>, body: () => void) {
+  const seat = company.address as unknown as Record<string, string>
+  const before = { ...seat }
+
+  Object.assign(seat, patch)
+  try {
+    body()
+  } finally {
+    Object.assign(seat, before)
+  }
+}
+
 describe('the hand-over point', () => {
-  it('is unset out of the box, so nothing can be priced from a guess', () => {
-    // The registered seat in `company.ts` is still `[TODO: …]`, and the same
-    // parcel costs a different amount posted from an office than collected from
-    // an address — so "no sender configured" has to mean "cannot quote", not a
-    // default.
-    expect(econtShipFrom()).toBeNull()
-    expect(canQuoteLiveRates('econt')).toBe(false)
+  it('defaults to the registered seat, now that the owner has supplied one', () => {
+    // A home business hands parcels over where it is registered, so filling in the
+    // impressum is enough to price from. Asserted against `company.address` rather
+    // than against literals: this is about the wiring, and the seat's own values
+    // are asserted in the impressum tests.
+    expect(econtShipFrom()).toEqual({
+      city: company.address.city,
+      postCode: company.address.postalCode,
+      street: company.address.street,
+    })
   })
 
   it('uses the office the merchant drops parcels at, when one is named', () => {
@@ -242,8 +264,15 @@ describe('the hand-over point', () => {
     vi.stubEnv('ECONT_SENDER_CITY', 'София')
     vi.stubEnv('ECONT_SENDER_POST_CODE', '1000')
 
-    // Two thirds of an address is not an address, and Econt would reject it.
-    expect(econtShipFrom()).toBeNull()
+    // Two thirds of an address is not an address, and Econt would reject it — so
+    // the partial override is ignored in favour of the seat rather than being
+    // patched up with the seat's street, which would be a third address that
+    // exists nowhere.
+    expect(econtShipFrom()).toEqual({
+      city: company.address.city,
+      postCode: company.address.postalCode,
+      street: company.address.street,
+    })
 
     vi.stubEnv('ECONT_SENDER_STREET', 'бул. Витоша 10')
 
@@ -254,24 +283,15 @@ describe('the hand-over point', () => {
     })
   })
 
-  it('falls back to the registered seat once the owner fills it in', () => {
-    // Mutating the constant is the only way to model "the owner answered", and
-    // it is restored below. The point is that filling in the impressum is enough
-    // — a home business hands parcels over where it is registered.
-    const seat = company.address as unknown as Record<string, string>
-    const before = { ...seat }
-
-    Object.assign(seat, { street: 'ул. Пример 1', city: 'София', postalCode: '1000' })
-
-    try {
-      expect(econtShipFrom()).toEqual({
-        city: 'София',
-        postCode: '1000',
-        street: 'ул. Пример 1',
-      })
-    } finally {
-      Object.assign(seat, before)
-    }
+  it('quotes nothing at all if the seat is ever emptied back to a marker', () => {
+    // The guard that used to be the out-of-the-box case. The same parcel costs a
+    // different amount posted from an office than collected from an address, so
+    // "nowhere to post from" has to mean "cannot quote" rather than a default —
+    // and that has to stay true if someone clears the impressum again.
+    withSeat({ street: '[TODO: street and number]' }, () => {
+      expect(econtShipFrom()).toBeNull()
+      expect(canQuoteLiveRates('econt')).toBe(false)
+    })
   })
 })
 
@@ -280,17 +300,19 @@ describe('whether a courier can quote a real price', () => {
     vi.stubEnv('ECONT_USERNAME', 'merchant')
     vi.stubEnv('ECONT_PASSWORD', 'secret')
 
-    // Credentials alone buy an authenticated call for a parcel posted from
-    // nowhere.
-    expect(canQuoteLiveRates('econt')).toBe(false)
-    expect(missingLiveRateRequirements()).toEqual([
-      'ECONT_SENDER_OFFICE_CODE or the registered address in company.ts',
-    ])
-
-    vi.stubEnv('ECONT_SENDER_OFFICE_CODE', '1120')
-
+    // The registered seat supplies the hand-over point, so credentials are the
+    // last thing needed.
     expect(canQuoteLiveRates('econt')).toBe(true)
     expect(missingLiveRateRequirements()).toEqual([])
+
+    // Without one, credentials alone buy an authenticated call for a parcel posted
+    // from nowhere.
+    withSeat({ city: '[TODO: city]' }, () => {
+      expect(canQuoteLiveRates('econt')).toBe(false)
+      expect(missingLiveRateRequirements()).toEqual([
+        'ECONT_SENDER_OFFICE_CODE or the registered address in company.ts',
+      ])
+    })
   })
 
   it('names the credentials that are missing while the sender is set', () => {

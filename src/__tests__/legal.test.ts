@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest'
 import enMessages from '../../messages/en.json'
 import bgMessages from '../../messages/bg.json'
 import { LEGAL_DOCS, LEGAL_IS_DRAFT, isLegalSlug, legalPath } from '../lib/legal'
-import { company, missingIdentityFields, isTodo } from '../lib/company'
+import {
+  company,
+  formatAddress,
+  isIdentityComplete,
+  missingIdentityFields,
+  isTodo,
+} from '../lib/company'
 
 type Catalogue = typeof enMessages
 
@@ -124,24 +130,42 @@ describe('trader identity', () => {
     expect(company.vatNumber).not.toBe(`BG${company.eik}`)
   })
 
+  it('publishes no VAT number while the company is not registered', () => {
+    // The two have to agree. A number with the flag false would be a false number
+    // on the impressum; the flag true with no number would be a missing one.
+    expect(company.isVatRegistered).toBe(false)
+    expect(company.vatNumber).toBeNull()
+  })
+
+  it('records the registered seat', () => {
+    // As held by the Търговски регистър, in Cyrillic — the impressum has to match
+    // the register, so this asserts the parts rather than the formatting.
+    expect(company.address.city).toBe('София')
+    expect(company.address.postalCode).toBe('1734')
+    expect(company.address.street).toContain('Еньо Вълчев')
+    expect(formatAddress('bg')).toContain('България')
+    expect(formatAddress('en')).toContain('Bulgaria')
+  })
+
   it('renders unresolved fields visibly rather than blank', () => {
     for (const field of missingIdentityFields()) {
       expect(field.length).toBeGreaterThan(0)
     }
-    // Whatever is unset must be a visible marker, never an empty string.
-    for (const value of [company.manager, company.contact.email]) {
+    // Whatever is unset must be a visible marker or a deliberate `null`, never an
+    // empty string — `null` is omitted by every consumer, `''` renders as a blank
+    // row that looks like a shop which has lost its own details.
+    for (const value of [company.manager, company.vatNumber, company.contact.email]) {
+      if (value === null) continue
       expect(value.length, 'identity fields must never be empty strings').toBeGreaterThan(0)
       if (isTodo(value)) expect(value).toMatch(/^\[TODO:/)
     }
   })
 
-  it('lists what the owner still has to supply', () => {
-    const missing = missingIdentityFields()
-    // Fails once everything is filled in, which is the signal to delete this
-    // test and assert isIdentityComplete() instead.
-    // `contact.email` is no longer here: `contact@55candles.com` receives (it
-    // forwards to the owners' mailboxes), so the impressum has a durable channel.
-    expect(missing).not.toContain('contact.email')
-    expect(missing).toContain('address.street')
+  it('has every trader-identity field the impressum needs', () => {
+    // The owner supplied the last of them on 2026-09-21. This is the assertion the
+    // old "lists what is still missing" test existed to grow into, and it now
+    // guards against a field being emptied again.
+    expect(missingIdentityFields()).toEqual([])
+    expect(isIdentityComplete()).toBe(true)
   })
 })

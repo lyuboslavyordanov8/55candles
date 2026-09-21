@@ -48,21 +48,44 @@ export const company = {
    * company, not a string transformation. Do not derive it from the ЕИК.
    * Registration is mandatory above the turnover threshold and optional below
    * it, and it changes what the prices on this site must include.
+   *
+   * Not registered, as confirmed by the owner on 2026-09-21: `null`, because
+   * there is no number to publish. The impressum says so in words rather than
+   * dropping the row — "ДДС №" left blank reads as an oversight, and a customer
+   * comparing prices is entitled to know no VAT is charged on them.
    */
-  vatNumber: '[TODO: ДДС номер, or confirm not VAT-registered]' as Todo | string,
-  isVatRegistered: null as boolean | null,
+  vatNumber: null as string | null,
+  isVatRegistered: false,
 
-  /** Registered seat (седалище и адрес на управление) from the Търговски регистър. */
+  /**
+   * Registered seat (седалище и адрес на управление) from the Търговски регистър,
+   * confirmed by the owner on 2026-09-21.
+   *
+   * Kept in Cyrillic on both locales: this is the address as it is registered, and
+   * a transliteration would not be the registered seat. `street` carries the
+   * district and the housing estate as well as the street, because that is the
+   * whole of what the register holds — splitting them out would invent fields the
+   * impressum and `PostalAddress` have nowhere to put.
+   */
   address: {
-    street: '[TODO: street and number]' as Todo | string,
-    city: '[TODO: city]' as Todo | string,
-    postalCode: '[TODO: postal code]' as Todo | string,
+    street: 'р-н Студентски, ж.к. Малинова долина, ул. „Еньо Вълчев“ 1А',
+    city: 'София',
+    postalCode: '1734',
     country: 'Bulgaria',
+    countryName: { bg: 'България', en: 'Bulgaria' } as Record<string, string>,
     countryCode: 'BG',
   },
 
-  /** Управител — required on the impressum. */
-  manager: '[TODO: name of управител]' as Todo | string,
+  /**
+   * Управител.
+   *
+   * `null` by the owner's decision of 2026-09-21, and lawfully so: ТЗ чл. 13 and
+   * ЗЕТ чл. 4 require the firm, the seat and address of management, the ЕИК and a
+   * VAT number where there is one — not the name of the manager, which anyone can
+   * look up against the ЕИК in the Търговски регистър anyway. Put a name here and
+   * the impressum row reappears.
+   */
+  manager: null as string | null,
 
   contact: {
     /**
@@ -97,10 +120,17 @@ export const company = {
   },
 } as const
 
-/** Formatted registered address, or the TODO markers if it is unset. */
-export function formatAddress(): string {
-  const { street, postalCode, city, country } = company.address
-  return [street, `${postalCode} ${city}`.trim(), country].filter(Boolean).join(', ')
+/**
+ * Formatted registered address, or the TODO markers if it is unset.
+ *
+ * The locale only picks the country name: the rest is the registered wording and
+ * does not translate. Reading "…, София, Bulgaria" on the Bulgarian impressum was
+ * the one part that looked like a bug rather than a legal address.
+ */
+export function formatAddress(locale?: string): string {
+  const { street, postalCode, city, country, countryName } = company.address
+  const land = (locale && countryName[locale]) || country
+  return [street, `${postalCode} ${city}`.trim(), land].filter(Boolean).join(', ')
 }
 
 /**
@@ -110,7 +140,10 @@ export function formatAddress(): string {
 export function missingIdentityFields(): string[] {
   const missing: string[] = []
 
-  const checks: Array<[string, string]> = [
+  // `null` is not missing — it is a decision that a field has no value (no VAT
+  // registration, no published manager or phone), and every consumer omits it.
+  // Only a `[TODO:]` marker means nobody has decided yet.
+  const checks: Array<[string, string | null]> = [
     ['vatNumber', company.vatNumber],
     ['manager', company.manager],
     ['contact.email', company.contact.email],
@@ -120,7 +153,7 @@ export function missingIdentityFields(): string[] {
   ]
 
   for (const [field, value] of checks) {
-    if (isTodo(value)) missing.push(field)
+    if (value !== null && isTodo(value)) missing.push(field)
   }
 
   if (company.isVatRegistered === null) missing.push('isVatRegistered')
