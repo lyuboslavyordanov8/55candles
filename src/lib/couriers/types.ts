@@ -69,16 +69,13 @@ export type LookupResult<T> =
   | { status: 'failed'; courier: Courier; reason: string }
 
 /**
- * A parcel to be priced.
+ * Where a parcel is going, in the form both couriers address one.
  *
- * Deliberately carries **no personal data**: no name, no phone, no house number.
- * A price depends on the destination settlement, the weight and the amount to
- * collect, and nothing else — verified against Econt on 2026-09-20, where a
- * quote with no `receiverClient` at all returns the same figure as one with it.
- * So the customer's details are sent to the courier when a waybill is created
- * and there is a parcel to deliver, not while they are still deciding.
+ * Shared by the quote and the waybill so that the price a customer was shown and
+ * the label eventually printed are built from the same fields — a parcel quoted
+ * to an office and booked to an address would be a different price, silently.
  */
-export interface ShipmentQuoteRequest {
+export interface ParcelDestination {
   method: DeliveryMethod
   /** The office code for `office`/`locker` — a `CourierOffice.id`. */
   officeId?: string
@@ -90,12 +87,71 @@ export interface ShipmentQuoteRequest {
    * alone is ambiguous, and Econt refuses it with "повече от едно населени места".
    */
   address?: { city: string; postCode: string; street: string }
+}
+
+/**
+ * A parcel to be priced.
+ *
+ * Deliberately carries **no personal data**: no name, no phone, no house number.
+ * A price depends on the destination settlement, the weight and the amount to
+ * collect, and nothing else — verified against Econt on 2026-09-20, where a
+ * quote with no `receiverClient` at all returns the same figure as one with it.
+ * So the customer's details are sent to the courier when a waybill is created
+ * and there is a parcel to deliver, not while they are still deciding.
+ */
+export interface ShipmentQuoteRequest extends ParcelDestination {
   weightGrams: number
   /**
    * What the courier will collect on delivery (наложен платеж), so that its COD
    * fee comes back as part of the answer. `null` for no collection.
    */
   codAmount: Money | null
+}
+
+/**
+ * A parcel to actually book.
+ *
+ * The quote's fields plus the two things a courier cannot deliver without: who
+ * to hand it to and what number to ring. This is the moment the customer's
+ * details leave the shop, which is why they appear on this type and not on
+ * `ShipmentQuoteRequest`.
+ */
+export interface WaybillRequest extends ParcelDestination {
+  weightGrams: number
+  /** What the courier collects on delivery. `null` on a prepaid parcel. */
+  codAmount: Money | null
+  recipient: {
+    name: string
+    /** Required by every courier: a parcel with no phone is a parcel nobody can deliver. */
+    phone: string
+    /** Passed on only when the customer gave one, for the courier's own notification. */
+    email?: string
+  }
+  /**
+   * Our order number, printed on the label and carried in the courier's own
+   * record, so a parcel found on a shelf can be traced back to an order.
+   */
+  orderNumber: string
+}
+
+/**
+ * A booked parcel.
+ *
+ * `number` is the only field that must exist: once the courier has issued one,
+ * the parcel is real and billable, so everything else is best-effort detail
+ * rather than a reason to report failure. See `createWaybill`.
+ */
+export interface Waybill {
+  /** The waybill (товарителница) number, as printed and tracked. */
+  number: string
+  /** Public tracking page for this parcel, ready to send to the customer. */
+  trackingUrl: string
+  /** The courier's own printable label, when the response carries one. */
+  pdfUrl?: string
+  /** What the courier says this parcel costs, when the response is readable. */
+  price?: ShipmentRate
+  /** ISO date the courier expects to deliver on, when it commits to one. */
+  expectedDeliveryDate?: string
 }
 
 /**
@@ -153,4 +209,21 @@ export interface CourierClient {
    * `src/lib/shipping-rates.ts`.
    */
   priceShipment(request: ShipmentQuoteRequest): Promise<LookupResult<ShipmentRate>>
+
+  /**
+   * Book the parcel: this **creates a real waybill** the shop will be billed for.
+   *
+   * The one call in this contract with a side effect at the courier, which sets
+   * two rules for every implementation:
+   *
+   * - **Never `failed` once a number exists.** If the courier issued a waybill
+   *   and something later in the response could not be read, report `ok` with
+   *   what is known. A `failed` result invites the caller to try again, and a
+   *   retry here means a second parcel, a second charge, and a label the shop
+   *   has to find and cancel.
+   * - **Idempotency is the caller's.** No courier API we use offers it, so
+   *   `src/lib/waybills.ts` holds the guard: an order that already has a number
+   *   is never booked twice.
+   */
+  createWaybill(request: WaybillRequest): Promise<LookupResult<Waybill>>
 }

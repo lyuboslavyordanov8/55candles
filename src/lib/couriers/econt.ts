@@ -8,8 +8,11 @@ import type {
   CourierClient,
   CourierOffice,
   LookupResult,
+  ParcelDestination,
   ShipmentQuoteRequest,
   ShipmentRate,
+  Waybill,
+  WaybillRequest,
 } from './types'
 
 /**
@@ -43,13 +46,25 @@ import type {
  * things that cost money. `priceShipment` is that call site and carries its own;
  * it is also the only thing here that can answer `unconfigured`.
  *
- * ## Pricing: `createLabel` in `calculate` mode
+ * ## Pricing and booking: one endpoint, two modes
  *
  * There is no separate rate endpoint. `Shipments/LabelService.createLabel.json`
  * takes `mode: 'calculate' | 'validate' | 'create'`, and `calculate` prices a
  * parcel without booking anything — verified against the demo service on
  * 2026-09-20, where it returned the tariff line by name ("между офисите на
  * куриера до 1 кг") and a separate наложен платеж fee.
+ *
+ * `create` is the same request with the customer's name and phone added, and it
+ * **books a real parcel the shop is billed for**. The `mode` field is therefore
+ * the single most consequential string in this file, and the two call sites are
+ * deliberately separate functions — `quoteBody` can only ever say `calculate`,
+ * `waybillBody` can only ever say `create`, and neither takes the mode as an
+ * argument that could be passed the wrong way round.
+ *
+ * Request and response shapes here are taken from
+ * `https://ee.econt.com/services/openapi.yaml` (read 2026-09-21), not from
+ * memory: `CDPayOptions` spells the bank fields `IBAN`, `BIC` and `bankCurrency`,
+ * where the prose documentation on econt.com shows `bank_currency`.
  *
  * Two things about that response are load-bearing:
  *
@@ -88,6 +103,42 @@ export interface EcontShipFrom {
   street?: string
 }
 
+/**
+ * Who the parcel is *from*, as it goes on the waybill.
+ *
+ * Not needed to price — a quote carries no personal data at all — and required to
+ * book: Econt will not create a label without a sender name and a phone it can
+ * ring when a collection fails. The phone is therefore configuration rather than
+ * `company.contact.phone`, which is deliberately `null` because the owner does
+ * not publish their number (see `src/lib/company.ts`). Unpublished is not the
+ * same as unknown, and the courier is not the open web.
+ */
+export interface EcontSender {
+  name: string
+  phone: string
+}
+
+/**
+ * How Econt hands over the наложен платеж money it collects.
+ *
+ * Either form works, and the difference is where the arrangement lives:
+ *
+ * - `template` — the name of a payout arrangement already configured on the Econt
+ *   client profile (`cdPayOptionsTemplate`). What a signed merchant contract
+ *   gives you, and the better answer: the IBAN never travels in a request.
+ * - `bank` — the account, sent with every shipment (`cdPayOptions`). Works on a
+ *   personal е-Еконт profile with no contract at all.
+ *
+ * `null` means neither is configured, and the parcel is booked with no payout
+ * instruction: Econt then applies whatever the profile's own default is, which
+ * for a personal profile is cash at the counter. That is a real and working
+ * arrangement, so it is not treated as a misconfiguration — but it is the one
+ * case where the money does not arrive by itself.
+ */
+export type EcontCodPayout =
+  | { template: string }
+  | { method: 'bank'; iban: string; bic: string; currency: string }
+
 export interface EcontConfig {
   baseUrl: string
   /**
@@ -101,6 +152,10 @@ export interface EcontConfig {
   credentials?: () => { username: string; password: string } | null
   /** Hand-over point, same lazy reasoning as `credentials`. */
   shipFrom?: () => EcontShipFrom | null
+  /** Sender identity for waybills, same lazy reasoning as `credentials`. */
+  sender?: () => EcontSender | null
+  /** COD payout arrangement, same lazy reasoning as `credentials`. */
+  codPayout?: () => EcontCodPayout | null
 }
 
 const COURIER: Courier = 'econt'
@@ -172,6 +227,11 @@ interface EcontRawService {
 
 interface EcontLabelResponse {
   label?: {
+    /** Only in `create` mode: the waybill number, and the parcel now exists. */
+    shipmentNumber?: string
+    /** Only in `create` mode: the printable label. */
+    pdfURL?: string
+    expectedDeliveryDate?: string
     totalPrice?: number
     currency?: string
     services?: EcontRawService[]
@@ -318,7 +378,7 @@ function toMoney(value: unknown, currency: unknown): Money | null {
  * method with no code, a door method with no city. The action validates both
  * before reaching here, so this is the belt to that braces.
  */
-function destinationOf(request: ShipmentQuoteRequest): Record<string, unknown> | null {
+function destinationOf(request: ParcelDestination): Record<string, unknown> | null {
   if (request.method === 'door') {
     const address = request.address
     if (!address?.city || !address.postCode || !address.street) return null
@@ -355,6 +415,33 @@ function originOf(shipFrom: EcontShipFrom): Record<string, unknown> | null {
 const GRAMS_PER_KG = 1000
 
 /**
+ * Who pays Econt for carrying the parcel (AUDIT.md Q-23).
+ *
+ * **The shop, never the customer.** The customer was shown one number and the
+ * confirmation email repeats it, so the amount handed over at the counter has to
+ * be exactly `cdAmount` — the delivery they paid for is already inside it. Billing
+ * the receiver would add the courier's own fees *on top* of that: 3.74 EUR more
+ * than the site said, collected at the door, which is an undisclosed charge.
+ *
+ * Measured against `calculate` on 2026-09-21, same 0.55 kg office-to-office parcel
+ * with 19.99 наложен платеж:
+ *
+ * | request                       | total | senderDue | receiverDue |
+ * | `paymentReceiverMethod: cash` | 3.74  | 0         | 3.74        |
+ * | `paymentSenderMethod: cash`   | 3.74  | 3.74      | 0           |
+ *
+ * The total is the same either way — this decides who is billed, not what Econt
+ * charges — which is also why quoting and booking can send the same value: the
+ * price the checkout shows does not depend on it, and a quote that described a
+ * different parcel than the one we book would be the wrong kind of accurate.
+ *
+ * Sender-pays is also Econt's default with no payment field at all, so this is
+ * explicit rather than load-bearing: a default that decides who pays should be
+ * written down.
+ */
+const PAYMENT_SIDE = { paymentSenderMethod: 'cash' } as const
+
+/**
  * A quote runs inside a checkout submission, so it gets a tighter budget than
  * the office list: three attempts at 4 s is still under the platform's function
  * limit, and a customer waiting on a submit button notices 24 s.
@@ -378,22 +465,134 @@ function quoteBody(
       shipmentType: 'pack',
       weight: request.weightGrams / GRAMS_PER_KG,
       shipmentDescription: SHIPMENT_DESCRIPTION,
-      ...(request.codAmount
-        ? {
-            services: {
-              cdAmount: request.codAmount.amountMinor / MINOR_PER_MAJOR,
-              // `get` — the courier collects the amount and remits it to us.
-              cdType: 'get',
-              cdCurrency: request.codAmount.currency,
-            },
-            // The customer pays the courier in cash on delivery, which is what
-            // наложен платеж is. Only the per-service `price` values are read
-            // below, so this decides who Econt bills, not what it charges.
-            paymentReceiverMethod: 'cash',
-          }
-        : {}),
+      ...PAYMENT_SIDE,
+      ...(request.codAmount ? { services: codServices(request.codAmount) } : {}),
     },
     mode: 'calculate',
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Booking
+// ---------------------------------------------------------------------------
+
+/**
+ * Econt's public tracking page.
+ *
+ * Deliberately the customer-facing one on `econt.com` rather than anything under
+ * `ee.econt.com`: this URL is stored on the order and sent to the customer, so it
+ * has to be a page a person can open without credentials. Locale-free — Econt
+ * serves the page in Bulgarian and offers its own language switch.
+ */
+const TRACKING_URL_BASE = 'https://www.econt.com/services/track-shipment/'
+
+export function econtTrackingUrl(shipmentNumber: string): string {
+  return `${TRACKING_URL_BASE}${encodeURIComponent(shipmentNumber)}`
+}
+
+/**
+ * Booking gets a longer budget than a quote and **no retries**.
+ *
+ * Longer because nobody is watching a checkout — this runs behind an admin
+ * button, and 15 s of waiting beats a timeout on a call that may already have
+ * created the parcel. No retries for the same reason: `postJson` cannot tell a
+ * request that never arrived from one whose answer was lost, and re-sending a
+ * `create` is how a shop ends up paying for two parcels. One attempt, and a
+ * failure the admin can read.
+ */
+const BOOKING_TIMEOUT_MS = 15_000
+const BOOKING_ATTEMPTS = 1
+
+/** The COD service block, shared shape between a quote and a booking. */
+function codServices(codAmount: NonNullable<ShipmentQuoteRequest['codAmount']>) {
+  return {
+    cdAmount: codAmount.amountMinor / MINOR_PER_MAJOR,
+    // `get` — the courier collects the amount and remits it to us.
+    cdType: 'get',
+    cdCurrency: codAmount.currency,
+  }
+}
+
+/** The payout instruction, or nothing when the profile's default is to be used. */
+function payoutOf(payout: EcontCodPayout | null): Record<string, unknown> {
+  if (!payout) return {}
+
+  if ('template' in payout) return { cdPayOptionsTemplate: payout.template }
+
+  return {
+    cdPayOptions: {
+      method: payout.method,
+      IBAN: payout.iban,
+      BIC: payout.bic,
+      bankCurrency: payout.currency,
+    },
+  }
+}
+
+function waybillBody(
+  request: WaybillRequest,
+  shipFrom: EcontShipFrom,
+  sender: EcontSender,
+  payout: EcontCodPayout | null
+): Record<string, unknown> | null {
+  const origin = originOf(shipFrom)
+  const destination = destinationOf(request)
+
+  if (!origin || !destination) return null
+
+  return {
+    label: {
+      senderClient: { name: sender.name, phones: [sender.phone] },
+      ...origin,
+      receiverClient: {
+        name: request.recipient.name,
+        phones: [request.recipient.phone],
+        ...(request.recipient.email ? { email: request.recipient.email } : {}),
+      },
+      ...destination,
+      packCount: 1,
+      shipmentType: 'pack',
+      weight: request.weightGrams / GRAMS_PER_KG,
+      shipmentDescription: SHIPMENT_DESCRIPTION,
+      // Our reference on the courier's record, so a parcel can be traced back to
+      // an order from their side as well as ours.
+      orderNumber: request.orderNumber,
+      ...PAYMENT_SIDE,
+      ...(request.codAmount
+        ? { services: { ...codServices(request.codAmount), ...payoutOf(payout) } }
+        : {}),
+    },
+    mode: 'create',
+  }
+}
+
+/**
+ * The booked response to a `Waybill`.
+ *
+ * No `failed` branch on purpose: by the time this runs Econt has answered `200`,
+ * and if there is a `shipmentNumber` in it then a parcel exists. The price is read
+ * through the same projection as a quote but treated as optional — a breakdown we
+ * cannot split is worth a log line, not a failure that would have the admin press
+ * the button again. `null` is reserved for "no number came back", which is the one
+ * case where nothing was created.
+ */
+function toWaybill(response: EcontLabelResponse): Waybill | null {
+  const label = response.label
+  const number = label?.shipmentNumber?.trim()
+
+  if (!label || !number) return null
+
+  // `hasCod: false` regardless of what was booked: it only controls whether a
+  // *missing* breakdown is fatal, and here nothing about the price is fatal. A
+  // `CD` line present in the breakdown is still separated out as the COD fee.
+  const priced = toRate(response, false)
+
+  return {
+    number,
+    trackingUrl: econtTrackingUrl(number),
+    ...(label.pdfURL ? { pdfUrl: label.pdfURL } : {}),
+    ...(label.expectedDeliveryDate ? { expectedDeliveryDate: label.expectedDeliveryDate } : {}),
+    ...(priced.status === 'ok' ? { price: priced.data } : {}),
   }
 }
 
@@ -643,6 +842,60 @@ export function createEcontClient(config: EcontConfig): CourierClient {
       }
 
       return toRate(response.data, request.codAmount !== null)
+    },
+
+    async createWaybill(request) {
+      const credentials = config.credentials?.() ?? null
+      const shipFrom = config.shipFrom?.() ?? null
+      const sender = config.sender?.() ?? null
+
+      // A sender is required here where a quote needs none: Econt will not issue a
+      // label without someone to call about the parcel.
+      if (!credentials || !shipFrom || !sender) {
+        return { status: 'unconfigured', courier: COURIER }
+      }
+
+      const body = waybillBody(request, shipFrom, sender, config.codPayout?.() ?? null)
+
+      if (!body) {
+        return {
+          status: 'failed',
+          courier: COURIER,
+          reason: 'the parcel has no addressable origin or destination',
+        }
+      }
+
+      const response = await postJson<EcontLabelResponse>({
+        url: `${config.baseUrl}/Shipments/LabelService.createLabel.json`,
+        body,
+        auth: credentials,
+        timeoutMs: BOOKING_TIMEOUT_MS,
+        attempts: BOOKING_ATTEMPTS,
+      })
+
+      if (!response.ok) {
+        return { status: 'failed', courier: COURIER, reason: response.reason }
+      }
+
+      const waybill = toWaybill(response.data)
+
+      if (!waybill) {
+        // A 200 with no number. Reported as a failure because nothing was
+        // created — but loudly, because if that reading is ever wrong it is the
+        // expensive kind of wrong, and the response is the only evidence.
+        console.error(
+          `[econt] createLabel answered 200 with no shipmentNumber for order ` +
+            `${request.orderNumber}: ${JSON.stringify(response.data).slice(0, 500)}`
+        )
+
+        return {
+          status: 'failed',
+          courier: COURIER,
+          reason: 'the courier accepted the request but returned no waybill number',
+        }
+      }
+
+      return { status: 'ok', data: waybill }
     },
   }
 }

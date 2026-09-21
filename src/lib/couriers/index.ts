@@ -1,8 +1,14 @@
 import 'server-only'
 
 import { company, isTodo } from '../company'
+import { CURRENCY } from '../money'
 import type { Courier } from '../shipping'
-import { createEcontClient, type EcontShipFrom } from './econt'
+import {
+  createEcontClient,
+  type EcontCodPayout,
+  type EcontSender,
+  type EcontShipFrom,
+} from './econt'
 import type { CourierClient, LookupResult } from './types'
 
 /**
@@ -27,8 +33,11 @@ export type {
   LookupResult,
   ShipmentQuoteRequest,
   ShipmentRate,
+  Waybill,
+  WaybillRequest,
 } from './types'
-export type { EcontShipFrom } from './econt'
+export type { EcontCodPayout, EcontSender, EcontShipFrom } from './econt'
+export { econtTrackingUrl } from './econt'
 
 /**
  * Which Econt nomenclature to read.
@@ -62,6 +71,19 @@ const SENDER_VARS = {
   city: 'ECONT_SENDER_CITY',
   postCode: 'ECONT_SENDER_POST_CODE',
   street: 'ECONT_SENDER_STREET',
+} as const
+
+/** Who the parcel is from, on the waybill only. See `econtSender()`. */
+const IDENTITY_VARS = {
+  name: 'ECONT_SENDER_NAME',
+  phone: 'ECONT_SENDER_PHONE',
+} as const
+
+/** Where the наложен платеж money goes. See `econtCodPayout()`. */
+const PAYOUT_VARS = {
+  template: 'ECONT_COD_PAY_TEMPLATE',
+  iban: 'ECONT_COD_IBAN',
+  bic: 'ECONT_COD_BIC',
 } as const
 
 /**
@@ -113,6 +135,51 @@ export function econtShipFrom(): EcontShipFrom | null {
 }
 
 /**
+ * Who the parcel is from, for the waybill. `null` while no phone is configured.
+ *
+ * The phone is the whole of the requirement: Econt refuses a label without one,
+ * and `company.contact.phone` is deliberately `null` because the owner does not
+ * publish their number. `ECONT_SENDER_NAME` is optional and defaults to the legal
+ * entity — the name on the parcel should be the name on the invoice unless the
+ * owner has a reason otherwise.
+ */
+export function econtSender(): EcontSender | null {
+  const phone = process.env[IDENTITY_VARS.phone]?.trim()
+  if (!phone) return null
+
+  return {
+    name: process.env[IDENTITY_VARS.name]?.trim() || company.legalName,
+    phone,
+  }
+}
+
+/**
+ * How Econt remits наложен платеж, in order of precedence:
+ *
+ * 1. `ECONT_COD_PAY_TEMPLATE` — a payout arrangement configured on the Econt
+ *    profile. Preferred: the account number never travels in a request.
+ * 2. `ECONT_COD_IBAN` + `ECONT_COD_BIC` — the account, sent with each shipment.
+ *    Works without a merchant contract.
+ *
+ * `null` for neither, which is not an error: Econt then applies the profile's own
+ * default, and for a personal profile that means collecting the cash at an office
+ * counter. See `EcontCodPayout`.
+ */
+export function econtCodPayout(): EcontCodPayout | null {
+  const template = process.env[PAYOUT_VARS.template]?.trim()
+  if (template) return { template }
+
+  const iban = process.env[PAYOUT_VARS.iban]?.trim()
+  const bic = process.env[PAYOUT_VARS.bic]?.trim()
+
+  // Both or neither: an IBAN without a BIC is rejected by Econt, and sending a
+  // half-arrangement would fail the booking rather than fall back to the default.
+  if (iban && bic) return { method: 'bank', iban, bic, currency: CURRENCY }
+
+  return null
+}
+
+/**
  * Whether this courier can quote a real price.
  *
  * Separate from `isCourierConfigured`, which only asks about credentials: a
@@ -123,6 +190,27 @@ export function canQuoteLiveRates(courier: Courier): boolean {
   if (courier !== 'econt') return false
 
   return isCourierConfigured(courier) && econtShipFrom() !== null
+}
+
+/**
+ * Whether this courier can issue a real waybill.
+ *
+ * Everything pricing needs, plus a sender to put on the label. Strictly stronger
+ * than `canQuoteLiveRates`, and kept separate because the shop can legitimately
+ * run with live prices and hand-written labels — which is exactly where it stood
+ * before this was built.
+ */
+export function canBookWaybills(courier: Courier): boolean {
+  return canQuoteLiveRates(courier) && econtSender() !== null
+}
+
+/** What waybill creation is still waiting on, for the launch checklist. */
+export function missingWaybillRequirements(): string[] {
+  const missing = missingLiveRateRequirements()
+
+  if (econtSender() === null) missing.push(IDENTITY_VARS.phone)
+
+  return missing
 }
 
 /**
@@ -190,6 +278,7 @@ function unconfiguredClient(courier: Courier): CourierClient {
     officesIn: result,
     findOffice: result,
     priceShipment: result,
+    createWaybill: result,
   }
 }
 
@@ -214,6 +303,8 @@ function econtClient(): CourierClient {
     baseUrl: process.env.ECONT_BASE_URL ?? ECONT_BASE_URL[environment],
     credentials: () => credentialsFor('econt'),
     shipFrom: econtShipFrom,
+    sender: econtSender,
+    codPayout: econtCodPayout,
   })
 
   clients.set(key, created)
