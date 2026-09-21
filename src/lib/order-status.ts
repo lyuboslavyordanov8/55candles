@@ -72,6 +72,23 @@ export const STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
 }
 
 /**
+ * Statuses that must carry a reason on the event that reaches them.
+ *
+ * Both are the shop finding out something went wrong after the parcel had
+ * already left, and "why" is the one thing worth writing down at the moment
+ * it is freshest — it is also what the repeat-refusal flag reads later, so an
+ * empty reason here would make that flag mean nothing.
+ */
+export const REQUIRES_REASON: readonly OrderStatus[] = [
+  'refused_at_delivery',
+  'returned',
+] as const
+
+export function statusRequiresReason(status: OrderStatus): boolean {
+  return REQUIRES_REASON.includes(status)
+}
+
+/**
  * Which statuses count as "needs attention" on the order list.
  *
  * Everything before the parcel leaves the shop. This is what the list filters to

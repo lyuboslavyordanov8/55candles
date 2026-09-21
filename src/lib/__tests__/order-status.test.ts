@@ -5,7 +5,9 @@ import {
   canTransition,
   nextStatuses,
   OPEN_STATUSES,
+  REQUIRES_REASON,
   STATUS_LABELS,
+  statusRequiresReason,
 } from '@/lib/order-status'
 import { orderStatus, type OrderStatus } from '@/db/schema'
 
@@ -94,5 +96,20 @@ describe('the admin’s vocabulary', () => {
     // The default list filter. A shipped parcel is no longer the shop's to-do.
     expect(OPEN_STATUSES).not.toContain('shipped')
     expect(OPEN_STATUSES).toContain('awaiting_cod')
+  })
+})
+
+describe('statusRequiresReason', () => {
+  it('requires a reason for exactly the two unhappy-ending statuses', () => {
+    // Pinned to the literal list, not derived from it: the point of this test
+    // is to notice if REQUIRES_REASON quietly grows or shrinks.
+    expect(REQUIRES_REASON).toEqual(['refused_at_delivery', 'returned'])
+  })
+
+  it('reports true only for those two statuses', () => {
+    for (const status of orderStatus.enumValues) {
+      const expected = status === 'refused_at_delivery' || status === 'returned'
+      expect(statusRequiresReason(status), status).toBe(expected)
+    }
   })
 })
