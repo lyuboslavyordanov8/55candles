@@ -12,6 +12,8 @@ import {
   type PlacedOrder,
 } from '@/lib/orders'
 import { PAYMENT_METHOD } from '@/lib/payments'
+import { sendOrderNotifications } from '@/lib/order-notifications'
+import { defaultLocale, isLocale } from '@/i18n/locales'
 import type { DeliveryOption } from '@/lib/shipping'
 
 /**
@@ -365,6 +367,29 @@ export async function submitCheckout(
     return { status: 'error', ...priced, messageKey: 'orderNotSaved' }
   }
 
+  if (!placed.duplicate) {
+    /**
+     * Confirmation to the customer, notification to the shop (B-17).
+     *
+     * After the order is stored, and awaited so the customer is not shown a
+     * confirmation before the process that sends it can be cut short — this is a
+     * serverless function, and work left running past the response may simply not
+     * happen. It cannot fail the order: `sendOrderNotifications` catches
+     * everything and logs it (see there).
+     *
+     * Skipped for a replay. The order already exists, so the customer already has
+     * their confirmation, and a second one would read as a second parcel.
+     */
+    await sendOrderNotifications({
+      orderNumber: placed.orderNumber,
+      locale: localeOf(raw.locale),
+      delivery: delivery.value,
+      office: office.snapshot,
+      officeVerified: office.verified,
+      total,
+    })
+  }
+
   return {
     status: 'placed',
     ...priced,
@@ -386,6 +411,18 @@ export async function submitCheckout(
  */
 function stepOf(value: unknown): CheckoutStep {
   return value === 'confirm' ? 'confirm' : 'quote'
+}
+
+/**
+ * The language to write the confirmation email in.
+ *
+ * Taken from a hidden field rather than from `next-intl`, because a Server Action
+ * is a bare POST endpoint and carries no locale of its own. Anything unrecognised
+ * falls back to Bulgarian: the shop's customers read Bulgarian, and a confirmation
+ * in the wrong language is still a confirmation, so this must never refuse.
+ */
+function localeOf(value: unknown): string {
+  return isLocale(value) ? value : defaultLocale
 }
 
 /**

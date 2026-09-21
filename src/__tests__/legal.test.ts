@@ -139,7 +139,9 @@ describe('trader identity', () => {
     const missing = missingIdentityFields()
     // Fails once everything is filled in, which is the signal to delete this
     // test and assert isIdentityComplete() instead.
-    expect(missing).toContain('contact.email')
+    // `contact.email` is no longer here: `contact@55candles.com` receives (it
+    // forwards to the owners' mailboxes), so the impressum has a durable channel.
+    expect(missing).not.toContain('contact.email')
     expect(missing).toContain('address.street')
   })
 })

@@ -362,6 +362,12 @@ export default function DeliveryForm({
       <input type="hidden" name="cart" value={JSON.stringify(cart)} />
       <input type="hidden" name="intentToken" value={intentToken} />
       {/*
+        The language the customer is checking out in, so the confirmation email is
+        written in it. A Server Action is a plain POST and has no locale of its
+        own; an absent or unrecognised value falls back to Bulgarian server-side.
+      */}
+      <input type="hidden" name="locale" value={locale} />
+      {/*
         Which half of the flow this press is asking for. Rendered from state rather
         than set by the button's own `value`, so that the form submitted by pressing
         Enter in a text field asks for exactly what the button offers.

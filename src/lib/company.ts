@@ -68,9 +68,14 @@ export const company = {
     /**
      * A monitored email address is not optional: consumers must be able to
      * withdraw from a contract in a durable medium, and Instagram DMs do not
-     * qualify. Instagram and phone are the only channels on the site today.
+     * qualify.
+     *
+     * This one **receives**, which is the whole point — it forwards to the owners'
+     * mailboxes (ImprovMX, MX records on the apex). It is deliberately not
+     * `EMAIL_FROM`: that address sends and cannot receive, so publishing it would
+     * put an address on the impressum that silently swallows every reply.
      */
-    email: '[TODO: contact email on your own domain]' as Todo | string,
+    email: 'contact@55candles.com' as Todo | string,
     phone: '+359887115957',
     phoneDisplay: '+359 887 115 957',
     instagram: '55candles.bg',

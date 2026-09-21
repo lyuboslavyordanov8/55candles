@@ -1,6 +1,6 @@
 import { company } from '@/lib/company'
 import { HONEYPOT_FIELD, looksAutomated, validateContact } from '@/lib/contact-schema'
-import { isMailerConfigured, sendEmail } from '@/lib/mailer'
+import { contactRecipient, isMailerConfigured, sendEmail } from '@/lib/mailer'
 
 /**
  * Contact form endpoint (AUDIT.md B-20).
@@ -9,14 +9,14 @@ import { isMailerConfigured, sendEmail } from '@/lib/mailer'
  * the customer "Message sent!" — including for order enquiries, which were
  * silently destroyed. This endpoint replaces that with a truthful result.
  *
- * It cannot yet actually deliver mail: no provider is chosen (B-17). So it
- * returns **503 `unconfigured`** rather than a fake 200, and the form tells the
- * customer to phone or DM instead. That is the honest failure mode, and it is
- * the whole point — a visibly broken form loses one enquiry, a fake one loses
- * every enquiry without anyone noticing.
+ * Mail now has a provider (`src/lib/mailer.ts`), but the endpoint still refuses
+ * visibly rather than faking success: with no API key, no verified sender or no
+ * recipient it answers **503 `unconfigured`** and the form tells the customer to
+ * phone or DM instead. That is the honest failure mode, and it is the whole
+ * point — a visibly broken form loses one enquiry, a fake one loses every enquiry
+ * without anyone noticing.
  *
- * The first thing to do once a provider exists is set CONTACT_EMAIL_TO and
- * EMAIL_PROVIDER_API_KEY and implement `deliver` in `src/lib/mailer.ts`.
+ * Needs `EMAIL_PROVIDER_API_KEY`, `EMAIL_FROM` and `CONTACT_EMAIL_TO`.
  */
 
 // In-process, best-effort rate limit. It resets on deploy and is per-instance,
@@ -77,7 +77,9 @@ export async function POST(request: Request) {
     return Response.json({ error: 'validation', fields: errors }, { status: 400 })
   }
 
-  if (!isMailerConfigured()) {
+  const recipient = contactRecipient()
+
+  if (!isMailerConfigured() || recipient.length === 0) {
     // Deliberately loud in the server log: this is a lost enquiry.
     console.error(
       '[contact] Enquiry received but no email provider is configured (AUDIT.md B-17). ' +
@@ -87,7 +89,7 @@ export async function POST(request: Request) {
   }
 
   const result = await sendEmail({
-    to: process.env.CONTACT_EMAIL_TO!,
+    to: recipient,
     replyTo: data.email,
     subject: `55° candles enquiry from ${data.name}`,
     text: [
