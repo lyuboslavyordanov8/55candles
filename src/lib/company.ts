@@ -76,8 +76,22 @@ export const company = {
      * put an address on the impressum that silently swallows every reply.
      */
     email: 'contact@55candles.com' as Todo | string,
-    phone: '+359887115957',
-    phoneDisplay: '+359 887 115 957',
+    /**
+     * Deliberately unpublished, by the owner's decision of 2026-09-21: the shop is
+     * run from a personal number and does not want it on the open web.
+     *
+     * `null`, not a `[TODO:]` marker — a marker means "nobody has decided yet" and
+     * gets rendered on the page until someone does. This is a decision, so every
+     * consumer omits the field instead of showing a placeholder. Setting it to a
+     * number is all that is needed to bring it back everywhere.
+     *
+     * Lawful because the email address below receives and is published: distance
+     * selling requires contact data including email, and a phone number only
+     * "where available". The customer's own phone is unaffected — the courier
+     * cannot deliver without it.
+     */
+    phone: null as string | null,
+    phoneDisplay: null as string | null,
     instagram: '55candles.bg',
     instagramUrl: 'https://www.instagram.com/55candles.bg/',
   },

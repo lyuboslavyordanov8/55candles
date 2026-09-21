@@ -17,10 +17,10 @@
  *
  * The number, in any form a Bulgarian would actually type it:
  *
- *     0887 115 957     +359 887 115 957     00359 887 115 957
- *     0887115957       +359887115957        (0887) 115-957
+ *     0888 123 456     +359 888 123 456     00359 888 123 456
+ *     0888123456       +359888123456        (0888) 123-456
  *
- * All of them normalise to one canonical `+359887115957`, which is what gets
+ * All of them normalise to one canonical `+359888123456`, which is what gets
  * stored and handed to the courier. One format in the database means one format
  * for the SMS gateway, and no "is this the same customer" guessing later.
  *
@@ -77,7 +77,7 @@ export const PHONE_PROBLEMS = [
 export type PhoneProblem = (typeof PHONE_PROBLEMS)[number]
 
 export type PhoneCheck =
-  /** `+359887115957`. Store this, not what was typed. */
+  /** `+359888123456`. Store this, not what was typed. */
   | { ok: true; e164: string }
   | { ok: false; problem: PhoneProblem }
 

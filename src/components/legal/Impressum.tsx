@@ -56,12 +56,18 @@ export default function Impressum({
       <dt className="text-ink-ghost">{locale === 'bg' ? 'Имейл' : 'Email'}</dt>
       <dd className="text-charcoal">{company.contact.email}</dd>
 
-      <dt className="text-ink-ghost">{locale === 'bg' ? 'Телефон' : 'Phone'}</dt>
-      <dd className="text-charcoal">
-        <a href={`tel:${company.contact.phone}`} className="hover:text-clay transition-colors">
-          {company.contact.phoneDisplay}
-        </a>
-      </dd>
+      {/* Only when there is one to show. An empty "Телефон" row is worse than no
+          row: it reads as a site that lost its own number. */}
+      {company.contact.phone && company.contact.phoneDisplay && (
+        <>
+          <dt className="text-ink-ghost">{locale === 'bg' ? 'Телефон' : 'Phone'}</dt>
+          <dd className="text-charcoal">
+            <a href={`tel:${company.contact.phone}`} className="hover:text-clay transition-colors">
+              {company.contact.phoneDisplay}
+            </a>
+          </dd>
+        </>
+      )}
 
       <dt className="text-ink-ghost">Instagram</dt>
       <dd className="text-charcoal">

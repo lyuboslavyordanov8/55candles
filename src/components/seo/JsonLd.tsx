@@ -48,6 +48,19 @@ export function OrganizationJsonLd({ locale }: { locale: string }) {
     ).filter(([, value]) => !value.startsWith('[TODO:'))
   )
 
+  const email = company.contact.email.startsWith('[TODO:') ? undefined : company.contact.email
+
+  const contactChannel =
+    company.contact.phone || email
+      ? {
+          '@type': 'ContactPoint' as const,
+          ...(company.contact.phone ? { telephone: company.contact.phone } : {}),
+          ...(email ? { email } : {}),
+          contactType: 'customer service',
+          availableLanguage: locales.map((l) => (l === 'bg' ? 'Bulgarian' : 'English')),
+        }
+      : undefined
+
   return (
     <Script
       data={{
@@ -68,22 +81,18 @@ export function OrganizationJsonLd({ locale }: { locale: string }) {
         // taxID doubles as the company registration number in schema.org's
         // vocabulary; there is no dedicated ЕИК field.
         taxID: company.eik,
-        ...(company.contact.email.startsWith('[TODO:')
-          ? {}
-          : { email: company.contact.email }),
-        telephone: company.contact.phone,
+        ...(email ? { email } : {}),
+        ...(company.contact.phone ? { telephone: company.contact.phone } : {}),
         sameAs: [company.contact.instagramUrl],
         address: {
           '@type': 'PostalAddress',
           ...address,
           addressCountry: countryCode,
         },
-        contactPoint: {
-          '@type': 'ContactPoint',
-          telephone: company.contact.phone,
-          contactType: 'customer service',
-          availableLanguage: locales.map((l) => (l === 'bg' ? 'Bulgarian' : 'English')),
-        },
+        // A ContactPoint needs a way to be contacted. With no published phone the
+        // email is it — and if neither exists the whole node is dropped, because a
+        // contact point with no channel is noise in machine-read data.
+        ...(contactChannel ? { contactPoint: contactChannel } : {}),
       }}
     />
   )

@@ -1,4 +1,4 @@
-import { company } from '@/lib/company'
+import { company, isTodo } from '@/lib/company'
 import { products } from '@/data/products'
 import { formatMoney } from '@/lib/money'
 import { defaultLocale, isLocale, type Locale } from '@/i18n/locales'
@@ -81,7 +81,7 @@ const copy = {
     nextBody:
       'Ще получиш съобщение с номера за проследяване, когато пратката тръгне. ' +
       'Ако нещо в поръчката не е както трябва, отговори на този имейл или ни пиши.',
-    footerContact: (phone: string) => `Въпроси? Пиши ни или се обади на ${phone}.`,
+    footerContact: (contact: string) => `Въпроси? Отговори на този имейл или пиши на ${contact}.`,
     signature: `${company.tradingName} · ${company.legalName}, ЕИК ${company.eik}`,
   },
   en: {
@@ -112,7 +112,7 @@ const copy = {
     nextBody:
       'We will send you the tracking number once the parcel is on its way. ' +
       'If anything about the order is wrong, reply to this email or message us.',
-    footerContact: (phone: string) => `Questions? Reply to this email or call ${phone}.`,
+    footerContact: (contact: string) => `Questions? Reply to this email or write to ${contact}.`,
     signature: `${company.tradingName} · ${company.legalName}, EIK ${company.eik}`,
   },
 } as const
@@ -122,6 +122,19 @@ const courierName = { econt: 'Econt', speedy: 'Speedy' } as const
 
 function dictionary(locale: string) {
   return copy[isLocale(locale) ? (locale as Locale) : defaultLocale]
+}
+
+/**
+ * The channel the footer invites the customer to use.
+ *
+ * The published email address where there is one, the phone number where there is
+ * not. Never `EMAIL_FROM`, which cannot receive, and never a `[TODO:]` marker:
+ * whatever this returns is printed in an email a customer keeps.
+ */
+function contactChannel(): string {
+  const { email, phoneDisplay } = company.contact
+  if (!isTodo(email)) return email
+  return phoneDisplay ?? email
 }
 
 /** The catalogue's own product name, or the slug if the product is gone. */
@@ -237,7 +250,7 @@ export function buildCustomerOrderEmail(
     '',
     `${t.nextHeading}: ${t.nextBody}`,
     '',
-    t.footerContact(company.contact.phoneDisplay),
+    t.footerContact(contactChannel()),
     t.signature,
   ].join('\n')
 
@@ -389,7 +402,7 @@ ${data.delivery.note ? `<br>${escapeHtml(`${t.note}: ${data.delivery.note}`)}` :
 <p style="margin:0;font-size:14px;line-height:1.7;">${escapeHtml(t.nextBody)}</p>
 
 <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e8ded2;font-size:13px;color:${muted};">
-${escapeHtml(t.footerContact(company.contact.phoneDisplay))}<br>
+${escapeHtml(t.footerContact(contactChannel()))}<br>
 ${escapeHtml(t.signature)}
 </p>
 </td></tr></table>
