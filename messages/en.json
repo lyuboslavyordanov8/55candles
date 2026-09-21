@@ -611,15 +611,15 @@
       "notPricedYet": "One or more items in your basket has no price yet, so the order can't be completed. Please contact us and we'll help directly.",
       "deliveryNotPricedYet": "We can't calculate delivery for that choice yet. Please contact us and we'll arrange it directly.",
       "noOrderStorageYet": "Your details are valid, but orders can't be saved yet, so nothing has been placed and no payment was taken. Please contact us to order.",
-      "orderPlacedCod": "Your order is saved and you'll pay the courier on delivery. Please keep the number above — we'll be in touch to confirm the parcel.",
-      "orderPlacedEmailSent": "Your order is saved and you'll pay the courier on delivery. We've emailed a confirmation with the full details — please keep the number above too.",
+      "orderPlacedCod": "Your order is saved. Please keep the number above — we'll be in touch to confirm the parcel.",
+      "orderPlacedEmailSent": "Your order is saved. We've emailed a confirmation with the full details — please keep the number above too.",
       "orderNotSaved": "We couldn't save your order, so nothing has been placed and no payment was taken. Please try again in a moment, or contact us and we'll take it directly.",
       "formOutdated": "This page has been open too long. Please reload it and submit again — nothing has been placed.",
       "deliveryRateUnavailable": "We could not get a delivery price from Econt just now, so your order was not saved and no payment was taken. Please try again in a minute, or contact us and we'll take it directly.",
       "rateLimited": "You've submitted this a lot in a short time. Please wait a few minutes and try again."
     },
     "orderPlaced": {
-      "heading": "Order received",
+      "heading": "Thank you for your order!",
       "numberLabel": "Your order number"
     },
     "provisionalPricing": "The candle prices and parcel weights shown here are stand-ins until they are confirmed.",

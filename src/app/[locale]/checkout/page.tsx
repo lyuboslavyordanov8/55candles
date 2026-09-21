@@ -4,14 +4,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { isLocale } from '@/i18n/locales'
-import BasketEditor from '@/components/commerce/BasketEditor'
-import DeliveryForm from '@/components/commerce/DeliveryForm'
-import {
-  candlesUntilFreeDelivery,
-  FREE_DELIVERY_FROM_ITEMS,
-  isShippingConfigured,
-  type Courier,
-} from '@/lib/shipping'
+import CheckoutFlow from '@/components/commerce/CheckoutFlow'
+import { isShippingConfigured, type Courier } from '@/lib/shipping'
 import { deliveryRatesArePlaceholders } from '@/lib/shipping-rates'
 import { promoCodesConfigured } from '@/lib/promo'
 import { isMailerConfigured } from '@/lib/mailer'
@@ -139,10 +133,6 @@ function CheckoutContent({
 }) {
   const t = useTranslations('checkout')
 
-  /** Candles, not lines: three of one scent earn the free delivery (Q-24). */
-  const itemCount = cart.reduce((count, line) => count + line.quantity, 0)
-  const candlesToFree = candlesUntilFreeDelivery(itemCount)
-
   return (
     <main className="bg-cream-base min-h-screen px-6 py-20">
       <BreadcrumbJsonLd
@@ -210,60 +200,20 @@ function CheckoutContent({
             </Link>
           </div>
         ) : (
-          <>
-            <section aria-labelledby="basket-heading" className="space-y-3">
-              <h2 id="basket-heading" className="font-serif text-lg text-charcoal">
-                {t('basket')}
-              </h2>
-
-              {/*
-                Editable, not a read-only list: this is the last screen before an
-                order, and "I meant two" must not require the back button. It
-                rewrites `?items=` and lets this page re-render, so every price
-                below still comes from the server. See `BasketEditor`.
-              */}
-              <BasketEditor lines={cart} locale={locale} />
-
-              {/*
-                No total here on purpose. Shipping depends on the delivery
-                method the customer has not chosen yet, and showing a
-                goods-only "total" that grows at the next step is the pattern
-                consumer law exists to prevent. The form's first press returns
-                the full breakdown, before anything is ordered, and every edit
-                after that reprices automatically (DeliveryForm's auto-requote
-                effect) rather than needing another press — so there is
-                nothing this line could tell the customer that the page does
-                not already show them a moment later.
-              */}
-
-              {/*
-                The free-delivery promise, and how far off it this basket is
-                (Q-24). Said here, next to the ± buttons, because a customer one
-                candle short can only act on it while they are still looking at
-                the basket — being told at the summary is being told too late.
-              */}
-              {FREE_DELIVERY_FROM_ITEMS !== null && (
-                <p className="text-xs text-clay">
-                  {candlesToFree === null
-                    ? t('freeDeliveryEarned')
-                    : t('freeDeliveryNudge', {
-                        missing: candlesToFree,
-                        from: FREE_DELIVERY_FROM_ITEMS,
-                      })}
-                </p>
-              )}
-            </section>
-
-            <DeliveryForm
-              cart={cart}
-              intentToken={intentToken}
-              shippingConfigured={shippingConfigured}
-              promoCodesEnabled={promoCodesEnabled}
-              officeLookup={officeLookup}
-              officeDataIsDemo={officeDataIsDemo}
-              locale={locale}
-            />
-          </>
+          /*
+            Basket editor and delivery form together, sharing whether the order
+            has been placed — see `CheckoutFlow` for why that has to be lifted
+            above both rather than left inside `DeliveryForm` alone.
+          */
+          <CheckoutFlow
+            cart={cart}
+            intentToken={intentToken}
+            shippingConfigured={shippingConfigured}
+            promoCodesEnabled={promoCodesEnabled}
+            officeLookup={officeLookup}
+            officeDataIsDemo={officeDataIsDemo}
+            locale={locale}
+          />
         )}
       </div>
     </main>

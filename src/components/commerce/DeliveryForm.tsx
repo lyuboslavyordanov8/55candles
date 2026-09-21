@@ -179,6 +179,12 @@ interface Props {
   officeDataIsDemo?: boolean
   /** For currency formatting — Bulgarian writes `24,50 €`, English `€24.50`. */
   locale: string
+  /**
+   * Told once the order exists, so a parent holding the basket editor can hide
+   * it — see `CheckoutFlow`. Not read from here for anything of this form's own:
+   * `placed`, below, already covers everything this component renders.
+   */
+  onOrderPlaced?: () => void
 }
 
 export default function DeliveryForm({
@@ -189,6 +195,7 @@ export default function DeliveryForm({
   officeLookup = [],
   officeDataIsDemo = false,
   locale,
+  onOrderPlaced,
 }: Props) {
   const t = useTranslations('checkout')
   const [state, formAction, pending] = useActionState(submitCheckout, INITIAL)
@@ -330,6 +337,14 @@ export default function DeliveryForm({
 
   /** An order exists on the server. Nothing in this form can alter it now. */
   const placed = state.status === 'placed'
+
+  // Told upward exactly once per order, in an effect rather than during render:
+  // this notifies a parent component, which is the kind of side effect render
+  // must stay free of. `setPlaced(true)` in `CheckoutFlow` is idempotent, so a
+  // dependency on the boolean (rather than firing on every render) is enough.
+  useEffect(() => {
+    if (placed) onOrderPlaced?.()
+  }, [placed])
 
   /**
    * Whether the next press places the order.

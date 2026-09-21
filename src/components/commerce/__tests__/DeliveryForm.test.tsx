@@ -659,7 +659,22 @@ describe('DeliveryForm', () => {
       await user.click(submitButton())
 
       expect(await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })).toBeInTheDocument()
-      expect(screen.getByText(/order received/i)).toBeInTheDocument()
+      expect(screen.getByText(/thank you for your order/i)).toBeInTheDocument()
+    })
+
+    it('tells a parent the order is placed, so it can hide the basket editor', async () => {
+      // `CheckoutFlow` is what actually hides the basket — this only proves the
+      // signal it depends on fires, without pulling that component in here.
+      const user = userEvent.setup()
+      const onOrderPlaced = vi.fn()
+      placedAction()
+      renderForm({ onOrderPlaced })
+      await fillIn(user)
+
+      await user.click(submitButton())
+      await screen.findByText('55C-2026-000123', {}, { timeout: 5_000 })
+
+      expect(onOrderPlaced).toHaveBeenCalledTimes(1)
     })
 
     it('announces it as news rather than as an error', async () => {
@@ -673,7 +688,10 @@ describe('DeliveryForm', () => {
 
       // A stored order read out as an `alert` would sound like a failure.
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-      expect(screen.getByText(/pay the courier on delivery/i)).toBeInTheDocument()
+      // The confirmation no longer repeats how payment works — the payment
+      // section it used to echo is gone along with the rest of the form.
+      expect(screen.queryByText(/pay the courier/i)).not.toBeInTheDocument()
+      expect(screen.getByText(/order is saved/i)).toBeInTheDocument()
     })
 
     it('removes the submit button entirely, since this form can no longer change the order', async () => {
