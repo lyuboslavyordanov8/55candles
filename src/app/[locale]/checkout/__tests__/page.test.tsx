@@ -39,11 +39,32 @@ async function renderPage(items?: string) {
 }
 
 describe('CheckoutPage', () => {
-  it('says plainly that orders cannot be placed yet', async () => {
-    // The customer learns this here, not after filling in an address.
+  it('warns about the missing confirmation email without talking the customer out of ordering', async () => {
+    // This notice used to say the checkout was not live and ask the customer to
+    // order by hand. Orders are stored and the action emails a confirmation, so
+    // that text was costing sales for a reason that had gone away. What is left
+    // is true only while no mail provider is configured — which is the default in
+    // tests, hence no env stubbing here.
     await renderPage('cherry:1')
 
-    expect(screen.getByText(/not live yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/can.t email a confirmation/i)).toBeInTheDocument()
+    expect(screen.queryByText(/not live/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/contact us instead/i)).not.toBeInTheDocument()
+  })
+
+  it('says nothing about email once a provider is configured', async () => {
+    // The whole point of gating it: a shop that can send the confirmation must
+    // not warn that it cannot.
+    vi.stubEnv('EMAIL_PROVIDER_API_KEY', 're_test')
+    vi.stubEnv('EMAIL_FROM', 'orders@example.com')
+
+    try {
+      await renderPage('cherry:1')
+
+      expect(screen.queryByText(/can.t email a confirmation/i)).not.toBeInTheDocument()
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('flags the placeholder delivery rates as illustrative', async () => {
@@ -79,9 +100,9 @@ describe('CheckoutPage', () => {
       await renderPage('cherry:1')
 
       expect(screen.queryByText(/delivery rates are placeholders/i)).not.toBeInTheDocument()
-      // The order flow is still not live for its own reasons — no confirmation
-      // email, draft legal pages — so that notice stays.
-      expect(screen.getByText(/not live yet/i)).toBeInTheDocument()
+      // Courier credentials say nothing about email: the confirmation notice is
+      // gated on its own configuration and still stands here.
+      expect(screen.getByText(/can.t email a confirmation/i)).toBeInTheDocument()
     } finally {
       for (const key of Object.keys(process.env)) {
         if (!(key in saved)) delete process.env[key]

@@ -14,6 +14,7 @@ import {
 } from '@/lib/shipping'
 import { deliveryRatesArePlaceholders } from '@/lib/shipping-rates'
 import { promoCodesConfigured } from '@/lib/promo'
+import { isMailerConfigured } from '@/lib/mailer'
 import { couriersWithOfficeLookup, econtEnvironment } from '@/lib/couriers'
 import { unpricedSlugs, PRICING_IS_PROVISIONAL } from '@/data/pricing'
 import { parseCartParam } from '@/lib/cart-params'
@@ -30,9 +31,10 @@ import { BreadcrumbJsonLd } from '@/components/seo/JsonLd'
  * quantities, and every price is re-read server-side.
  *
  * Orders themselves *are* stored (Q-34) — the action writes one and hands back its
- * number — but the page still carries its "not live" notice and stays `noindex`,
- * because the delivery rates are placeholders (Q-22), the legal pages are drafts
- * and nothing can email a confirmation yet (B-17). An unfinished checkout must not
+ * number — and a confirmation is emailed when a mail provider is configured
+ * (B-17), so the page no longer tells the customer to order by hand. It stays
+ * `noindex` because the delivery rates are placeholders for one courier (Q-22)
+ * and the legal pages are unreviewed drafts; an unfinished checkout must not
  * appear in search results.
  *
  * Server Component. It reads what is configured on the server — tariffs, prices,
@@ -93,6 +95,14 @@ export default async function CheckoutPage({
       */
       promoCodesEnabled={promoCodesConfigured()}
       unpricedCount={unpricedSlugs().length}
+      /*
+        A boolean, not the key: whether a confirmation can be sent is the only
+        part of the mail configuration the page is entitled to know. The notice it
+        controls is a promise to the customer, so it is read from the same
+        function the action reads before sending (`src/lib/mailer.ts`) rather than
+        from a hand-maintained flag that could outlive the truth.
+      */
+      canEmailConfirmation={isMailerConfigured()}
       officeLookup={couriersWithOfficeLookup()}
       officeDataIsDemo={econtEnvironment() === 'demo'}
     />
@@ -112,6 +122,7 @@ function CheckoutContent({
   ratesArePlaceholders,
   promoCodesEnabled,
   unpricedCount,
+  canEmailConfirmation,
   officeLookup,
   officeDataIsDemo,
 }: {
@@ -122,6 +133,7 @@ function CheckoutContent({
   ratesArePlaceholders: boolean
   promoCodesEnabled: boolean
   unpricedCount: number
+  canEmailConfirmation: boolean
   officeLookup: readonly Courier[]
   officeDataIsDemo: boolean
 }) {
@@ -149,11 +161,24 @@ function CheckoutContent({
         {/*
           The honest state of things, stated on the page rather than discovered
           at the payment step. Same principle as the legal draft banner.
+
+          This used to say the checkout was not live at all and ask the customer
+          to order by hand. It no longer does: orders are stored and the
+          confirmation email is sent from the action. What remains is the one
+          case where the customer would otherwise be left waiting for an email
+          that never arrives — a shop with no mail provider configured.
         */}
-        <p role="note" className="rounded-sm border border-border bg-cream-surface p-4 text-xs leading-relaxed text-ink-secondary">
-          {t('notLiveYet')}
-          {unpricedCount > 0 && ` ${t('unpricedCount', { count: unpricedCount })}`}
-        </p>
+        {!canEmailConfirmation && (
+          <p role="note" className="rounded-sm border border-border bg-cream-surface p-4 text-xs leading-relaxed text-ink-secondary">
+            {t('noConfirmationEmail')}
+          </p>
+        )}
+
+        {unpricedCount > 0 && (
+          <p role="note" className="rounded-sm border border-border bg-cream-surface p-4 text-xs leading-relaxed text-ink-secondary">
+            {t('unpricedCount', { count: unpricedCount })}
+          </p>
+        )}
 
         {/*
           One notice per flag, rather than one sentence covering both. They were
