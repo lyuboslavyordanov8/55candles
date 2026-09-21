@@ -231,7 +231,7 @@
     "eyebrow": "Legal",
     "lastUpdatedLabel": "Last updated",
     "draftNoticeTitle": "Draft — not yet reviewed by a lawyer",
-    "draftNoticeBody": "This document is a working draft prepared during development. It has not been reviewed by a Bulgarian lawyer and is not binding. Items marked [TODO] still need to be supplied. Do not rely on it, and do not open the shop for orders until it has been reviewed.",
+    "draftNoticeBody": "This document is a working draft written during development. It has not been reviewed by a Bulgarian lawyer and is not binding. Do not rely on it, and do not open the shop for orders until it has been reviewed.",
     "todoLabel": "Still to be confirmed",
     "docs": {
       "terms": {
@@ -382,7 +382,7 @@
           },
           {
             "heading": "3. Sending the goods back",
-            "body": "Send the goods back without undue delay and within 14 days of telling us you withdraw. [TODO: state who pays the cost of return — you may require the consumer to bear it, but only if this page says so before they order. If it does not, you must pay it.]"
+            "body": "Send the goods back without undue delay and within 14 days of telling us you withdraw. The cost of return is yours to bear — you arrange and pay for the parcel back to us. We refund what you paid for the goods in full, including any delivery charge you paid to receive them. If the goods arrive faulty or are the wrong ones through our mistake, the return is at our expense — that is not a withdrawal under this section but a complaint: see the complaints page."
           },
           {
             "heading": "4. Refunds",
@@ -446,7 +446,7 @@
           },
           {
             "heading": "3. Dispatch and delivery times",
-            "body": "[TODO: state how long you take to dispatch, and the courier's delivery time. Give a total, since that is what the customer experiences, and note that these are estimates and not guaranteed.]"
+            "body": "We dispatch your order within 2 working days of receiving it. Econt delivers within 1–2 working days inside Bulgaria, so you will usually have the parcel between 2 and 4 working days after ordering. These times are estimates, are not guaranteed, and do not count public holidays. If something is going to take longer, we will write to you rather than leave you waiting."
           },
           {
             "heading": "4. Delivery charges",
@@ -462,7 +462,7 @@
           },
           {
             "heading": "7. Failed delivery",
-            "body": "[TODO: state how long the courier holds an undelivered parcel, and what happens to the delivery charge if a parcel is returned to us undelivered.]"
+            "body": "The courier attempts delivery and holds the parcel at its office under its own terms — usually a few working days — after which it returns it to us. This is why the phone number you enter matters: it is how the courier reaches you. If a parcel comes back undelivered we refund the price of the goods but not the delivery charge, because Econt bills both directions and that cost has already been incurred. If you order again, delivery is payable again. None of this applies where the delivery failed through our fault or the courier’s — then you lose nothing; write to us at the email address below."
           }
         ]
       }

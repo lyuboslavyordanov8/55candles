@@ -84,11 +84,13 @@ describe('legal documents', () => {
   })
 
   /**
-   * The gate for launch. While LEGAL_IS_DRAFT is true this only reports, but
-   * once the flag flips the assertions bite — so the drafts cannot be marked
-   * reviewed while placeholders remain.
+   * The gate for launch, and it now bites unconditionally: every placeholder was
+   * answered on 2026-09-21, so a reappearing marker is a regression rather than a
+   * decision still outstanding. `LEGAL_IS_DRAFT` remains a separate statement —
+   * it says no Bulgarian lawyer has reviewed the wording yet, which no amount of
+   * filling in blanks can settle.
    */
-  it('has no unresolved placeholders once the draft flag is cleared', () => {
+  it('has no unresolved placeholders left in any document', () => {
     const remaining: string[] = []
 
     for (const { key } of LEGAL_DOCS) {
@@ -97,23 +99,29 @@ describe('legal documents', () => {
         ['bg', bgMessages],
       ] as const) {
         for (const section of doc(messages as Catalogue, key).sections) {
-          if (section.body.includes('[TODO')) {
+          if (section.body.includes('[TODO') || section.heading.includes('[TODO')) {
             remaining.push(`${locale}/${key}: ${section.heading}`)
           }
         }
       }
     }
 
-    if (LEGAL_IS_DRAFT) {
-      // Documented, not asserted: these are the owner's outstanding decisions.
-      expect(remaining.length).toBeGreaterThan(0)
-      return
-    }
+    expect(remaining, `[TODO] markers are back:\n  ${remaining.join('\n  ')}`).toEqual([])
+  })
 
-    expect(
-      remaining,
-      `LEGAL_IS_DRAFT is false but [TODO] markers remain:\n  ${remaining.join('\n  ')}`
-    ).toEqual([])
+  it('still warns that the wording is unreviewed', () => {
+    // The banner is the only thing left standing between a draft and a customer
+    // relying on it, so it outlives the placeholders it used to point at.
+    expect(LEGAL_IS_DRAFT).toBe(true)
+
+    for (const messages of [enMessages, bgMessages] as const) {
+      const notice = (messages.legal as unknown as { draftNoticeBody: string }).draftNoticeBody
+      // No longer allowed to promise that "[TODO]" marks what is outstanding:
+      // nothing is marked any more, so saying so would send a reader looking for
+      // markers that do not exist.
+      expect(notice).not.toContain('TODO')
+      expect(notice.length).toBeGreaterThan(0)
+    }
   })
 })
 
