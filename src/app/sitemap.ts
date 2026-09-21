@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { products } from '@/data/products'
-import { locales, defaultLocale } from '@/i18n/locales'
+import { defaultLocale, localeAlternates } from '@/i18n/locales'
 import { LEGAL_DOCS, LEGAL_IS_DRAFT } from '@/lib/legal'
 import { absoluteUrl } from '@/lib/site'
 
@@ -16,23 +16,36 @@ const staticPaths: Array<{ path: string; priority: number; changeFrequency: 'wee
 
 /**
  * Emits one entry per path (using the default locale as the canonical URL)
- * with every locale listed under alternates.languages, which is how Google
- * wants hreflang expressed in a sitemap. Emitting one entry per locale
- * instead would look like duplicate content.
+ * with every locale — plus `x-default` — listed under alternates.languages,
+ * which is how Google wants hreflang expressed in a sitemap. Emitting one
+ * entry per locale instead would look like duplicate content.
+ *
+ * `lastModified` is only set when the caller has a real date for the
+ * content. It used to be `new Date()` unconditionally, which put the build
+ * timestamp — identical across all 13 URLs — on every entry. That is not a
+ * lastmod, it is noise with a timestamp shape, and Google's own guidance is
+ * that an inaccurate lastmod is worse than none: it can get the whole signal
+ * discounted. The legal documents are the one place a real date already
+ * exists (`LEGAL_DOCS[].lastUpdated`, hand-maintained — see src/lib/legal.ts)
+ * so only they carry one.
  */
 function entry(
   path: string,
   priority: number,
-  changeFrequency: 'weekly' | 'monthly'
+  changeFrequency: 'weekly' | 'monthly',
+  lastModified?: string
 ): MetadataRoute.Sitemap[number] {
   return {
     url: absoluteUrl(`/${defaultLocale}${path}`),
-    lastModified: new Date(),
+    ...(lastModified ? { lastModified } : {}),
     changeFrequency,
     priority,
     alternates: {
       languages: Object.fromEntries(
-        locales.map((locale) => [locale, absoluteUrl(`/${locale}${path}`)])
+        Object.entries(localeAlternates(path)).map(([lang, relativeUrl]) => [
+          lang,
+          absoluteUrl(relativeUrl),
+        ])
       ),
     },
   }
@@ -49,6 +62,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // They join the sitemap when LEGAL_IS_DRAFT flips to false.
     ...(LEGAL_IS_DRAFT
       ? []
-      : LEGAL_DOCS.map((doc) => entry(`/legal/${doc.slug}`, 0.3, 'monthly'))),
+      : LEGAL_DOCS.map((doc) =>
+          entry(`/legal/${doc.slug}`, 0.3, 'monthly', doc.lastUpdated)
+        )),
   ]
 }

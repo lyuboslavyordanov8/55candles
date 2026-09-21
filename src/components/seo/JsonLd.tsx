@@ -1,13 +1,12 @@
 import { company } from '@/lib/company'
 import { absoluteUrl } from '@/lib/site'
 import { locales } from '@/i18n/locales'
+import { getPricing, isPurchasable } from '@/data/pricing'
+import { toMajorUnits } from '@/lib/money'
+import type { Product } from '@/types/product'
 
 /**
  * Structured data (AUDIT.md S-12).
- *
- * `Product` / `Offer` are deliberately absent: an `Offer` requires a price, and
- * no product has one yet (B-03). Emitting `Product` without `offers` produces
- * Search Console warnings, so it waits for pricing.
  *
  * Per the Next 16 guide (`node_modules/next/dist/docs/01-app/02-guides/json-ld.md`),
  * structured data belongs in a plain `<script>` — not `next/script`, which is
@@ -93,6 +92,60 @@ export function OrganizationJsonLd({ locale }: { locale: string }) {
         // email is it — and if neither exists the whole node is dropped, because a
         // contact point with no channel is noise in machine-read data.
         ...(contactChannel ? { contactPoint: contactChannel } : {}),
+      }}
+    />
+  )
+}
+
+/**
+ * One candle (AUDIT.md S-12, the `Product`/`Offer` half). Previously absent
+ * outright: an `Offer` needs a price, and no product had one (B-03). Pricing
+ * landed in Phase 1b, so this now emits whenever a product has a price —
+ * `offers` is omitted, same as before, for the few that still don't
+ * (`unpricedSlugs()`), rather than emitting a `Product` with nothing to buy.
+ *
+ * `aggregateRating` is deliberately never emitted. `product.rating` /
+ * `reviewCount` are the type's own documented placeholders — "hand-written
+ * ... nothing computes them, because there is no reviews table yet"
+ * (`src/types/product.ts`) — and Google's structured-data policy requires
+ * review markup to reflect genuine reviews. Encoding a placeholder as machine-
+ * read data is worse than showing it on the page: a person can tell "4.9 (42)"
+ * next to six candles looks uniform, a rich-result parser cannot.
+ */
+export function ProductJsonLd({
+  locale,
+  product,
+  description,
+}: {
+  locale: string
+  product: Product
+  description: string
+}) {
+  const url = absoluteUrl(`/${locale}/products/${product.slug}`)
+  const pricing = getPricing(product.slug)
+
+  return (
+    <Script
+      data={{
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: product.name,
+        description,
+        image: absoluteUrl(product.imagePath),
+        url,
+        ...(pricing
+          ? {
+              offers: {
+                '@type': 'Offer',
+                url,
+                priceCurrency: pricing.price.currency,
+                price: toMajorUnits(pricing.price),
+                availability: isPurchasable(product.slug)
+                  ? 'https://schema.org/InStock'
+                  : 'https://schema.org/OutOfStock',
+              },
+            }
+          : {}),
       }}
     />
   )

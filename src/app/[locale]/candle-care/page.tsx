@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { useTranslations } from 'next-intl'
 import Reveal from '@/components/motion/Reveal'
-import { locales } from '@/i18n/locales'
+import { localeAlternates } from '@/i18n/locales'
 
 const FlameIcon = () => (
   <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -56,7 +56,7 @@ export async function generateMetadata({
     description: t('subtitle'),
     alternates: {
       canonical: `/${locale}/candle-care`,
-      languages: Object.fromEntries(locales.map((l) => [l, `/${l}/candle-care`])),
+      languages: localeAlternates('/candle-care'),
     },
   }
 }

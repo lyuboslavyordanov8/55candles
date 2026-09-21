@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
-import { locales } from '@/i18n/locales'
+import { localeAlternates } from '@/i18n/locales'
 import ContactContent from './ContactContent'
 
 // Thin server wrapper. The UI is a Client Component, and Client Components
@@ -18,7 +18,7 @@ export async function generateMetadata({
     description: t('subtitle'),
     alternates: {
       canonical: `/${locale}/contact`,
-      languages: Object.fromEntries(locales.map((l) => [l, `/${l}/contact`])),
+      languages: localeAlternates('/contact'),
     },
   }
 }

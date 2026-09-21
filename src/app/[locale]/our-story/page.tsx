@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { getTranslations } from 'next-intl/server'
 import { useTranslations } from 'next-intl'
 import Reveal from '@/components/motion/Reveal'
-import { locales } from '@/i18n/locales'
+import { localeAlternates } from '@/i18n/locales'
 
 const LeafIcon = () => (
   <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -77,7 +77,7 @@ export async function generateMetadata({
     description: t('intro'),
     alternates: {
       canonical: `/${locale}/our-story`,
-      languages: Object.fromEntries(locales.map((l) => [l, `/${l}/our-story`])),
+      languages: localeAlternates('/our-story'),
     },
   }
 }

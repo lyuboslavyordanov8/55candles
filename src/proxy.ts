@@ -1,10 +1,16 @@
+import type { NextRequest } from 'next/server'
 import createMiddleware from 'next-intl/middleware'
 import { defaultLocale, locales } from './i18n/locales'
+import { addVaryOnRedirect } from './lib/vary'
 
-export default createMiddleware({
+const intlMiddleware = createMiddleware({
   locales: [...locales],
   defaultLocale,
 })
+
+export default function proxy(request: NextRequest) {
+  return addVaryOnRedirect(intlMiddleware(request))
+}
 
 export const config = {
   // Note: the `.*\..*` clause excludes any path containing a dot, so requests
