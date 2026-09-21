@@ -260,7 +260,7 @@
           },
           {
             "heading": "6. Payment",
-            "body": "Payment is by cash on delivery (наложен платеж) only: you pay the courier in cash when the parcel is handed to you. We accept no card payments, so no card details are ever entered on this website. [TODO: state the cash-on-delivery fee, if any, and whether the customer or we pay it.]"
+            "body": "Payment is by cash on delivery only: you pay the courier in cash when the parcel is handed to you. We do not accept card payments, so card details are never entered on this site. The fee the courier charges for collecting the money is ours to pay — we add nothing above the amount shown as \"Total to pay\" before you confirm your order."
           },
           {
             "heading": "7. Delivery",
@@ -302,15 +302,15 @@
         "sections": [
           {
             "heading": "1. Who is responsible for your data",
-            "body": "The data controller is ВиреонЛабс ЕООД, ЕИК 208907603. Our contact details are below. [TODO: confirm whether a Data Protection Officer is required and, if so, their contact details.]"
+            "body": "The data controller is VireonLabs EOOD, reg. no. 208907603. Our contact details are below. We are not required to appoint a data protection officer and have not appointed one: we are not a public authority, our business does not involve large-scale systematic monitoring of people, and we do not process special categories of data on a large scale (Article 37 GDPR). Write to the email address below with any question about your data and we will answer it ourselves."
           },
           {
             "heading": "2. What we collect today",
             "body": "This website has no user accounts. If you use the contact form we handle the name, email address and message you send us, in order to answer you. If you place an order we record the recipient name, telephone number, email address, delivery address or collection point, and what you ordered, because we cannot deliver a parcel without them. We load no analytics, advertising or tracking services."
           },
           {
-            "heading": "3. What we will collect when the shop opens",
-            "body": "[TODO: complete before the first order can be placed.] Expected: name, delivery address, email address, telephone number, order contents and history, and whether the courier has collected and remitted the cash on delivery. We take no card payments, so no card data is collected anywhere."
+            "heading": "3. What we collect",
+            "body": "When you place an order we record the recipient’s name, phone number, email address, the delivery address or the courier office or parcel locker you chose, the note you left with the order if you left one, the items ordered with quantities and prices, the weight of the parcel, any promotional code used, the amount to pay, the status of the order and the history of changes to it, the waybill number, and whether the courier has collected and remitted the cash-on-delivery amount. When you write to us through the contact form we process your name, email address and the content of your message. If we ever record a consent from you for a separate purpose, we keep the email address, the purpose, the date, the version of this policy and the IP address it was given from, so that we can show when and for what it was given. We do not accept card payments, so no card details are collected anywhere."
           },
           {
             "heading": "4. Why we process it, and on what legal basis",
@@ -318,15 +318,15 @@
           },
           {
             "heading": "5. Who we share it with",
-            "body": "[TODO: list every processor once chosen — hosting, database, payment provider, courier, email provider — with the country each operates in.] Couriers receive the name, address and telephone number needed to deliver your parcel. We do not sell your data."
+            "body": "We use the following processors: Vercel Inc. (USA) for hosting the site, with requests served from its Frankfurt, Germany region; Neon Inc. (USA) for the order database, stored in region eu-central-1, Frankfurt, Germany; Resend (USA) for sending order confirmations and contact-form enquiries, through region eu-west-1, Ireland; ImprovMX Incorporated (USA) for forwarding mail sent to contact@55candles.com to our mailboxes, and Google (USA) as the provider of those mailboxes; and Econt Express OOD (Bulgaria) for delivery. The courier receives the name, the address or chosen office, the phone number and the amount to collect — as much as it needs to hand the parcel over to you. We do not sell your data and we do not make it available for anyone else’s advertising."
           },
           {
             "heading": "6. Transfers outside the EEA",
-            "body": "[TODO: state whether any processor transfers data outside the EEA and, if so, the safeguard relied on.]"
+            "body": "Your orders and this site are stored and served inside the European Union, in Frankfurt, Germany. The companies that provide our hosting, database, email sending and email forwarding are, however, incorporated in the United States, and their staff may access the data while supporting those services. To the extent that this is a transfer outside the EEA, it rests on the European Commission’s standard contractual clauses and, for providers certified under the EU–US Data Privacy Framework, on the Commission’s adequacy decision. You can request a copy of the clauses at the email address below."
           },
           {
             "heading": "7. How long we keep it",
-            "body": "[TODO: set a retention period for each category.] Accounting records must be kept for the period required by Bulgarian tax law. Contact-form messages are kept only as long as needed to deal with your enquiry."
+            "body": "Orders and the documents belonging to them are kept for 5 years from the end of the year in which the order was completed — the period for which Bulgarian tax law may ask for them. Accounting records and financial statements are kept for 10 years, as the Accountancy Act requires. Contact-form messages are kept for up to 12 months after the conversation ends. Consent records are kept while the consent stands and for 3 years after it is withdrawn, so that we can show when and for what it was given. Once those periods expire the data is deleted."
           },
           {
             "heading": "8. Your rights",
@@ -334,7 +334,7 @@
           },
           {
             "heading": "9. Security",
-            "body": "The site is served over HTTPS with a content security policy and other protective headers. [TODO: describe access controls, encryption at rest and backup arrangements once the database exists.]"
+            "body": "The site is served over HTTPS with a content security policy and other protective headers. The database is encrypted at rest, the connection to it is required to be encrypted, and its provider takes backups that allow restoring to a point in time. Orders are visible only through a password-protected admin panel: the session is a signed cookie that scripts cannot read, is sent only over HTTPS, and expires by itself. Only the shop’s two owners have access to that panel and to the mailboxes. No card details exist anywhere in the system, because we do not accept card payments."
           },
           {
             "heading": "10. Automated decisions",
@@ -390,7 +390,7 @@
           },
           {
             "heading": "5. Condition of the goods, and exceptions",
-            "body": "You may examine the goods as you would in a shop, but you are liable for any reduction in value caused by handling beyond that. A candle that has been burned cannot normally be returned under this right. [TODO: confirm with a lawyer whether any statutory exception applies to your products — for example sealed goods unsuitable for return on hygiene grounds, or goods made to the consumer's specification.]"
+            "body": "You may examine the goods as you would in a shop, but you are liable for any diminished value caused by handling beyond what was necessary. A candle that has been burned cannot, as a rule, be returned on this basis. We do not rely on the statutory exception for sealed goods: our candles are not sold sealed for hygiene reasons and are not made to individual order, so your right of withdrawal applies to our whole range."
           },
           {
             "heading": "6. Standard withdrawal form",
@@ -420,7 +420,7 @@
           },
           {
             "heading": "4. Our response",
-            "body": "[TODO: confirm the response time you commit to.] We will acknowledge your claim in writing, tell you whether we accept it, and if we do, how and by when we will resolve it. We keep a register of claims as required by Bulgarian consumer law."
+            "body": "We will confirm in writing that we received your complaint and tell you within 14 days whether we accept it. If we do, we will resolve it within one month of the date you raised it — the period the Consumer Protection Act allows us — and we will tell you how. We keep a register of complaints as Bulgarian consumer law requires."
           },
           {
             "heading": "5. Damage in transit",
@@ -438,11 +438,11 @@
         "sections": [
           {
             "heading": "1. Where we deliver",
-            "body": "[TODO: confirm whether you ship only within Bulgaria, or to the EU as well. Shipping outside Bulgaria changes your VAT and consumer-law obligations.]"
+            "body": "We deliver within Bulgaria only. If you need a parcel sent to another country, write to the email address at the bottom of this page and we will tell you what is possible, but an order outside Bulgaria cannot be placed through the site."
           },
           {
             "heading": "2. Carriers",
-            "body": "[TODO: confirm the courier(s) — Econt, Speedy, or both — and whether delivery to an office or automated parcel locker is offered as well as to an address.]"
+            "body": "We deliver with Econt Express. You can choose delivery to your address, to an Econt office, or to an Econt parcel locker — the choice is yours at checkout, and offices and lockers are searchable in the form itself. We plan to add Speedy as well; until then Speedy is shown as coming soon and cannot be selected."
           },
           {
             "heading": "3. Dispatch and delivery times",
@@ -450,11 +450,11 @@
           },
           {
             "heading": "4. Delivery charges",
-            "body": "[TODO: state the charge, how it is calculated, and any free-delivery threshold. Charges depend on parcel weight, so every product needs a weight before this can be answered.] The exact charge is always shown before you confirm your order."
+            "body": "The delivery charge is calculated by Econt for your particular parcel — from its weight, the place we post it from, and the address, office or locker you chose. That is why it is not a fixed sum and appears in your order rather than in a table here. With three candles or more, delivery is free for you: the courier still charges for it and we absorb the charge. The exact amount is always shown before you confirm your order."
           },
           {
             "heading": "5. Cash on delivery",
-            "body": "[TODO: confirm whether наложен платеж is offered, any fee, and who pays it.]"
+            "body": "Yes — cash on delivery is the only way to pay in this shop. You pay the courier in cash when you receive the parcel, and the courier remits the money to us. The fee Econt charges for that service is ours to pay: we add nothing above the amount shown as \"Total to pay\" before you confirm your order."
           },
           {
             "heading": "6. On arrival",
