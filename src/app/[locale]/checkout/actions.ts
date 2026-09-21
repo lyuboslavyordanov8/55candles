@@ -1,6 +1,9 @@
 'use server'
 
+import { headers } from 'next/headers'
 import { courierClient } from '@/lib/couriers'
+import { createRateLimiter } from '@/lib/rate-limit'
+import { CHECKOUT_MAX_PER_WINDOW, CHECKOUT_WINDOW_MS } from './rate-limit-config'
 import { validateDelivery, type DeliveryDetails, type FieldErrors } from '@/lib/delivery-schema'
 import { calculateTotal, priceCart, type AppliedDiscount, type CartLine } from '@/lib/order-total'
 import { evaluatePromoCode, PROMO_CODE_MAX, type PromoOutcome } from '@/lib/promo'
@@ -57,7 +60,38 @@ import type { DeliveryOption } from '@/lib/shipping'
  * Where no database is configured the action still stops at `readyToPay` and says
  * so, rather than pretending an order exists. Same principle as the contact form
  * (B-20): a visible refusal beats a silent lie.
+ *
+ * ── Rate limiting ───────────────────────────────────────────────────────────
+ * Unlike the contact form and the admin login, this action used to have no
+ * abuse control at all — and a flood here is worse than either: every call
+ * prices the parcel against Econt's live API (a cost per attempt) and, on
+ * `confirm`, writes an order row and can email a confirmation to whatever
+ * address the request names, which is not necessarily the sender's own. The
+ * limiter runs before anything else so a request over budget never reaches
+ * the courier or the database.
+ *
+ * Generous relative to the contact form's 5/minute: one real checkout is at
+ * least two submissions (`quote`, then `confirm`), plus a retry for any field
+ * the customer got wrong, all from the one visitor the window exists to allow.
  */
+
+/** See "Rate limiting" above. */
+const checkoutLimiter = createRateLimiter({
+  windowMs: CHECKOUT_WINDOW_MS,
+  max: CHECKOUT_MAX_PER_WINDOW,
+})
+
+/**
+ * Same derivation as `api/contact/route.ts`'s limiter: the first hop of
+ * `X-Forwarded-For`. Trustworthy only if the deployment's edge/proxy
+ * overwrites rather than appends to a client-supplied value — see the
+ * security review. Best-effort, not a boundary a determined attacker with a
+ * spoofable header cannot cross.
+ */
+async function clientKey(): Promise<string> {
+  const list = await headers()
+  return list.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+}
 
 /**
  * The fields whose values are sent back to the form after a submission.
@@ -179,6 +213,10 @@ export async function submitCheckout(
   _previous: CheckoutState,
   formData: FormData
 ): Promise<CheckoutState> {
+  if (checkoutLimiter.hit(await clientKey())) {
+    return { status: 'error', messageKey: 'rateLimited' }
+  }
+
   const raw = Object.fromEntries(formData) as Record<string, unknown>
 
   const delivery = validateDelivery(raw)
