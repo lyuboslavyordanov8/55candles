@@ -59,7 +59,7 @@ function stubOrder(events: OrderEvent[]) {
 }
 
 function get() {
-  return GET(new Request(`http://localhost/api/admin/orders/${ORDER_ID}/label`), {
+  return GET(new Request(`http://localhost/admin/orders/${ORDER_ID}/label`), {
     params: Promise.resolve({ id: ORDER_ID }),
   })
 }

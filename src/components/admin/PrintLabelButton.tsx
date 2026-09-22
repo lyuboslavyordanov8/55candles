@@ -27,10 +27,11 @@ const FAILURES: Record<number, string> = {
 const GENERIC_FAILURE = 'Етикетът не можа да бъде зареден. Опитай пак.'
 
 export default function PrintLabelButton({
-  orderId,
+  labelUrl,
   label = 'Принтирай етикет',
 }: {
-  orderId: string
+  /** From `labelPath()`, which is also what the "етикет (PDF)" link points at. */
+  labelUrl: string
   label?: string
 }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
@@ -42,7 +43,7 @@ export default function PrintLabelButton({
     setLoading(true)
 
     try {
-      const response = await fetch(`/api/admin/orders/${orderId}/label`)
+      const response = await fetch(labelUrl)
 
       if (!response.ok) {
         setFailure(FAILURES[response.status] ?? GENERIC_FAILURE)

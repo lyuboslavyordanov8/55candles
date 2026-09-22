@@ -43,6 +43,16 @@ import { redirect } from 'next/navigation'
 
 const COOKIE_NAME = 'admin_session'
 
+/**
+ * The only path the session cookie is sent to.
+ *
+ * Narrow on purpose: nothing outside the admin needs it, and a cookie that is
+ * not sent cannot leak from a page that has no business holding it. Exported
+ * because it is a constraint on *where admin endpoints may live* — one outside
+ * this path receives no cookie and answers as if nobody were logged in.
+ */
+export const ADMIN_COOKIE_PATH = '/admin'
+
 /** How long a login lasts. Long enough for a working day, not a month. */
 const SESSION_MS = 12 * 60 * 60 * 1000
 
@@ -165,14 +175,14 @@ export async function startAdminSession(name: string): Promise<void> {
     // Off in development, where the dev server is plain HTTP and a Secure cookie
     // would simply never be stored.
     secure: process.env.NODE_ENV === 'production',
-    path: '/admin',
+    path: ADMIN_COOKIE_PATH,
     maxAge: SESSION_MS / 1000,
   })
 }
 
 export async function endAdminSession(): Promise<void> {
   const store = await cookies()
-  store.delete({ name: COOKIE_NAME, path: '/admin' })
+  store.delete({ name: COOKIE_NAME, path: ADMIN_COOKIE_PATH })
 }
 
 /** True when the current request carries a valid session. */

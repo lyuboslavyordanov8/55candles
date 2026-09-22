@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 
+import { ADMIN_COOKIE_PATH } from '@/lib/admin-auth'
 import {
   BOOKABLE_ORDER_STATUSES,
+  labelPath,
   labelPdfUrl,
   waybillBlocker,
   waybillRequestFor,
@@ -259,6 +261,16 @@ describe('the label PDF on an order', () => {
     for (const hostile of ['javascript:alert(1)', 'file:///etc/passwd', 'ee.econt.com/label', 42]) {
       expect(labelPdfUrl([event({ waybillPdfUrl: hostile }, '2026-09-22T07:00:00Z')])).toBeNull()
     }
+  })
+
+  it('is served from inside the path the admin session cookie is scoped to', () => {
+    // Not decoration: the cookie is set with `path: '/admin'`, so a route
+    // anywhere else — `/api/admin/...`, for one — never receives it and answers
+    // 404 to the very admin looking at the order. Cost a deploy on 2026-09-22.
+    expect(labelPath('09b2f737-750a-4333-8a5a-11faafdee2c5')).toBe(
+      '/admin/orders/09b2f737-750a-4333-8a5a-11faafdee2c5/label'
+    )
+    expect(labelPath('any-id').startsWith(ADMIN_COOKIE_PATH)).toBe(true)
   })
 
   it('upgrades the http link Econt actually returns', () => {

@@ -82,6 +82,19 @@ export function waybillBlocker(order: Order): WaybillBlocker | null {
 }
 
 /**
+ * Where this shop serves an order's label from.
+ *
+ * **Under `/admin`, and that is the whole point of the function.** The session
+ * cookie is scoped to `ADMIN_COOKIE_PATH`, so an endpoint outside it is handed no
+ * cookie and answers 404 to an admin who is plainly logged in — which is what
+ * `/api/admin/orders/[id]/label` did until 2026-09-22. One function, used by the
+ * link and the print button alike, and a test that holds it inside that path.
+ */
+export function labelPath(orderId: string): string {
+  return `/admin/orders/${orderId}/label`
+}
+
+/**
  * The label PDF from the order's history, newest first, or `null`.
  *
  * Kept in the booking event's `detail` rather than in a column: it is one link

@@ -7,7 +7,7 @@ import PrintLabelButton from '../PrintLabelButton'
 /**
  * One click from the order to the printer (order-management back office UX).
  *
- * The label is fetched from `/api/admin/orders/[id]/label` — our own origin,
+ * The label is fetched from `labelPath()` — our own origin,
  * because a cross-origin PDF cannot be printed by script — turned into a blob
  * URL and printed from a hidden iframe.
  *
@@ -20,7 +20,7 @@ import PrintLabelButton from '../PrintLabelButton'
  * — the same treatment `CopyButton.test.tsx` gives the clipboard.
  */
 
-const ORDER_ID = '11111111-1111-1111-1111-111111111111'
+const LABEL_URL = '/admin/orders/11111111-1111-1111-1111-111111111111/label'
 const BLOB_URL = 'blob:http://localhost/label'
 
 const print = vi.fn()
@@ -33,7 +33,7 @@ function pdfResponse() {
 
 /** The button, clicked, with the fetch it makes already settled. */
 async function clickPrint() {
-  render(<PrintLabelButton orderId={ORDER_ID} />)
+  render(<PrintLabelButton labelUrl={LABEL_URL} />)
   await userEvent.click(screen.getByRole('button'))
 }
 
@@ -60,7 +60,7 @@ describe('PrintLabelButton', () => {
   it('asks our own route for the label, not the courier', async () => {
     await clickPrint()
 
-    expect(fetch).toHaveBeenCalledWith(`/api/admin/orders/${ORDER_ID}/label`)
+    expect(fetch).toHaveBeenCalledWith(LABEL_URL)
   })
 
   it('prints once the label has loaded in the frame', async () => {
@@ -117,7 +117,7 @@ describe('PrintLabelButton', () => {
       })
     )
 
-    render(<PrintLabelButton orderId={ORDER_ID} />)
+    render(<PrintLabelButton labelUrl={LABEL_URL} />)
     await userEvent.click(screen.getByRole('button'))
 
     expect(screen.getByRole('button')).toBeDisabled()
@@ -129,7 +129,7 @@ describe('PrintLabelButton', () => {
   it('clears a previous failure when tried again', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 502 }))
 
-    render(<PrintLabelButton orderId={ORDER_ID} />)
+    render(<PrintLabelButton labelUrl={LABEL_URL} />)
     await userEvent.click(screen.getByRole('button'))
     expect(await screen.findByRole('alert')).toBeInTheDocument()
 

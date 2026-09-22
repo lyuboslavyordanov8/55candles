@@ -10,6 +10,11 @@ import { labelPdfUrl } from '@/lib/waybills'
  * admin's "Принтирай етикет" button asks this route, and this route asks Econt —
  * the same arrangement, and for a second reason, as `/api/couriers/.../offices`.
  *
+ * **It lives under `/admin` rather than beside those other routes**, because the
+ * session cookie is scoped to `ADMIN_COOKIE_PATH`. At `/api/admin/orders/[id]/label`
+ * it was sent no cookie and answered 404 to a logged-in admin. `labelPath()` is
+ * the one place the URL is written; see it.
+ *
  * The second reason is that Econt's link is a **capability URL**: the numeric id
  * in it is the only thing guarding the file, there is no authentication on it,
  * and the ids are sequential. Putting it in the page's HTML published it to

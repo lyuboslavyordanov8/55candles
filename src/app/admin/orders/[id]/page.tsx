@@ -6,7 +6,7 @@ import { getOrderDetail, refusalHistory, undoEligibility, UNDO_WINDOW_MS } from 
 import { nextStatuses, STATUS_LABELS, statusRequiresReason } from '@/lib/order-status'
 import { formatMoney, money } from '@/lib/money'
 import { defaultBuyerFor, getInvoiceForOrder, invoiceBlocker } from '@/lib/invoices'
-import { labelPdfUrl, waybillBlocker } from '@/lib/waybills'
+import { labelPath, labelPdfUrl, waybillBlocker } from '@/lib/waybills'
 import { econtSender, econtShipFrom } from '@/lib/couriers'
 import CopyButton from '@/components/admin/CopyButton'
 import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
@@ -349,7 +349,7 @@ export default async function AdminOrderPage({
               <>
                 {' · '}
                 <a
-                  href={`/api/admin/orders/${order.id}/label`}
+                  href={labelPath(order.id)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline"
@@ -373,7 +373,7 @@ export default async function AdminOrderPage({
             )}
             {pdfUrl && (
               <span className="mt-2 block">
-                <PrintLabelButton orderId={order.id} />
+                <PrintLabelButton labelUrl={labelPath(order.id)} />
               </span>
             )}
             <span className="mt-1 block text-stone-400">
