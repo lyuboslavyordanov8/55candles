@@ -88,19 +88,28 @@ export function waybillBlocker(order: Order): WaybillBlocker | null {
  * per booking and the history is already where a booking is recorded, so a
  * column would be a migration to store a duplicate of something we have.
  *
- * `https://` is checked here and not by the callers, because the value arrives
- * in the courier's JSON and is then used two ways — as an `href` in the admin
- * and as a fetch target on the server — and a scheme neither of them should
- * follow has no business reaching either.
+ * The scheme is checked here and not by the caller, because the value arrives in
+ * the courier's JSON and becomes a fetch target on the server: anything that is
+ * not `http(s)` has no business reaching it.
+ *
+ * **`http` is upgraded rather than followed.** Production hands back a
+ * `printLoading` export over plain http —
+ * `http://ee.econt.com/api_export.php?exportMethod=printLoading&loading_num=…&_key=…`
+ * — not the `PDFService.getPDF.json` link the demo service returns. The `_key`
+ * in that query is the only thing guarding the file, so it does not travel in
+ * the clear; `https://` was checked against the live service on 2026-09-22 and
+ * serves the identical bytes with no redirect.
  */
 export function labelPdfUrl(events: readonly OrderEvent[]): string | null {
   for (let i = events.length - 1; i >= 0; i -= 1) {
     const detail = events[i].detail
+    if (!detail || typeof detail !== 'object') continue
 
-    if (detail && typeof detail === 'object') {
-      const url = (detail as Record<string, unknown>).waybillPdfUrl
-      if (typeof url === 'string' && url.startsWith('https://')) return url
-    }
+    const url = (detail as Record<string, unknown>).waybillPdfUrl
+    if (typeof url !== 'string') continue
+
+    if (url.startsWith('https://')) return url
+    if (url.startsWith('http://')) return `https://${url.slice('http://'.length)}`
   }
 
   return null

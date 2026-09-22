@@ -253,12 +253,24 @@ describe('the label PDF on an order', () => {
     expect(labelPdfUrl([event({ note: 'confirmed by hand' }, '2026-09-22T06:00:00Z')])).toBeNull()
   })
 
-  it('refuses anything that is not an https URL', () => {
-    // The value arrives in the courier's JSON and is then both an `href` and a
-    // server-side fetch target, so `https://` is checked here rather than trusted
-    // twice downstream.
-    for (const hostile of ['javascript:alert(1)', 'http://ee.econt.com/label', 'file:///etc/passwd', 42]) {
+  it('refuses anything that is not an http(s) URL', () => {
+    // The value arrives in the courier's JSON and is then a fetch target on the
+    // server, so the scheme is checked here rather than trusted downstream.
+    for (const hostile of ['javascript:alert(1)', 'file:///etc/passwd', 'ee.econt.com/label', 42]) {
       expect(labelPdfUrl([event({ waybillPdfUrl: hostile }, '2026-09-22T07:00:00Z')])).toBeNull()
     }
+  })
+
+  it('upgrades the http link Econt actually returns', () => {
+    // What production hands back, unlike the demo service: a `printLoading`
+    // export over plain http, with a `_key` in the query that is the only thing
+    // guarding the file. `https://` serves the identical bytes, so the key is
+    // never sent in the clear — checked against the live service on 2026-09-22.
+    const insecure =
+      'http://ee.econt.com/api_export.php?exportMethod=printLoading&loading_num=1055255364093&_key=abc'
+
+    expect(labelPdfUrl([event({ waybillPdfUrl: insecure }, '2026-09-22T07:00:00Z')])).toBe(
+      'https://ee.econt.com/api_export.php?exportMethod=printLoading&loading_num=1055255364093&_key=abc'
+    )
   })
 })
