@@ -3,6 +3,16 @@ import Link from 'next/link'
 import { requireAdmin } from '@/lib/admin-auth'
 import { listInvoices, readSnapshot } from '@/lib/invoices'
 import { formatMoney, money, type Currency } from '@/lib/money'
+import {
+  button,
+  EmptyState,
+  PageHeader,
+  table,
+  tableWrap,
+  td,
+  th,
+  tr,
+} from '@/components/admin/ui'
 
 /**
  * Every фактура issued, newest first.
@@ -30,64 +40,76 @@ export default async function InvoicesPage() {
   const rows = await listInvoices()
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Link href="/admin" className="text-xs text-stone-500 underline">
-          ← поръчки
-        </Link>
-        <h1 className="text-lg font-medium">Фактури</h1>
-        <p className="text-xs text-stone-500">
-          Издадена фактура не се редактира и не се изтрива — номерът вече е част от редовна
-          поредица. Грешка се коригира с кредитно известие, което се прави ръчно.
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="Фактури"
+        back={{ href: '/admin', label: 'поръчки' }}
+        description="Издадена фактура не се редактира и не се изтрива — номерът е част от редовна поредица. Грешка се коригира с кредитно известие, което се прави ръчно."
+      />
 
       {rows.length === 0 ? (
-        <p className="rounded-sm border border-stone-200 bg-white p-4 text-xs text-stone-500">
-          Още няма издадени фактури.
-        </p>
+        <EmptyState
+          title="Още няма издадени фактури"
+          description="Фактура се издава от страницата на поръчката, след като е потвърдена."
+          action={
+            <Link href="/admin" className={button('secondary')}>
+              Към поръчките
+            </Link>
+          }
+        />
       ) : (
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-stone-300 text-left text-stone-500">
-              <th className="py-2 font-medium">№</th>
-              <th className="py-2 font-medium">Получател</th>
-              <th className="py-2 font-medium">Поръчка</th>
-              <th className="py-2 font-medium">Издадена</th>
-              <th className="py-2 text-right font-medium">Сума</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((invoice) => {
-              const snapshot = readSnapshot(invoice.snapshot)
-              const buyer = snapshot?.buyer
+        <div className={`${tableWrap} overflow-x-auto`}>
+          <table className={table}>
+            <thead className="bg-cream-surface/60">
+              <tr>
+                <th className={th}>№</th>
+                <th className={th}>Получател</th>
+                <th className={th}>Поръчка</th>
+                <th className={th}>Издадена</th>
+                <th className={`${th} text-right`}>Сума</th>
+                <th className={`${th} text-right`}>Документ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((invoice) => {
+                const snapshot = readSnapshot(invoice.snapshot)
+                const buyer = snapshot?.buyer
 
-              return (
-                <tr key={invoice.id} className="border-b border-stone-200">
-                  <td className="py-2 tabular-nums">
-                    <Link
-                      href={`/admin/orders/${invoice.orderId}/invoice`}
-                      className="underline"
-                    >
+                return (
+                  <tr key={invoice.id} className={tr}>
+                    <td className={`${td} font-medium whitespace-nowrap tabular-nums`}>
                       {invoice.number}
-                    </Link>
-                  </td>
-                  <td className="py-2">{buyer?.company || buyer?.name || '—'}</td>
-                  <td className="py-2">
-                    <Link href={`/admin/orders/${invoice.orderId}`} className="underline">
-                      {snapshot?.orderNumber ?? 'поръчката'}
-                    </Link>
-                  </td>
-                  <td className="py-2">{dateFormat.format(invoice.issuedAt)}</td>
-                  <td className="py-2 text-right tabular-nums">
-                    {formatMoney(money(invoice.totalMinor, invoice.currency as Currency), 'bg')}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td className={td}>{buyer?.company || buyer?.name || '—'}</td>
+                    <td className={`${td} whitespace-nowrap`}>
+                      <Link
+                        href={`/admin/orders/${invoice.orderId}`}
+                        className="underline-offset-2 tabular-nums hover:underline"
+                      >
+                        {snapshot?.orderNumber ?? 'поръчката'}
+                      </Link>
+                    </td>
+                    <td className={`${td} whitespace-nowrap text-ink-ghost tabular-nums`}>
+                      {dateFormat.format(invoice.issuedAt)}
+                    </td>
+                    <td className={`${td} text-right font-medium whitespace-nowrap tabular-nums`}>
+                      {formatMoney(money(invoice.totalMinor, invoice.currency as Currency), 'bg')}
+                    </td>
+                    <td className={`${td} text-right`}>
+                      <Link
+                        href={`/admin/orders/${invoice.orderId}/invoice`}
+                        className={button('ghost', 'sm')}
+                      >
+                        За печат
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
-    </div>
+    </>
   )
 }

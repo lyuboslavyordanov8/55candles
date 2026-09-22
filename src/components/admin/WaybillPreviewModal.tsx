@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import ConfirmSubmit from './ConfirmSubmit'
+import { button } from './ui'
 
 interface Props {
   orderId: string
@@ -63,14 +64,14 @@ export default function WaybillPreviewModal({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-sm bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-700"
+        className={button('primary')}
       >
         Прегледай преди издаване
       </button>
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/45 p-4 backdrop-blur-[2px]"
           onClick={(event) => {
             // Only the backdrop itself closes it — a click inside the card must not.
             if (event.target === event.currentTarget) setOpen(false)
@@ -80,54 +81,63 @@ export default function WaybillPreviewModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="waybill-preview-heading"
-            className="w-full max-w-md space-y-3 rounded-sm border border-stone-300 bg-white p-5 text-xs"
+            className="w-full max-w-md rounded-lg border border-border bg-paper-white text-xs shadow-xl"
           >
-            <h3 id="waybill-preview-heading" className="text-sm font-medium text-stone-900">
-              Преглед на товарителницата
-            </h3>
-            <p className="text-stone-500">
-              {courierLabel} · {orderNumber}
-            </p>
-
-            {sender && (
-              <div>
-                <p className="text-stone-500">Подател</p>
-                <p className="text-stone-900">
-                  {sender.name} · {sender.phone}
-                </p>
-                <p className="text-stone-600">{sender.from}</p>
-              </div>
-            )}
-
-            <div>
-              <p className="text-stone-500">Получател</p>
-              <p className="text-stone-900">
-                {recipientName} · {recipientPhone}
+            <div className="border-b border-border/60 px-5 py-4">
+              <h3
+                id="waybill-preview-heading"
+                className="font-serif text-lg leading-tight text-charcoal"
+              >
+                Издаване на товарителница
+              </h3>
+              <p className="mt-1 text-ink-secondary">
+                {courierLabel} · {orderNumber} · пратката се създава веднага и се заплаща, дори да
+                не бъде подадена.
               </p>
-              <p className="text-stone-600">{destination}</p>
             </div>
 
-            <div className="flex justify-between border-t border-stone-100 pt-2">
-              <span className="text-stone-500">Тегло</span>
-              <span>{weightGrams} г</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-stone-500">Наложен платеж</span>
-              <span className="font-medium text-stone-900">{codAmount}</span>
+            <div className="space-y-3 px-5 py-4">
+
+              {sender && (
+                <div>
+                  <p className="text-[11px] tracking-wide text-ink-ghost uppercase">Подател</p>
+                  <p className="text-ink-primary">
+                    {sender.name} · <span className="tabular-nums">{sender.phone}</span>
+                  </p>
+                  <p className="text-ink-secondary">{sender.from}</p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[11px] tracking-wide text-ink-ghost uppercase">Получател</p>
+                <p className="text-ink-primary">
+                  {recipientName} · <span className="tabular-nums">{recipientPhone}</span>
+                </p>
+                <p className="text-ink-secondary">{destination}</p>
+              </div>
+
+              <dl className="space-y-1 border-t border-border/60 pt-3">
+                <div className="flex justify-between">
+                  <dt className="text-ink-ghost">Тегло</dt>
+                  <dd className="tabular-nums">{weightGrams} г</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-ink-ghost">Наложен платеж</dt>
+                  <dd className="font-medium text-ink-primary tabular-nums">{codAmount}</dd>
+                </div>
+              </dl>
             </div>
 
-            <form action={issueWaybill} className="space-y-2 border-t border-stone-100 pt-3">
-              <input type="hidden" name="orderId" value={orderId} />
-              <ConfirmSubmit expected={orderNumber} buttonLabel="Издай товарителница" />
-            </form>
+            <div className="flex flex-wrap items-end justify-between gap-3 border-t border-border/60 bg-cream-surface/60 px-5 py-4">
+              <form action={issueWaybill}>
+                <input type="hidden" name="orderId" value={orderId} />
+                <ConfirmSubmit expected={orderNumber} buttonLabel="Издай товарителница" />
+              </form>
 
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="text-stone-500 underline"
-            >
-              Затвори без да издаваш
-            </button>
+              <button type="button" onClick={() => setOpen(false)} className={button('ghost')}>
+                Затвори
+              </button>
+            </div>
           </div>
         </div>
       )}

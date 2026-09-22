@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 
 import { hasAdminSession, isAdminConfigured } from '@/lib/admin-auth'
+import { CandleIcon } from '@/components/admin/icons'
+import { button, fieldLabel, input, Notice, panel } from '@/components/admin/ui'
 import { logIn } from '../actions'
 
 /**
@@ -13,6 +15,10 @@ import { logIn } from '../actions'
  * Every wrong outcome says the same thing — "грешна парола" — whether the password
  * was wrong or the form was throttled is distinguished only because a throttled
  * person needs to know to wait.
+ *
+ * The only page in the admin with no navigation rail (see the layout), so it
+ * carries the wordmark itself: a bare password box on a cream field could belong
+ * to anything.
  */
 
 const errors: Record<string, string> = {
@@ -34,21 +40,26 @@ export default async function AdminLoginPage({
   const message = error ? errors[error] : undefined
 
   return (
-    <div className="mx-auto max-w-sm py-10">
-      <h1 className="mb-1 text-lg font-medium">Вход</h1>
-      <p className="mb-6 text-xs text-stone-500">Панелът за поръчките на 55° candles.</p>
+    <div className="mx-auto w-full max-w-sm py-10 sm:py-16">
+      <div className="mb-6 flex items-center gap-2 text-charcoal">
+        <CandleIcon className="text-clay" />
+        <span className="font-serif text-xl leading-none">55° candles</span>
+      </div>
+
+      <h1 className="font-serif text-2xl leading-tight text-charcoal">Вход</h1>
+      <p className="mt-1 mb-5 text-xs text-ink-secondary">
+        Панелът за поръчките. Името се пише в историята на всяка промяна.
+      </p>
 
       {!isAdminConfigured() && (
-        <p className="mb-4 rounded-sm border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-          {errors.unconfigured}
-        </p>
+        <div className="mb-4">
+          <Notice>{errors.unconfigured}</Notice>
+        </div>
       )}
 
-      <form action={logIn} className="space-y-3">
+      <form action={logIn} className={`${panel} space-y-4 p-5`}>
         <label className="block">
-          <span className="mb-1 block text-xs text-stone-600">
-            Име (за историята на поръчките)
-          </span>
+          <span className={fieldLabel}>Име</span>
           <input
             type="text"
             name="name"
@@ -56,31 +67,28 @@ export default async function AdminLoginPage({
             autoFocus
             maxLength={40}
             placeholder="напр. Мария"
-            className="w-full rounded-sm border border-stone-300 px-3 py-2"
+            className={`${input} h-9 text-sm`}
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs text-stone-600">Парола</span>
+          <span className={fieldLabel}>Парола</span>
           <input
             type="password"
             name="password"
             required
             autoComplete="current-password"
-            className="w-full rounded-sm border border-stone-300 px-3 py-2"
+            className={`${input} h-9 text-sm`}
           />
         </label>
 
         {message && (
-          <p role="alert" className="text-xs text-red-700">
+          <p role="alert" className="text-xs font-medium text-red-800">
             {message}
           </p>
         )}
 
-        <button
-          type="submit"
-          className="w-full rounded-sm bg-stone-900 px-3 py-2 text-white hover:bg-stone-700"
-        >
+        <button type="submit" className={`${button('primary', 'lg')} w-full`}>
           Влез
         </button>
       </form>

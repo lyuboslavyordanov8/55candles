@@ -11,18 +11,32 @@ import { econtSender, econtShipFrom } from '@/lib/couriers'
 import CopyButton from '@/components/admin/CopyButton'
 import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
 import WaybillPreviewModal from '@/components/admin/WaybillPreviewModal'
+import OrderStatusBadge from '@/components/admin/OrderStatusBadge'
+import OrderStatusRail from '@/components/admin/OrderStatusRail'
+import {
+  button,
+  DetailRow,
+  fieldLabel,
+  input,
+  Notice,
+  PageHeader,
+  panel,
+  Section,
+} from '@/components/admin/ui'
 import { addNote, changeStatus, issueInvoice, issueWaybill, undoStatusChange } from '../../actions'
 
 /**
  * One order: everything needed to pack it, ship it and settle it.
  *
- * The blocks are in the order they are used — what to put in the box, where it
- * goes and who to call, then what can be done to it now, then what has happened
- * so far. Status moves are single-click buttons, one per status the order may go
- * to next (`src/lib/order-status.ts` decides which), with a short Undo window
- * rather than a dropdown-and-save: see `undoEligibility`. `refused_at_delivery`
- * and `returned` are the one exception — both require a reason, so both need a
- * field before they can be a click.
+ * The blocks are in the order they are used — where the parcel is, what to put in
+ * the box, where it goes and who to call, then the paperwork, then what can be
+ * done to it now, then what has happened so far. Status moves are single-click
+ * buttons, one per status the order may go to next (`src/lib/order-status.ts`
+ * decides which), with a short Undo window rather than a dropdown-and-save: see
+ * `undoEligibility`. `refused_at_delivery` and `returned` are the one exception —
+ * both require a reason, so both need a field before they can be a click, and
+ * both are kept away from the ordinary buttons because neither is an ordinary
+ * step.
  */
 
 const dateFormat = new Intl.DateTimeFormat('bg-BG', {
@@ -143,27 +157,39 @@ export default async function AdminOrderPage({
   const reasonNext = upcoming.filter(statusRequiresReason)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <Link href="/admin" className="text-xs text-stone-500 underline">
-            ← всички поръчки
-          </Link>
-          <h1 className="text-lg font-medium">{order.orderNumber}</h1>
-          <p className="text-xs text-stone-500">
-            {dateFormat.format(order.createdAt)} · {STATUS_LABELS[order.status]}
-          </p>
-        </div>
-        <p className="text-right">
-          <span className="block text-xs text-stone-500">наложен платеж</span>
-          <span className="text-lg">{amount(order.totalMinor)}</span>
-        </p>
+    <>
+      <PageHeader
+        title={order.orderNumber}
+        back={{ href: '/admin', label: 'всички поръчки' }}
+        description={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            {dateFormat.format(order.createdAt)}
+            <OrderStatusBadge status={order.status} />
+          </span>
+        }
+        meta={
+          <div className="text-right">
+            <span className="block text-[11px] tracking-wide text-ink-ghost uppercase">
+              наложен платеж
+            </span>
+            <span className="font-serif text-2xl leading-tight text-charcoal tabular-nums">
+              {amount(order.totalMinor)}
+            </span>
+          </div>
+        }
+      />
+
+      <div className={`${panel} px-4 py-3`}>
+        <OrderStatusRail status={order.status} />
       </div>
 
       {refusals.length > 0 && (
-        <p role="alert" className="rounded-sm border border-red-300 bg-red-50 p-3 text-xs text-red-900">
+        <Notice tone="danger">
           Този телефон има {refusals.length}{' '}
-          {refusals.length === 1 ? 'предишна отказана/върната поръчка' : 'предишни отказани/върнати поръчки'}:{' '}
+          {refusals.length === 1
+            ? 'предишна отказана/върната поръчка'
+            : 'предишни отказани/върнати поръчки'}
+          :{' '}
           {refusals.map((row, index) => (
             <span key={row.id}>
               {index > 0 && ', '}
@@ -173,72 +199,67 @@ export default async function AdminOrderPage({
             </span>
           ))}
           . Провери преди да подадеш отново.
-        </p>
+        </Notice>
       )}
 
-      {error && notices[error] && (
-        <p role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-          {notices[error]}
-        </p>
-      )}
+      {error && notices[error] && <Notice>{notices[error]}</Notice>}
 
       {waybill && (
-        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+        <Notice tone="success">
           Товарителница {waybill} е издадена. Разпечатай етикета и подай пратката на Econt.
-        </p>
+        </Notice>
       )}
 
       {invoice && (
-        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+        <Notice tone="success">
           Фактура № {invoice} е издадена.{' '}
           <Link href={`/admin/orders/${order.id}/invoice`} className="underline">
             Отвори за печат
           </Link>
           .
-        </p>
+        </Notice>
       )}
 
-      {noted && (
-        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
-          Бележката е записана.
-        </p>
-      )}
+      {noted && <Notice tone="success">Бележката е записана.</Notice>}
 
       {changed && STATUS_LABELS[changed as keyof typeof STATUS_LABELS] && (
-        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+        <Notice tone="success">
           Статусът е сменен на „{STATUS_LABELS[changed as keyof typeof STATUS_LABELS]}“.
-        </p>
+        </Notice>
       )}
 
       {reverted && STATUS_LABELS[reverted as keyof typeof STATUS_LABELS] && (
-        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
-          Отменено — статусът е върнат на „{STATUS_LABELS[reverted as keyof typeof STATUS_LABELS]}“.
-        </p>
+        <Notice tone="success">
+          Отменено — статусът е върнат на „
+          {STATUS_LABELS[reverted as keyof typeof STATUS_LABELS]}“.
+        </Notice>
       )}
 
-      <section className="rounded-sm border border-stone-200 bg-white">
-        <h2 className="border-b border-stone-200 px-4 py-2 text-xs font-medium tracking-wide text-stone-500 uppercase">
+      <section className={panel}>
+        <h2 className="border-b border-border/60 px-4 py-3 text-[11px] font-medium tracking-wide text-ink-ghost uppercase">
           За опаковане
         </h2>
         <table className="w-full border-collapse text-xs">
           <tbody>
             {items.map((item) => (
-              <tr key={item.id} className="border-b border-stone-100">
-                <td className="px-4 py-2">
-                  {item.name}
-                  <span className="block text-stone-400">{item.productSlug}</span>
+              <tr key={item.id} className="border-b border-border/60">
+                <td className="px-4 py-2.5">
+                  <span className="block text-ink-primary">{item.name}</span>
+                  <span className="block text-ink-ghost">{item.productSlug}</span>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap">{item.quantity} бр.</td>
-                <td className="px-4 py-2 whitespace-nowrap text-stone-500">
+                <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">
+                  {item.quantity} бр.
+                </td>
+                <td className="px-4 py-2.5 whitespace-nowrap text-ink-ghost tabular-nums">
                   {amount(item.unitPriceMinor)} / бр.
                 </td>
-                <td className="px-4 py-2 text-right whitespace-nowrap">
+                <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums">
                   {amount(item.lineTotalMinor)}
                 </td>
               </tr>
             ))}
           </tbody>
-          <tfoot className="text-stone-600">
+          <tfoot className="text-ink-secondary">
             <Money label="Стоки" value={amount(order.goodsMinor)} />
             {order.discountMinor > 0 && (
               <Money
@@ -255,75 +276,71 @@ export default async function AdminOrderPage({
             )}
             <Money label="Общо" value={amount(order.totalMinor)} strong />
             <tr>
-              <td colSpan={3} className="px-4 py-2 text-stone-400">
+              <td colSpan={3} className="px-4 pt-1 pb-3 text-ink-ghost">
                 Тегло на пратката
               </td>
-              <td className="px-4 py-2 text-right text-stone-400">{order.weightGrams} г</td>
+              <td className="px-4 pt-1 pb-3 text-right text-ink-ghost tabular-nums">
+                {order.weightGrams} г
+              </td>
             </tr>
           </tfoot>
         </table>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-sm border border-stone-200 bg-white p-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="text-xs font-medium tracking-wide text-stone-500 uppercase">
-              Доставка
-            </h2>
-            <CopyButton text={addressForCopy(order)} label="Копирай адреса" />
-          </div>
-          <dl className="space-y-1 text-xs">
-            <Row label="Куриер">
+      <div className="grid gap-5 md:grid-cols-2">
+        <Section
+          title="Доставка"
+          actions={<CopyButton text={addressForCopy(order)} label="Копирай адреса" />}
+        >
+          <dl>
+            <DetailRow label="Куриер">
               {order.courier === 'econt' ? 'Econt' : 'Speedy'} ·{' '}
               {methodLabels[order.deliveryMethod] ?? order.deliveryMethod}
-            </Row>
+            </DetailRow>
             {order.deliveryMethod === 'door' ? (
-              <Row label="Адрес">
+              <DetailRow label="Адрес">
                 {order.street}, {order.postCode} {order.city}
-              </Row>
+              </DetailRow>
             ) : (
-              <Row label="Офис">
+              <DetailRow label="Офис">
                 {order.officeName || '—'}
                 {order.officeAddress ? `, ${order.officeAddress}` : ''}
-                <span className="block text-stone-400">
+                <span className="block text-ink-ghost">
                   код {order.officeId || '—'} · {order.postCode} {order.city}
                 </span>
-              </Row>
+              </DetailRow>
             )}
-            {order.note && <Row label="Бележка">{order.note}</Row>}
-            <Row label="Товарителница">
+            {order.note && <DetailRow label="Бележка">{order.note}</DetailRow>}
+            <DetailRow label="Товарителница">
               {order.waybillNumber ? (
                 order.trackingUrl ? (
                   <a
                     href={order.trackingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="underline"
+                    className="underline tabular-nums"
                   >
                     {order.waybillNumber}
                   </a>
                 ) : (
-                  order.waybillNumber
+                  <span className="tabular-nums">{order.waybillNumber}</span>
                 )
               ) : (
                 '—'
               )}
-            </Row>
+            </DetailRow>
           </dl>
-        </section>
+        </Section>
 
-        <section className="rounded-sm border border-stone-200 bg-white p-4">
-          <h2 className="mb-2 text-xs font-medium tracking-wide text-stone-500 uppercase">
-            Клиент
-          </h2>
-          <dl className="space-y-1 text-xs">
-            <Row label="Име">{order.recipientName}</Row>
-            <Row label="Телефон">
-              <a href={`tel:${order.phone}`} className="underline">
+        <Section title="Клиент">
+          <dl>
+            <DetailRow label="Име">{order.recipientName}</DetailRow>
+            <DetailRow label="Телефон">
+              <a href={`tel:${order.phone}`} className="underline tabular-nums">
                 {order.phone}
               </a>
-            </Row>
-            <Row label="Имейл">
+            </DetailRow>
+            <DetailRow label="Имейл">
               {order.email ? (
                 <a href={`mailto:${order.email}`} className="underline">
                   {order.email}
@@ -331,32 +348,31 @@ export default async function AdminOrderPage({
               ) : (
                 '— (без имейл, потвърждение не е изпратено)'
               )}
-            </Row>
+            </DetailRow>
           </dl>
-        </section>
+        </Section>
       </div>
 
-      <section className="rounded-sm border border-stone-200 bg-white p-4">
-        <h2 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">
-          Товарителница
-        </h2>
-
+      <Section title="Товарителница">
         {order.waybillNumber ? (
-          <p className="text-xs text-stone-600">
-            Издадена: <span className="font-medium">{order.waybillNumber}</span>
-            {order.trackingUrl && (
-              <>
-                {' · '}
-                <a
-                  href={order.trackingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline"
-                >
-                  проследяване
-                </a>
-              </>
-            )}
+          <div className="space-y-3 text-xs text-ink-secondary">
+            <p>
+              Издадена: <span className="font-medium tabular-nums">{order.waybillNumber}</span>
+              {order.trackingUrl && (
+                <>
+                  {' · '}
+                  <a
+                    href={order.trackingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    проследяване
+                  </a>
+                </>
+              )}
+            </p>
+
             {/*
               A link, not a button that prints: Chrome renders a PDF in its own
               cross-origin viewer, so no script on this page can open the print
@@ -364,30 +380,31 @@ export default async function AdminOrderPage({
               printing is possible, so the tab is what this offers. See the route.
             */}
             {pdfUrl && (
-              <span className="mt-2 block">
+              <div>
                 <a
                   href={labelPath(order.id)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-sm border border-stone-300 px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                  className={button('secondary')}
                 >
                   Принтирай етикета ↗
                 </a>
-                <span className="mt-1 block text-stone-400">
+                <span className="mt-1.5 block text-ink-ghost">
                   Отваря се в нов таб — оттам Ctrl+P.
                 </span>
-              </span>
+              </div>
             )}
-            <span className="mt-1 block text-stone-400">
+
+            <p className="text-ink-ghost">
               Втора товарителница за същата поръчка не се издава оттук. Ако тази е грешна, отмени я
               в my.econt.com.
-            </span>
-          </p>
+            </p>
+          </div>
         ) : blocker ? (
-          <p className="text-xs text-stone-500">{blockerText(blocker)}</p>
+          <p className="text-xs text-ink-secondary">{blockerText(blocker)}</p>
         ) : (
-          <div className="space-y-2">
-            <p className="text-xs text-stone-600">
+          <div className="space-y-3">
+            <p className="text-xs text-ink-secondary">
               Econt ще издаде истинска товарителница на {amount(order.totalMinor)} наложен
               платеж — прегледай данните преди да я издадеш.
             </p>
@@ -409,37 +426,35 @@ export default async function AdminOrderPage({
             />
           </div>
         )}
-      </section>
+      </Section>
 
-      <section className="rounded-sm border border-stone-200 bg-white p-4">
-        <h2 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">
-          Фактура
-        </h2>
-
+      <Section title="Фактура">
         {issued ? (
-          <p className="text-xs text-stone-600">
-            Издадена: <span className="font-medium">№ {issued.number}</span> ·{' '}
-            {dateFormat.format(issued.issuedAt)} ·{' '}
-            <Link href={`/admin/orders/${order.id}/invoice`} className="underline">
-              за печат
-            </Link>
-            <span className="mt-1 block text-stone-400">
+          <div className="space-y-1.5 text-xs text-ink-secondary">
+            <p>
+              Издадена: <span className="font-medium tabular-nums">№ {issued.number}</span> ·{' '}
+              {dateFormat.format(issued.issuedAt)} ·{' '}
+              <Link href={`/admin/orders/${order.id}/invoice`} className="underline">
+                за печат
+              </Link>
+            </p>
+            <p className="text-ink-ghost">
               Фактурата не се редактира и не се изтрива — номерът вече е част от редовна поредица.
               Грешка се коригира с кредитно известие, което се прави ръчно.
-            </span>
-          </p>
+            </p>
+          </div>
         ) : invoiceStop ? (
-          <p className="text-xs text-stone-500">{invoiceBlockerText(invoiceStop)}</p>
+          <p className="text-xs text-ink-secondary">{invoiceBlockerText(invoiceStop)}</p>
         ) : (
-          <form action={issueInvoice} className="space-y-3">
+          <form action={issueInvoice} className="space-y-4">
             <input type="hidden" name="orderId" value={order.id} />
-            <p className="text-xs text-stone-600">
+            <p className="text-xs text-ink-secondary">
               Фактура на {amount(order.totalMinor)} без ДДС (дружеството не е регистрирано по ЗДДС).
               По подразбиране на физическото лице от поръчката — попълни полетата само ако клиентът
               иска фактура на фирма.
             </p>
 
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Field name="buyerName" label="Получател" defaultValue={buyer.name} required />
               <Field name="buyerAddress" label="Адрес" defaultValue={buyer.address ?? ''} />
               <Field name="buyerCompany" label="Фирма (ако е на фирма)" />
@@ -451,22 +466,22 @@ export default async function AdminOrderPage({
             <ConfirmSubmit expected={order.orderNumber} buttonLabel="Издай фактура" />
           </form>
         )}
-      </section>
+      </Section>
 
-      <section className="rounded-sm border border-stone-200 bg-white p-4">
-        <h2 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">
-          Следваща стъпка
-        </h2>
-
+      <Section title="Следваща стъпка">
         {undo.eligible && (
-          <form action={undoStatusChange} className="mb-3 flex items-center gap-2 rounded-sm border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+          <form
+            action={undoStatusChange}
+            className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+          >
             <input type="hidden" name="orderId" value={order.id} />
             <span>
-              Последна промяна преди {Math.round((Date.now() - undo.event.createdAt.getTime()) / 1000)} сек.
+              Последна промяна преди{' '}
+              {Math.round((Date.now() - undo.event.createdAt.getTime()) / 1000)} сек.
             </span>
             <button
               type="submit"
-              className="rounded-sm border border-amber-400 bg-white px-2 py-1 font-medium hover:bg-amber-100"
+              className="inline-flex h-7 items-center rounded-md border border-amber-300 bg-paper-white px-2.5 font-medium transition-colors hover:bg-amber-100"
             >
               Отмени (до {Math.round(UNDO_WINDOW_MS / 60_000)} мин.)
             </button>
@@ -474,9 +489,11 @@ export default async function AdminOrderPage({
         )}
 
         {upcoming.length === 0 ? (
-          <p className="text-xs text-stone-500">Поръчката е приключена — няма следващ статус.</p>
+          <p className="text-xs text-ink-secondary">
+            Поръчката е приключена — няма следващ статус.
+          </p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {normalNext.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {normalNext.map((status) => (
@@ -491,89 +508,90 @@ export default async function AdminOrderPage({
                         value={order.waybillNumber ?? ''}
                       />
                     )}
-                    <button
-                      type="submit"
-                      className="rounded-sm bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-700"
-                    >
-                      → {STATUS_LABELS[status]}
+                    <button type="submit" className={button('primary')}>
+                      {STATUS_LABELS[status]} →
                     </button>
                   </form>
                 ))}
               </div>
             )}
 
-            {reasonNext.map((status) => (
-              <form
-                key={status}
-                action={changeStatus}
-                className="flex flex-wrap items-end gap-2 rounded-sm border border-stone-200 p-3"
-              >
-                <input type="hidden" name="orderId" value={order.id} />
-                <input type="hidden" name="expectedFrom" value={order.status} />
-                <input type="hidden" name="to" value={status} />
-                <label className="grow text-xs">
-                  <span className="mb-1 block text-stone-500">
-                    Причина (задължително за „{STATUS_LABELS[status]}“)
-                  </span>
-                  <input
-                    name="reason"
-                    required
-                    maxLength={500}
-                    className="w-full rounded-sm border border-stone-300 px-2 py-1.5"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  className="rounded-sm border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-900 hover:bg-red-100"
-                >
-                  → {STATUS_LABELS[status]}
-                </button>
-              </form>
-            ))}
+            {reasonNext.length > 0 && (
+              <div className="space-y-3 border-t border-border/60 pt-4">
+                <p className="text-[11px] font-medium tracking-wide text-ink-ghost uppercase">
+                  Развалена продажба
+                </p>
+                {reasonNext.map((status) => (
+                  <form
+                    key={status}
+                    action={changeStatus}
+                    className="flex flex-wrap items-end gap-2 rounded-md border border-border bg-cream-surface/60 p-3"
+                  >
+                    <input type="hidden" name="orderId" value={order.id} />
+                    <input type="hidden" name="expectedFrom" value={order.status} />
+                    <input type="hidden" name="to" value={status} />
+                    <label className="grow">
+                      <span className={fieldLabel}>
+                        Причина (задължително за „{STATUS_LABELS[status]}“)
+                      </span>
+                      <input name="reason" required maxLength={500} className={input} />
+                    </label>
+                    <button type="submit" className={button('danger')}>
+                      {STATUS_LABELS[status]} →
+                    </button>
+                  </form>
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </section>
+      </Section>
 
-      <section className="rounded-sm border border-stone-200 bg-white p-4">
-        <h2 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">
-          История
-        </h2>
-        <ol className="mb-4 space-y-2 text-xs">
+      <Section title="История">
+        <ol className="space-y-0">
           {events.map((event) => (
-            <li key={event.id} className="flex flex-wrap gap-x-3 border-b border-stone-100 pb-2 last:border-0">
-              <span className="text-stone-400" title={event.createdAt.toISOString()}>
+            <li
+              key={event.id}
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border/60 py-2 text-xs last:border-0"
+            >
+              <span className="text-ink-ghost tabular-nums" title={event.createdAt.toISOString()}>
                 {dateFormat.format(event.createdAt)}
               </span>
-              <span>
+              <span className="text-ink-primary">
                 {event.fromStatus && event.fromStatus !== event.toStatus
                   ? `${STATUS_LABELS[event.fromStatus]} → ${STATUS_LABELS[event.toStatus]}`
                   : STATUS_LABELS[event.toStatus]}
               </span>
-              <span className="text-stone-400">{event.actor}</span>
+              <span className="text-ink-ghost">{event.actor}</span>
               {formatDetail(event.detail) ? (
-                <code className="w-full text-stone-400">{formatDetail(event.detail)}</code>
+                <code className="w-full break-all text-[11px] text-ink-ghost">
+                  {formatDetail(event.detail)}
+                </code>
               ) : null}
             </li>
           ))}
         </ol>
 
-        <form action={addNote} className="flex flex-wrap items-end gap-2 border-t border-stone-100 pt-3">
+        <form
+          action={addNote}
+          className="mt-4 flex flex-wrap items-end gap-2 border-t border-border/60 pt-4"
+        >
           <input type="hidden" name="orderId" value={order.id} />
-          <label className="grow text-xs">
-            <span className="mb-1 block text-stone-500">
-              Бележка (напр. „обадих се два пъти, никой не отговори“)
-            </span>
-            <input name="note" maxLength={500} className="w-full rounded-sm border border-stone-300 px-2 py-1.5" />
+          <label className="grow">
+            <span className={fieldLabel}>Бележка</span>
+            <input
+              name="note"
+              maxLength={500}
+              placeholder="напр. обадих се два пъти, никой не отговори"
+              className={input}
+            />
           </label>
-          <button
-            type="submit"
-            className="rounded-sm border border-stone-300 px-3 py-1.5 text-xs hover:bg-stone-100"
-          >
+          <button type="submit" className={button('secondary')}>
             Добави бележка
           </button>
         </form>
-      </section>
-    </div>
+      </Section>
+    </>
   )
 }
 
@@ -637,15 +655,6 @@ function formatDetail(detail: unknown): string {
   return entries.map(([key, value]) => `${key}: ${String(value)}`).join(' · ')
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex gap-2">
-      <dt className="w-28 shrink-0 text-stone-500">{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  )
-}
-
 function Field({
   name,
   label,
@@ -658,14 +667,14 @@ function Field({
   required?: boolean
 }) {
   return (
-    <label className="text-xs">
-      <span className="mb-1 block text-stone-500">{label}</span>
+    <label className="block">
+      <span className={fieldLabel}>{label}</span>
       <input
         name={name}
         defaultValue={defaultValue}
         required={required}
         maxLength={200}
-        className="w-full rounded-sm border border-stone-300 px-2 py-1.5"
+        className={input}
       />
     </label>
   )
@@ -681,11 +690,13 @@ function Money({
   strong?: boolean
 }) {
   return (
-    <tr className={strong ? 'font-medium text-stone-900' : undefined}>
-      <td colSpan={3} className="px-4 py-1">
+    <tr className={strong ? 'border-t border-border font-medium text-ink-primary' : undefined}>
+      <td colSpan={3} className={`px-4 ${strong ? 'pt-2 pb-1' : 'py-1'}`}>
         {label}
       </td>
-      <td className="px-4 py-1 text-right whitespace-nowrap">{value}</td>
+      <td className={`px-4 text-right whitespace-nowrap tabular-nums ${strong ? 'pt-2 pb-1' : 'py-1'}`}>
+        {value}
+      </td>
     </tr>
   )
 }

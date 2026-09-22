@@ -50,10 +50,10 @@ export default async function ProformaPage({
   if (!snapshot) {
     return (
       <div className="space-y-3">
-        <Link href="/admin/proformas" className="text-xs underline">
+        <Link href="/admin/proformas" className="inline-flex items-center gap-1 text-xs text-ink-ghost transition-colors hover:text-ink-primary">
           ← всички проформи
         </Link>
-        <p role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-3 text-xs">
+        <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
           Проформа № {proforma.number} е записана в формат, който тази версия не разпознава. Данните
           са в базата (таблица `proformas`), но не се изобразяват тук.
         </p>
@@ -67,16 +67,23 @@ export default async function ProformaPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 print:hidden">
-        <Link href="/admin/proformas" className="text-xs underline">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <Link href="/admin/proformas" className="inline-flex items-center gap-1 text-xs text-ink-ghost transition-colors hover:text-ink-primary">
           ← всички проформи
         </Link>
-        <p className="text-xs text-stone-500">
-          Печат с Ctrl+P. Изберете A4 и без полета на браузъра (header/footer).
+        <p className="rounded-md border border-border bg-paper-white px-2.5 py-1.5 text-xs text-ink-secondary">
+          Печат с <kbd className="font-medium">Ctrl+P</kbd> · A4, без полета на браузъра
         </p>
       </div>
 
-      <article className="mx-auto w-[210mm] max-w-full bg-white p-[15mm] text-[10pt] leading-snug text-black shadow-sm print:w-auto print:p-0 print:shadow-none">
+      {/*
+        The sheet keeps neutral greys and true black rather than the admin's warm
+        brand ink: this is a document that comes out of a printer, and warming the
+        type of a legal document to match the interface around it would be the
+        interface deciding how the paperwork looks. The chrome above is brand; the
+        page below is a page.
+      */}
+      <article className="mx-auto w-[210mm] max-w-full bg-white p-[15mm] text-[10pt] leading-snug text-black shadow-[0_1px_2px_rgba(46,37,33,0.05),0_12px_32px_-16px_rgba(46,37,33,0.22)] print:w-auto print:p-0 print:shadow-none">
         <header className="flex items-start justify-between gap-6 border-b border-black pb-3">
           <div>
             <h1 className="text-[16pt] font-semibold tracking-wide">ПРОФОРМА ФАКТУРА</h1>
@@ -188,16 +195,16 @@ export default async function ProformaPage({
         offer, not an accounting document — but the number is not handed back:
         see `deleteProforma`.
       */}
-      <section className="mx-auto w-[210mm] max-w-full space-y-2 rounded-sm border border-stone-200 bg-white p-4 print:hidden">
-        <h2 className="text-xs font-medium tracking-wide text-stone-500 uppercase">Изтриване</h2>
-        <p className="text-xs text-stone-500">
+      <section className="mx-auto w-[210mm] max-w-full space-y-3 rounded-lg border border-border bg-paper-white p-4 print:hidden">
+        <h2 className="text-[11px] font-medium tracking-wide text-ink-ghost uppercase">Изтриване</h2>
+        <p className="text-xs text-ink-secondary">
           Проформата не е данъчен документ, така че може да се изтрие. Номер{' '}
           {snapshot.number} остава изразходван — ако вече е изпратен на клиент, втори
           документ със същия номер е по-лошо от дупка в поредицата.
         </p>
 
         {error === 'confirm' && (
-          <p role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+          <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Номерът не съвпада — проформата не е изтрита.
           </p>
         )}

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 
+import { button } from './ui'
+
 /**
  * Tap-to-copy for the address block (order-management back office, UX
  * requirement: "one-tap copyable for pasting into the courier's own system").
@@ -29,7 +31,7 @@ export default function CopyButton({ text, label = 'Копирай' }: { text: s
     <button
       type="button"
       onClick={handleClick}
-      className="rounded-sm border border-stone-300 px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+      className={button('secondary', 'sm')}
     >
       <span aria-live="polite">{copied ? 'Копирано ✓' : label}</span>
     </button>
