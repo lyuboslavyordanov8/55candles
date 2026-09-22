@@ -75,12 +75,86 @@ describe('PrintLabelButton', () => {
     expect(print).toHaveBeenCalledTimes(1)
   })
 
-  it('releases the blob once it has been printed', async () => {
+  it('focuses the frame before printing, as the print dialog expects', async () => {
+    const focus = vi.spyOn(HTMLIFrameElement.prototype, 'focus')
+
+    await clickPrint()
+    fireEvent.load(await screen.findByTitle('Етикет за печат'))
+
+    expect(focus).toHaveBeenCalled()
+    expect(focus.mock.invocationCallOrder[0]).toBeLessThan(print.mock.invocationCallOrder[0])
+  })
+
+  it('keeps the blob alive after printing, because the dialog still reads it', async () => {
+    // `print()` does not reliably block for a PDF in Chrome. Releasing the URL
+    // as soon as it returns pulls the file out from under a dialog that has not
+    // read it yet — and a dialog that never appears is exactly the symptom.
     await clickPrint()
 
     fireEvent.load(await screen.findByTitle('Етикет за печат'))
 
+    expect(revokeObjectURL).not.toHaveBeenCalled()
+  })
+
+  it('releases the blob when the order leaves the screen', async () => {
+    const { unmount } = render(<PrintLabelButton labelUrl={LABEL_URL} />)
+    await userEvent.click(screen.getByRole('button'))
+    await screen.findByTitle('Етикет за печат')
+
+    unmount()
+
     expect(revokeObjectURL).toHaveBeenCalledWith(BLOB_URL)
+  })
+
+  it('says so when the browser hands back no frame to print from', async () => {
+    // What `?.print()` used to swallow in silence.
+    Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+      get: () => null,
+      configurable: true,
+    })
+
+    await clickPrint()
+    fireEvent.load(await screen.findByTitle('Етикет за печат'))
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+  })
+
+  it('says so, with the reason, when printing throws', async () => {
+    print.mockImplementationOnce(() => {
+      throw new Error('blocked by the browser')
+    })
+
+    await clickPrint()
+    fireEvent.load(await screen.findByTitle('Етикет за печат'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/blocked by the browser/)
+  })
+
+  it('says so when the frame never loads at all', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    try {
+      render(<PrintLabelButton labelUrl={LABEL_URL} />)
+      await userEvent.click(screen.getByRole('button'))
+      await screen.findByTitle('Етикет за печат')
+
+      // No `load` event — the case where Chrome never announces the PDF.
+      await vi.advanceTimersByTimeAsync(4000)
+
+      expect(await screen.findByRole('alert')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('offers the label as a link whenever printing fails', async () => {
+    // A dead end is not an option: whatever the browser did, the admin still has
+    // a parcel to send.
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 502 }))
+
+    await clickPrint()
+
+    expect(await screen.findByRole('link', { name: /етикет/i })).toHaveAttribute('href', LABEL_URL)
   })
 
   it('says so when the route has no label to give', async () => {
