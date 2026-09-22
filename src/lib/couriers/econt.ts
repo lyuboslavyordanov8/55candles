@@ -113,13 +113,30 @@ export interface EcontShipFrom {
  * not publish their number (see `src/lib/company.ts`). Unpublished is not the
  * same as unknown, and the courier is not the open web.
  *
- * `molName` is the natural person authorised to act for the sender — Econt's
- * own abbreviation for "материално отговорно лице". `name` here is always
- * `company.legalName` unless overridden (see `econtSender()`), i.e. a
- * юридическо лице, and Econt refuses to `create` a label for a juridical
- * sender with nobody named on it: confirmed against the live service on
- * 2026-09-21, `517 ExInvalidParam` — *"подател: За юридическо лице,
+ * `molName` is the natural person authorised to act for the sender. `name` here
+ * is always `company.legalName` unless overridden (see `econtSender()`), i.e. a
+ * юридическо лице, and Econt refuses a label for a juridical sender with nobody
+ * named on it: `517 ExInvalidParam` — *"подател: За юридическо лице,
  * задължително се попълва упълномощено лице."*
+ *
+ * It travels as the label's **`senderAgent`**, a party of its own, and not as
+ * `senderClient.molName` — which the sender documentation does describe as "име
+ * на упълномощено от компанията лице" but which does not satisfy the check.
+ * Probed against the demo service with `mode: 'validate'` on 2026-09-22, seven
+ * shapes of the same parcel:
+ *
+ * - `senderClient.molName`, with and without `juridicalEntity: true`, and with
+ *   the whole company block beside it (`ein`, `companyType`,
+ *   `registrationAddress`) — **517**, the message above, every time.
+ * - `senderAgent: { name, phones }` — **accepted**, with or without any of the
+ *   above on `senderClient`, so none of it is sent.
+ * - `senderAgent` with a blank `name` — **517**, the same message, which is what
+ *   pins the check to this field.
+ * - `senderAgent` with a name and no phone — **517**, *"Необходим е телефон или
+ *   e-mail адрес на упълномощеното лице."* Hence the sender's own phone goes on
+ *   the agent too: one number, and it is the number for this parcel either way.
+ * - A sender named as a natural person, no agent at all — accepted, which is why
+ *   this is required only while the sender is the ЕООД.
  */
 export interface EcontSender {
   name: string
@@ -551,15 +568,12 @@ function waybillBody(
 
   return {
     label: {
-      senderClient: {
-        name: sender.name,
-        phones: [sender.phone],
-        // Always true: the sender is always `company.legalName`, our registered
-        // ЕООД, even when `EcontSender.name` is overridden for display — see the
-        // doc comment on `EcontSender`.
-        juridicalEntity: true,
-        molName: sender.molName,
-      },
+      senderClient: { name: sender.name, phones: [sender.phone] },
+      // The person authorised to act for the ЕООД we send as. A party of its own
+      // rather than a field on the client, and it needs a phone of its own —
+      // see the doc comment on `EcontSender` for what Econt accepts and what it
+      // refuses.
+      senderAgent: { name: sender.molName, phones: [sender.phone] },
       ...origin,
       receiverClient: {
         name: request.recipient.name,

@@ -834,8 +834,13 @@ describe('booking a parcel', () => {
     expect(label.senderClient).toEqual({
       name: 'ВиреонЛабс ЕООД',
       phones: ['+359888123456'],
-      juridicalEntity: true,
-      molName: 'Иван Иванов',
+    })
+    // The authorised person is a party of its own, not a field on the client, and
+    // needs a phone as much as the client does — see the doc comment on
+    // `EcontSender`.
+    expect(label.senderAgent).toEqual({
+      name: 'Иван Иванов',
+      phones: ['+359888123456'],
     })
     expect(label.receiverClient).toEqual({
       name: 'Мария Иванова',
