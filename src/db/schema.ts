@@ -403,6 +403,53 @@ export const invoices = pgTable(
   ]
 )
 
+/**
+ * One проформа фактура.
+ *
+ * Deliberately *not* a row in `invoices` with a flag, and deliberately not tied
+ * to an order:
+ *
+ * - **It is not an accounting document.** A проформа is an offer to pay, so it
+ *   carries no данъчно събитие, consumes none of the invoice series, and needs no
+ *   credit note to undo. Putting it in `invoices` would mean loosening the
+ *   constraints that keep that series lawful for the sake of a document the law
+ *   does not count.
+ * - **It has no order.** These are written for the enquiries that arrive *before*
+ *   an order exists — a bigger wholesale lot, a custom batch of candles — where
+ *   the customer needs a document to pay against or to get an approval with. So
+ *   the buyer and the lines are typed in, not derived.
+ *
+ * Same immutability as an invoice, for a different reason: it was sent to
+ * somebody. A wrong проформа is superseded by a new one, never edited, which is
+ * why there is no `updatedAt` here either.
+ *
+ * `invoiceId` is where the фактура lands when one of these is paid and the
+ * conversion is built. Null until then, and null forever for the ones that come
+ * to nothing — which is most of what a quote does.
+ */
+export const proformas = pgTable(
+  'proformas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Its own series, from the `'proforma'` counter. See `documentCounters`. */
+    number: text('number').notNull(),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+    /** After this date the prices on it are no longer offered. */
+    validUntil: timestamp('valid_until', { withTimezone: true }).notNull(),
+    totalMinor: integer('total_minor').notNull(),
+    currency: text('currency').notNull().default('EUR'),
+    /** The document exactly as issued, seller and bank details included. */
+    snapshot: jsonb('snapshot').notNull(),
+    /** The фактура issued against it, once that exists. */
+    invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('proformas_number_idx').on(table.number),
+    index('proformas_issued_at_idx').on(table.issuedAt),
+  ]
+)
+
 // ---------------------------------------------------------------------------
 // Inferred types
 // ---------------------------------------------------------------------------
@@ -416,3 +463,6 @@ export type NewOrderEvent = typeof orderEvents.$inferInsert
 export type OrderStatus = (typeof orderStatus.enumValues)[number]
 export type Invoice = typeof invoices.$inferSelect
 export type NewInvoice = typeof invoices.$inferInsert
+
+export type Proforma = typeof proformas.$inferSelect
+export type NewProforma = typeof proformas.$inferInsert
