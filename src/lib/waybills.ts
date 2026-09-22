@@ -3,7 +3,7 @@ import 'server-only'
 import { and, eq, isNull } from 'drizzle-orm'
 
 import { getDb } from '@/db'
-import { orderEvents, orders, type Order, type OrderStatus } from '@/db/schema'
+import { orderEvents, orders, type Order, type OrderEvent, type OrderStatus } from '@/db/schema'
 import { canBookWaybills, courierClient, missingWaybillRequirements } from './couriers'
 import type { Waybill, WaybillRequest } from './couriers/types'
 import { money, type Currency } from './money'
@@ -75,6 +75,31 @@ export function waybillBlocker(order: Order): WaybillBlocker | null {
       reason: 'notBookable',
       courier: order.courier,
       missing: missingWaybillRequirements(order.courier),
+    }
+  }
+
+  return null
+}
+
+/**
+ * The label PDF from the order's history, newest first, or `null`.
+ *
+ * Kept in the booking event's `detail` rather than in a column: it is one link
+ * per booking and the history is already where a booking is recorded, so a
+ * column would be a migration to store a duplicate of something we have.
+ *
+ * `https://` is checked here and not by the callers, because the value arrives
+ * in the courier's JSON and is then used two ways — as an `href` in the admin
+ * and as a fetch target on the server — and a scheme neither of them should
+ * follow has no business reaching either.
+ */
+export function labelPdfUrl(events: readonly OrderEvent[]): string | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const detail = events[i].detail
+
+    if (detail && typeof detail === 'object') {
+      const url = (detail as Record<string, unknown>).waybillPdfUrl
+      if (typeof url === 'string' && url.startsWith('https://')) return url
     }
   }
 

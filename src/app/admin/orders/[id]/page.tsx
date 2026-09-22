@@ -6,12 +6,12 @@ import { getOrderDetail, refusalHistory, undoEligibility, UNDO_WINDOW_MS } from 
 import { nextStatuses, STATUS_LABELS, statusRequiresReason } from '@/lib/order-status'
 import { formatMoney, money } from '@/lib/money'
 import { defaultBuyerFor, getInvoiceForOrder, invoiceBlocker } from '@/lib/invoices'
-import { waybillBlocker } from '@/lib/waybills'
+import { labelPdfUrl, waybillBlocker } from '@/lib/waybills'
 import { econtSender, econtShipFrom } from '@/lib/couriers'
-import type { OrderEvent } from '@/db/schema'
 import CopyButton from '@/components/admin/CopyButton'
 import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
 import WaybillPreviewModal from '@/components/admin/WaybillPreviewModal'
+import PrintLabelButton from '@/components/admin/PrintLabelButton'
 import { addNote, changeStatus, issueInvoice, issueWaybill, undoStatusChange } from '../../actions'
 
 /**
@@ -54,26 +54,6 @@ const notices: Record<string, string> = {
   undo_notLastTransition:
     'Няма какво да се отмени — статусът се е променил отново след последната стъпка.',
   note_empty: 'Бележката е празна — нищо не е записано.',
-}
-
-/**
- * The label PDF from the order's history, newest first.
- *
- * Kept in the event's `detail` rather than in a column: it is one link per booking
- * and the history is already where a booking is recorded, so a column would be a
- * migration to store a duplicate of something we have.
- */
-function labelPdfUrl(events: readonly OrderEvent[]): string | null {
-  for (let i = events.length - 1; i >= 0; i -= 1) {
-    const detail = events[i].detail
-
-    if (detail && typeof detail === 'object') {
-      const url = (detail as Record<string, unknown>).waybillPdfUrl
-      if (typeof url === 'string' && url.startsWith('https://')) return url
-    }
-  }
-
-  return null
 }
 
 /**
@@ -368,7 +348,12 @@ export default async function AdminOrderPage({
             {pdfUrl && (
               <>
                 {' · '}
-                <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                <a
+                  href={`/api/admin/orders/${order.id}/label`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
                   етикет (PDF)
                 </a>
               </>
@@ -385,6 +370,11 @@ export default async function AdminOrderPage({
                   проследяване
                 </a>
               </>
+            )}
+            {pdfUrl && (
+              <span className="mt-2 block">
+                <PrintLabelButton orderId={order.id} />
+              </span>
             )}
             <span className="mt-1 block text-stone-400">
               Втора товарителница за същата поръчка не се издава оттук. Ако тази е грешна, отмени я
