@@ -11,7 +11,6 @@ import { econtSender, econtShipFrom } from '@/lib/couriers'
 import CopyButton from '@/components/admin/CopyButton'
 import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
 import WaybillPreviewModal from '@/components/admin/WaybillPreviewModal'
-import PrintLabelButton from '@/components/admin/PrintLabelButton'
 import { addNote, changeStatus, issueInvoice, issueWaybill, undoStatusChange } from '../../actions'
 
 /**
@@ -345,19 +344,6 @@ export default async function AdminOrderPage({
         {order.waybillNumber ? (
           <p className="text-xs text-stone-600">
             Издадена: <span className="font-medium">{order.waybillNumber}</span>
-            {pdfUrl && (
-              <>
-                {' · '}
-                <a
-                  href={labelPath(order.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline"
-                >
-                  етикет (PDF)
-                </a>
-              </>
-            )}
             {order.trackingUrl && (
               <>
                 {' · '}
@@ -371,9 +357,25 @@ export default async function AdminOrderPage({
                 </a>
               </>
             )}
+            {/*
+              A link, not a button that prints: Chrome renders a PDF in its own
+              cross-origin viewer, so no script on this page can open the print
+              dialog over one — `contentWindow.print()` throws. The tab is where
+              printing is possible, so the tab is what this offers. See the route.
+            */}
             {pdfUrl && (
               <span className="mt-2 block">
-                <PrintLabelButton labelUrl={labelPath(order.id)} />
+                <a
+                  href={labelPath(order.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-sm border border-stone-300 px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                >
+                  Принтирай етикета ↗
+                </a>
+                <span className="mt-1 block text-stone-400">
+                  Отваря се в нов таб — оттам Ctrl+P.
+                </span>
               </span>
             )}
             <span className="mt-1 block text-stone-400">
