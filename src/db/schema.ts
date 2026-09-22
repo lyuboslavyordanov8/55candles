@@ -466,3 +466,182 @@ export type NewInvoice = typeof invoices.$inferInsert
 
 export type Proforma = typeof proformas.$inferSelect
 export type NewProforma = typeof proformas.$inferInsert
+
+// ---------------------------------------------------------------------------
+// Accounting
+// ---------------------------------------------------------------------------
+
+/**
+ * One month of accounting, and only what the month itself knows.
+ *
+ * Deliberately thin. Sales, invoices and expenses are *not* copied here: they
+ * are queried from `orders`, `invoices` and `expenses` by date range, so a
+ * period can never disagree with the records it summarises. What the row does
+ * hold is the handful of facts that exist nowhere else — how far the close has
+ * got, who said it was ready, and what the owner wrote about the month.
+ *
+ * `period` is `YYYY-MM`, which sorts correctly as text and reads correctly to a
+ * human. One row per month, created the first time the month is opened.
+ */
+export const accountingPeriods = pgTable(
+  'accounting_periods',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** `2026-09`. The month in Europe/Sofia, not UTC. */
+    period: text('period').notNull(),
+    /**
+     * `open` while the month is being worked, `ready` once the checklist passes
+     * or an admin overrides it, `exported` after a package is produced,
+     * `completed` when the accountant has confirmed. Text rather than an enum:
+     * this vocabulary belongs to the shop's own workflow and may be reworded
+     * without a migration on a table of thirteen rows a year.
+     */
+    status: text('status').notNull().default('open'),
+    /** Set when an admin declared the month ready despite an unfinished checklist. */
+    overriddenAt: timestamp('overridden_at', { withTimezone: true }),
+    overriddenBy: text('overridden_by'),
+    /** Free-form, for the owner and for whatever the accountant asks. */
+    note: text('note').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('accounting_periods_period_idx').on(table.period)]
+)
+
+/**
+ * One purchase the shop made.
+ *
+ * The only financial record in the system the shop types in rather than earns:
+ * everything else on the money side is an order the store produced. So this
+ * table is shaped around *speed of entry* — supplier, date, total, category is
+ * enough to save a row — with every other field optional and fillable later.
+ *
+ * ## Amounts
+ *
+ * Three, and the distinction matters: `netMinor` and `vatShownMinor` are what
+ * the **supplier's** document says, `totalMinor` is what was paid. A supplier
+ * charges ДДС whether or not this company is registered for it, so their VAT is
+ * recorded as part of their document and is deliberately not treated as
+ * recoverable — that is a question for the accountant, and nothing here answers
+ * it.
+ *
+ * `documentNumber` is the supplier's number, not ours, and is not unique: two
+ * suppliers may both number an invoice 1.
+ *
+ * There is no file column. Storing the document itself needs a blob store the
+ * project does not have yet; `documentMissing` records whether one exists at
+ * all, which is what the monthly close actually asks about.
+ */
+export const expenses = pgTable(
+  'expenses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** `EXP-0001`, for talking about it. Its own series, gaps allowed. */
+    reference: text('reference').notNull(),
+
+    supplier: text('supplier').notNull(),
+    /** ЕИК/Булстат of the supplier, when the document carries one. */
+    supplierEik: text('supplier_eik').notNull().default(''),
+    /** The supplier's own document number. */
+    documentNumber: text('document_number').notNull().default(''),
+    /** Date on the document. The one date the accountant sorts by. */
+    documentDate: timestamp('document_date', { withTimezone: true }).notNull(),
+
+    /** Key from `EXPENSE_CATEGORIES`. Text, so a new category is not a migration. */
+    category: text('category').notNull(),
+    description: text('description').notNull().default(''),
+
+    /** What the supplier's document says, in minor units. */
+    netMinor: integer('net_minor'),
+    vatShownMinor: integer('vat_shown_minor'),
+    totalMinor: integer('total_minor').notNull(),
+    currency: text('currency').notNull().default('EUR'),
+
+    /** `card`, `bank`, `cash`. Text for the same reason as `category`. */
+    paymentMethod: text('payment_method').notNull().default('card'),
+
+    /** `needs_review`, `ready`, `sent`, `accounted`. See `EXPENSE_STATUSES`. */
+    status: text('status').notNull().default('needs_review'),
+    /** True while nobody has the supplier's document in hand. */
+    documentMissing: boolean('document_missing').notNull().default(true),
+
+    /**
+     * `YYYY-MM`, derived from `documentDate` when the row is written and stored
+     * so a month's queries are an index lookup rather than a date function.
+     */
+    period: text('period').notNull(),
+
+    note: text('note').notNull().default(''),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('expenses_reference_idx').on(table.reference),
+    index('expenses_period_idx').on(table.period),
+    index('expenses_document_date_idx').on(table.documentDate),
+    index('expenses_supplier_idx').on(table.supplier),
+  ]
+)
+
+/**
+ * What was done to the books, and by whom.
+ *
+ * Append-only, and narrow on purpose: an expense created, a document marked
+ * found, a month declared ready, a package exported, a setting changed. Not
+ * every click — a log nobody can read is a log nobody reads.
+ *
+ * `entity` and `entityId` are loose rather than foreign keys, because the point
+ * of an audit row is to outlive the thing it is about. Deleting an expense must
+ * not take the record of its deletion with it.
+ */
+export const accountingEvents = pgTable(
+  'accounting_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** `expense.created`, `period.ready`, `export.created`, … */
+    action: text('action').notNull(),
+    /** `expense`, `period`, `export`, `settings`. */
+    entity: text('entity').notNull(),
+    entityId: text('entity_id').notNull().default(''),
+    /** `YYYY-MM` when the event belongs to a month; empty when it does not. */
+    period: text('period').notNull().default(''),
+    actor: text('actor').notNull(),
+    /** Whatever the writer thought was worth keeping. Read defensively. */
+    detail: jsonb('detail'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('accounting_events_period_idx').on(table.period),
+    index('accounting_events_created_at_idx').on(table.createdAt),
+  ]
+)
+
+/**
+ * The accountant, and what they ask for each month.
+ *
+ * A single row, addressed by a fixed `id` of `default`. A table rather than
+ * environment variables because these are things the owner edits — a new
+ * accountant should not need a deploy — and unlike the company's own legal
+ * details, nothing else in the system depends on them.
+ *
+ * `requirements` is the subset of `ACCOUNTANT_REQUIREMENTS` this accountant
+ * actually wants, stored as keys. Null means "not chosen yet", which the
+ * interface reads as the available defaults rather than as an empty list.
+ */
+export const accountantSettings = pgTable('accountant_settings', {
+  id: text('id').primaryKey().default('default'),
+  name: text('name').notNull().default(''),
+  email: text('email').notNull().default(''),
+  note: text('note').notNull().default(''),
+  /** Keys from `ACCOUNTANT_REQUIREMENTS`. */
+  requirements: jsonb('requirements'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text('updated_by').notNull().default(''),
+})
+
+export type AccountingPeriodRow = typeof accountingPeriods.$inferSelect
+export type Expense = typeof expenses.$inferSelect
+export type NewExpense = typeof expenses.$inferInsert
+export type AccountingEvent = typeof accountingEvents.$inferSelect
+export type AccountantSettingsRow = typeof accountantSettings.$inferSelect

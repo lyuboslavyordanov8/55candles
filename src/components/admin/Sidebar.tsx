@@ -3,7 +3,15 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-import { BoxIcon, CandleIcon, DocumentIcon, TagIcon } from './icons'
+import {
+  BoxIcon,
+  CalendarIcon,
+  CandleIcon,
+  DocumentIcon,
+  LedgerIcon,
+  ReceiptIcon,
+  TagIcon,
+} from './icons'
 
 /**
  * The admin's navigation.
@@ -13,10 +21,12 @@ import { BoxIcon, CandleIcon, DocumentIcon, TagIcon } from './icons'
  * and page, and an admin that does not say where you are is the complaint this
  * redesign exists to fix. Nothing else here is interactive.
  *
- * Three entries, which is all there is: orders, invoices, proformas. Products,
- * customers and settings are not in this admin — the catalogue lives in code and
- * there are no accounts — so there are no headings for them. A sidebar with
- * disabled entries for features that do not exist is worse than a short sidebar.
+ * Two groups, because the shop does two different things here: it packs parcels
+ * and it keeps books. Orders first — that is what the admin gets opened for.
+ *
+ * Products, customers and store settings are not in this admin: the catalogue
+ * lives in code and there are no accounts. A sidebar with entries for features
+ * that do not exist is worse than a short sidebar.
  *
  * Charcoal ground against the cream page: the one high-contrast surface in the
  * interface, so the shell reads as chrome and the content reads as content.
@@ -25,20 +35,46 @@ import { BoxIcon, CandleIcon, DocumentIcon, TagIcon } from './icons'
  * every width, and this rail's footer disappears below `lg`.
  */
 
-const ENTRIES = [
-  { href: '/admin', label: 'Поръчки', icon: BoxIcon, hint: 'какво да се пакетира' },
-  { href: '/admin/invoices', label: 'Фактури', icon: DocumentIcon, hint: 'издадени документи' },
-  { href: '/admin/proformas', label: 'Проформи', icon: TagIcon, hint: 'оферти за плащане' },
+const GROUPS = [
+  {
+    heading: 'Работа',
+    entries: [
+      { href: '/admin', label: 'Поръчки', icon: BoxIcon },
+      { href: '/admin/invoices', label: 'Фактури', icon: DocumentIcon },
+      { href: '/admin/proformas', label: 'Проформи', icon: TagIcon },
+    ],
+  },
+  {
+    heading: 'Счетоводство',
+    entries: [
+      { href: '/admin/accounting', label: 'Обзор', icon: LedgerIcon },
+      { href: '/admin/accounting/expenses', label: 'Разходи', icon: ReceiptIcon },
+      { href: '/admin/accounting/calendar', label: 'Календар', icon: CalendarIcon },
+    ],
+  },
 ] as const
 
 /**
- * `/admin` matches only itself: it is the orders list, and every other page
- * lives under it, so a `startsWith` test would light up all three entries at
- * once. `/admin/orders/…` is the orders list's own detail view, so that one is
- * matched deliberately.
+ * Which entry is the page you are on.
+ *
+ * Two entries need special treatment because every other admin page lives under
+ * their path: `/admin` would otherwise light up for all six, and
+ * `/admin/accounting` for all three of its own. So both match themselves plus the
+ * sub-trees that genuinely belong to them — `/admin/orders/…` is the orders
+ * list's detail view, and an accounting month is the overview's.
  */
 function isActive(pathname: string, href: string): boolean {
-  if (href === '/admin') return pathname === '/admin' || pathname.startsWith('/admin/orders')
+  if (href === '/admin') {
+    return pathname === '/admin' || pathname.startsWith('/admin/orders')
+  }
+
+  if (href === '/admin/accounting') {
+    return (
+      pathname === '/admin/accounting' ||
+      pathname.startsWith('/admin/accounting/periods') ||
+      pathname.startsWith('/admin/accounting/settings')
+    )
+  }
 
   return pathname === href || pathname.startsWith(`${href}/`)
 }
@@ -59,11 +95,15 @@ export default function Sidebar() {
         <span className="font-serif text-base leading-none text-cream-surface">55° candles</span>
       </Link>
 
-      <p className="mt-6 hidden px-2 pb-1 text-[10px] font-medium tracking-[0.12em] text-cream-muted/45 uppercase lg:block">
-        Работа
-      </p>
-
-      {ENTRIES.map((entry) => {
+      {GROUPS.map((group, groupIndex) => (
+        <div key={group.heading} className="flex gap-1 lg:mt-4 lg:flex-col lg:gap-0 lg:first:mt-6">
+          <p className="hidden px-2 pb-1 text-[10px] font-medium tracking-[0.12em] text-cream-muted/45 uppercase lg:block">
+            {group.heading}
+          </p>
+          {groupIndex > 0 && (
+            <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 self-center bg-white/10 lg:hidden" />
+          )}
+          {group.entries.map((entry) => {
         const active = isActive(pathname, entry.href)
         const Icon = entry.icon
 
@@ -89,7 +129,9 @@ export default function Sidebar() {
             <span className="font-medium">{entry.label}</span>
           </Link>
         )
-      })}
+          })}
+        </div>
+      ))}
     </nav>
   )
 }

@@ -72,3 +72,32 @@ export function ExitIcon({ className = '' }: { className?: string }) {
     </svg>
   )
 }
+
+/** Accounting: a book with a column down it. */
+export function LedgerIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3 3h10v10H3z" />
+      <path d="M6.5 3v10M3 6.5h3.5M3 10h3.5M9 6.5h2M9 9.5h2" />
+    </svg>
+  )
+}
+
+/** The compliance calendar. */
+export function CalendarIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3 4.5h10V13H3zM3 7.2h10M5.6 2.6v2M10.4 2.6v2" />
+    </svg>
+  )
+}
+
+/** One purchase. */
+export function ReceiptIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 2h8v12l-2-1-2 1-2-1-2 1z" />
+      <path d="M6.2 5.5h3.6M6.2 8h3.6" />
+    </svg>
+  )
+}

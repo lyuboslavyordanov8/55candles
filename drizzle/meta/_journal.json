@@ -43,6 +43,13 @@
       "when": 1790083534990,
       "tag": "0005_fixed_tarot",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790091399545,
+      "tag": "0006_sticky_naoko",
+      "breakpoints": true
     }
   ]
 }
