@@ -1,11 +1,17 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { requireAdmin } from '@/lib/admin-auth'
 import type { InvoiceBuyer } from '@/lib/invoices'
 import { PROFORMA_LINE_ROWS, type ProformaFormState } from '@/lib/proforma-form'
-import { issueProforma, type RawProformaLine } from '@/lib/proformas'
+import {
+  deleteProforma,
+  getProforma,
+  issueProforma,
+  type RawProformaLine,
+} from '@/lib/proformas'
 
 /**
  * Writing one проформа from the form.
@@ -83,4 +89,33 @@ export async function createProforma(
  */
 function optional<K extends string>(key: K, value: string): Record<K, string> | Record<string, never> {
   return value ? ({ [key]: value } as Record<K, string>) : {}
+}
+
+/**
+ * Delete one проформа.
+ *
+ * Type-to-confirm, checked **here** against the stored number and not only in
+ * the component that rendered the input: a hand-built POST is bound by nothing
+ * on the page. Same boundary as `confirmedOrderNumber` in the order actions.
+ *
+ * A фактура has no counterpart to this, and that is not an omission — see
+ * `listInvoices()`.
+ */
+export async function removeProforma(formData: FormData): Promise<void> {
+  await requireAdmin()
+
+  const id = String(formData.get('id') ?? '')
+  if (!id) redirect('/admin/proformas')
+
+  const proforma = await getProforma(id)
+  if (!proforma) redirect('/admin/proformas?error=missing')
+
+  const typed = String(formData.get('confirmOrderNumber') ?? '').trim()
+  if (typed !== proforma.number) redirect(`/admin/proformas/${id}?error=confirm`)
+
+  const deleted = await deleteProforma(id)
+
+  revalidatePath('/admin/proformas')
+
+  redirect(deleted ? `/admin/proformas?deleted=${proforma.number}` : '/admin/proformas?error=failed')
 }

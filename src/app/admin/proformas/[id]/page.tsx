@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { requireAdmin } from '@/lib/admin-auth'
 import { formatMoney, money, type Currency } from '@/lib/money'
 import { getProforma, readProformaSnapshot } from '@/lib/proformas'
+import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
+import { removeProforma } from '../actions'
 
 /**
  * The проформа, ready for a printer.
@@ -27,10 +29,17 @@ export const metadata = {
 
 const dateFormat = new Intl.DateTimeFormat('bg-BG', { dateStyle: 'short' })
 
-export default async function ProformaPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProformaPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ error?: string }>
+}) {
   await requireAdmin()
 
   const { id } = await params
+  const { error } = await searchParams
   const proforma = await getProforma(id)
   if (!proforma) notFound()
 
@@ -173,6 +182,31 @@ export default async function ProformaPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       </article>
+
+      {/*
+        Below the document, never on it. Deleting a проформа is lawful — it is an
+        offer, not an accounting document — but the number is not handed back:
+        see `deleteProforma`.
+      */}
+      <section className="mx-auto w-[210mm] max-w-full space-y-2 rounded-sm border border-stone-200 bg-white p-4 print:hidden">
+        <h2 className="text-xs font-medium tracking-wide text-stone-500 uppercase">Изтриване</h2>
+        <p className="text-xs text-stone-500">
+          Проформата не е данъчен документ, така че може да се изтрие. Номер{' '}
+          {snapshot.number} остава изразходван — ако вече е изпратен на клиент, втори
+          документ със същия номер е по-лошо от дупка в поредицата.
+        </p>
+
+        {error === 'confirm' && (
+          <p role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+            Номерът не съвпада — проформата не е изтрита.
+          </p>
+        )}
+
+        <form action={removeProforma}>
+          <input type="hidden" name="id" value={proforma.id} />
+          <ConfirmSubmit expected={proforma.number} buttonLabel="Изтрий проформата" />
+        </form>
+      </section>
     </div>
   )
 }

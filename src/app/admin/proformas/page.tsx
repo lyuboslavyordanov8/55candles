@@ -20,9 +20,14 @@ export const metadata = {
 
 const dateFormat = new Intl.DateTimeFormat('bg-BG', { dateStyle: 'short' })
 
-export default async function ProformasPage() {
+export default async function ProformasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string; error?: string }>
+}) {
   await requireAdmin()
 
+  const { deleted, error } = await searchParams
   const rows = await listProformas()
 
   return (
@@ -41,6 +46,21 @@ export default async function ProformasPage() {
           Нова проформа
         </Link>
       </div>
+
+      {deleted && (
+        <p className="rounded-sm border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+          Проформа № {deleted} е изтрита. Номерът остава изразходван — следващата получава
+          следващия номер.
+        </p>
+      )}
+
+      {error && (
+        <p role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+          {error === 'missing'
+            ? 'Тази проформа вече не съществува.'
+            : 'Проформата не беше изтрита. Опитай отново.'}
+        </p>
+      )}
 
       {rows.length === 0 ? (
         <p className="rounded-sm border border-stone-200 bg-white p-4 text-xs text-stone-500">

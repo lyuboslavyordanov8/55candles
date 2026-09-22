@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { eq, sql } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
 
 import { getDb } from '@/db'
 import {
@@ -345,6 +345,19 @@ export async function getInvoiceForOrder(orderId: string): Promise<Invoice | nul
     .limit(1)
 
   return invoice ?? null
+}
+
+/**
+ * Every invoice issued, newest first.
+ *
+ * Read-only, and there is deliberately no counterpart that deletes one. An
+ * issued фактура is an accounting document: the series may not have gaps and the
+ * document exists in somebody else's books, so a wrong one is corrected by a
+ * кредитно известие — which this module does not issue — and never by removing
+ * the row. See the module docblock.
+ */
+export async function listInvoices(limit = 200): Promise<Invoice[]> {
+  return getDb().select().from(invoices).orderBy(desc(invoices.issuedAt)).limit(limit)
 }
 
 /**

@@ -48,6 +48,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
             {signedIn && (
               <div className="flex items-center gap-3">
+                <Link href="/admin/invoices" className="text-xs text-stone-600 underline">
+                  фактури
+                </Link>
                 <Link href="/admin/proformas" className="text-xs text-stone-600 underline">
                   проформи
                 </Link>

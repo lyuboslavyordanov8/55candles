@@ -416,6 +416,28 @@ export async function listProformas(limit = 100): Promise<Proforma[]> {
 }
 
 /**
+ * Delete one проформа. `false` when there was nothing there to delete.
+ *
+ * Lawful where deleting a фактура is not: a проформа is an offer, not an
+ * accounting document, so nothing needs it to exist and nothing needs a second
+ * document to undo it.
+ *
+ * **The counter is deliberately left alone.** Deleting number 7 leaves a gap in
+ * the series, and that gap is the honest record: number 7 may be in somebody's
+ * inbox already. Handing the number back would mean issuing a *second*, different
+ * document with the same number on it, which is worse than a gap by any measure
+ * — and gaps in this series break nothing, since the law does not count it.
+ */
+export async function deleteProforma(id: string): Promise<boolean> {
+  const deleted = await getDb()
+    .delete(proformas)
+    .where(eq(proformas.id, id))
+    .returning({ id: proformas.id })
+
+  return deleted.length > 0
+}
+
+/**
  * A stored snapshot, or `null` when it is not a shape this version knows.
  *
  * Read rather than cast, because the column is `jsonb` and the row may have been
