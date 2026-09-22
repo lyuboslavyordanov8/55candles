@@ -257,7 +257,8 @@ interface EcontLabelResponse {
     shipmentNumber?: string
     /** Only in `create` mode: the printable label. */
     pdfURL?: string
-    expectedDeliveryDate?: string
+    /** `'2026-09-23'` from demo, `1790110800000` from production. See `toDeliveryDate()`. */
+    expectedDeliveryDate?: string | number
     totalPrice?: number
     currency?: string
     services?: EcontRawService[]
@@ -288,6 +289,42 @@ function formatHours(from?: number, to?: number): string | undefined {
   if (!from || !to || from === to) return undefined
 
   return `${timeFormatter.format(from)}–${timeFormatter.format(to)}`
+}
+
+/** `1790110800000` → `'2026-09-23'`. `en-CA` is the locale that spells a date that way. */
+const dayFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: COURIER_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+/**
+ * Econt's expected delivery date to the ISO date `Waybill` promises.
+ *
+ * Two shapes arrive under this one name. The demo service sends `'2026-09-23'`,
+ * which the OpenAPI describes (`format: date`); production sends
+ * `1790110800000` — the same epoch-milliseconds habit this API already has for
+ * office hours, see `formatHours`. Both are read, and the timestamp is resolved
+ * in `Europe/Sofia`, because a delivery day is the courier's day and the server
+ * is UTC.
+ *
+ * Anything else is dropped rather than passed through. The contract is an ISO
+ * date and the admin history prints what is stored, so an epoch on the screen is
+ * worse than no date at all.
+ */
+function toDeliveryDate(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const date = value.trim().slice(0, 10)
+
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return dayFormatter.format(value)
+  }
+
+  return undefined
 }
 
 /**
@@ -618,11 +655,13 @@ function toWaybill(response: EcontLabelResponse): Waybill | null {
   // `CD` line present in the breakdown is still separated out as the COD fee.
   const priced = toRate(response, false)
 
+  const expected = toDeliveryDate(label.expectedDeliveryDate)
+
   return {
     number,
     trackingUrl: econtTrackingUrl(number),
     ...(label.pdfURL ? { pdfUrl: label.pdfURL } : {}),
-    ...(label.expectedDeliveryDate ? { expectedDeliveryDate: label.expectedDeliveryDate } : {}),
+    ...(expected ? { expectedDeliveryDate: expected } : {}),
     ...(priced.status === 'ok' ? { price: priced.data } : {}),
   }
 }

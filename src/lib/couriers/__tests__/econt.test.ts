@@ -949,6 +949,31 @@ describe('booking a parcel', () => {
     })
   })
 
+  it('reads the delivery date production sends as a timestamp', async () => {
+    // What the live service answered for a real booking on 2026-09-22:
+    // `expectedDeliveryDate: 1790110800000`, not the `2026-09-23` the demo
+    // service sends. That instant is midnight in Europe/Sofia on the 23rd — it is
+    // the courier's day, so the courier's zone decides which date it is.
+    respondWithQuote(booked({ expectedDeliveryDate: 1790110800000 }))
+
+    const result = await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+    expect(result.status === 'ok' && result.data.expectedDeliveryDate).toBe('2026-09-23')
+  })
+
+  it('omits a delivery date it cannot read, rather than passing the raw value on', async () => {
+    // `Waybill.expectedDeliveryDate` is an ISO date by contract, and the admin
+    // history prints what is stored. An epoch or a sentence there is worse than
+    // no date at all.
+    for (const unreadable of ['утре', 0, -1, true, {}]) {
+      respondWithQuote(booked({ expectedDeliveryDate: unreadable }))
+
+      const result = await bookingClient().createWaybill(OFFICE_PARCEL_TO_BOOK)
+
+      expect(result.status === 'ok' && result.data.expectedDeliveryDate).toBeUndefined()
+    }
+  })
+
   it('reports the parcel even when the price cannot be read', async () => {
     // The expensive mistake this guards: a booked parcel reported as a failure
     // invites a second press of the button, and Econt bills for both.
