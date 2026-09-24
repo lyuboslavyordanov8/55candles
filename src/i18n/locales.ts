@@ -10,9 +10,9 @@ export type Locale = (typeof locales)[number]
  * Bulgarian, because the shop ships to Bulgaria only (Q-07) and its customers
  * read Bulgarian.
  *
- * This is what a visitor gets when their browser asks for neither language —
- * a crawler, a link opened from a chat app, `curl`. Everyone else is still
- * matched on Accept-Language, so an English browser lands on `/en`. It is also
+ * This is what every visitor to `/` gets, whatever their browser asks for:
+ * locale detection is off (see `src/proxy.ts`), so an English browser lands on
+ * `/bg` too and switches language by hand. It is also
  * the canonical locale in the sitemap and the one hreflang points at by
  * default, so changing it changes which URL Google treats as the original.
  */

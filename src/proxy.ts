@@ -6,6 +6,10 @@ import { addVaryOnRedirect } from './lib/vary'
 const intlMiddleware = createMiddleware({
   locales: [...locales],
   defaultLocale,
+  // `/` always opens in Bulgarian. With detection on, an English browser — or a
+  // NEXT_LOCALE cookie left by one visit to /en — sent the shop's own customers to
+  // the English site. English stays one click away in the language switcher.
+  localeDetection: false,
 })
 
 export default function proxy(request: NextRequest) {
