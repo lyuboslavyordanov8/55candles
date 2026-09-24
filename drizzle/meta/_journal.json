@@ -50,6 +50,13 @@
       "when": 1790091399545,
       "tag": "0006_sticky_naoko",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790240854846,
+      "tag": "0007_plain_skin",
+      "breakpoints": true
     }
   ]
 }

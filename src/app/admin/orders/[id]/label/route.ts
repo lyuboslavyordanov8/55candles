@@ -1,6 +1,7 @@
 import { hasAdminSession } from '@/lib/admin-auth'
 import { getOrderDetail } from '@/lib/admin-orders'
-import { labelPdfUrl } from '@/lib/waybills'
+import { courierClient } from '@/lib/couriers'
+import { labelFromCourier, labelPdfUrl } from '@/lib/waybills'
 
 /**
  * The waybill label PDF, served from our own domain (order-management back office).
@@ -71,14 +72,29 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const detail = await getOrderDetail(id)
   if (!detail) return empty(404)
 
-  const url = labelPdfUrl(detail.events)
-  if (!url) return empty(404)
-
   // `order.orderNumber` is what goes in any log line below. Never `url` — a log
   // line is not server-side enough for a capability URL: logs are pasted into
   // chats and tickets.
   const order = detail.order.orderNumber
   let bytes: ArrayBuffer
+
+  // Pigeon Express: no link to follow, the label is asked for by number with
+  // the API keys. The client checks the `%PDF` signature itself.
+  if (labelFromCourier(detail.order)) {
+    const label = await courierClient(detail.order.courier).labelPdf!(detail.order.waybillNumber!)
+
+    if (label.status !== 'ok') {
+      const reason = label.status === 'failed' ? label.reason : 'not configured'
+      console.error(`[label] order ${order}: the courier did not hand over the label — ${reason}`)
+
+      return empty(label.status === 'unconfigured' ? 404 : 502)
+    }
+
+    return pdfResponse(label.data, order)
+  }
+
+  const url = labelPdfUrl(detail.events)
+  if (!url) return empty(404)
 
   try {
     const response = await fetch(url, {
@@ -108,6 +124,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return empty(502)
   }
 
+  return pdfResponse(bytes, order)
+}
+
+function pdfResponse(bytes: ArrayBuffer, order: string): Response {
   return new Response(bytes, {
     headers: {
       'content-type': 'application/pdf',

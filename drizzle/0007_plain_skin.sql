@@ -1,0 +1,1 @@
+ALTER TYPE "public"."courier" ADD VALUE 'pigeon';

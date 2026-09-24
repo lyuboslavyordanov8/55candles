@@ -1,11 +1,12 @@
 import 'server-only'
 
 /**
- * The one HTTP call both courier clients make (AUDIT.md B-13 step 8).
+ * The one HTTP call every courier client makes (AUDIT.md B-13 step 8).
  *
- * Every courier endpoint we use is `POST` with a JSON body, so there is exactly
- * one shape to get right. It lives here rather than in each client so the
- * failure policy is written once:
+ * Econt and Speedy are `POST`-only with a JSON body, which is `postJson`. Pigeon
+ * Express is REST — `GET` with a query for lookups, API keys in headers — which
+ * is `requestJson`, the same call with the method and headers opened up. It
+ * lives here rather than in each client so the failure policy is written once:
  *
  * - **Always a timeout.** A courier that accepts the connection and never
  *   answers would otherwise hold a checkout request open until the platform
@@ -29,6 +30,16 @@ export interface PostJsonOptions {
   timeoutMs?: number
   /** Total attempts, including the first. */
   attempts?: number
+}
+
+export interface RequestJsonOptions extends Omit<PostJsonOptions, 'body'> {
+  method: 'GET' | 'POST'
+  /** Appended as a query string. `undefined` values are left out. */
+  query?: Record<string, string | number | undefined>
+  /** Sent as JSON. Not allowed on a `GET`. */
+  body?: unknown
+  /** Extra request headers — Pigeon's `X-API-Key` / `X-API-Secret`. */
+  headers?: Record<string, string>
 }
 
 const DEFAULT_TIMEOUT_MS = 8_000
@@ -87,16 +98,38 @@ function basicAuth(username: string, password: string): string {
   return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
 }
 
-export async function postJson<T>({
+export function postJson<T>(options: PostJsonOptions): Promise<HttpResult<T>> {
+  return requestJson<T>({ ...options, method: 'POST' })
+}
+
+function withQuery(url: string, query: RequestJsonOptions['query']): string {
+  if (!query) return url
+
+  const params = new URLSearchParams()
+
+  for (const [name, value] of Object.entries(query)) {
+    if (value !== undefined) params.set(name, String(value))
+  }
+
+  const encoded = params.toString()
+
+  return encoded ? `${url}${url.includes('?') ? '&' : '?'}${encoded}` : url
+}
+
+export async function requestJson<T>({
+  method,
   url,
+  query,
   body,
   auth,
+  headers: extraHeaders,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   attempts = DEFAULT_ATTEMPTS,
-}: PostJsonOptions): Promise<HttpResult<T>> {
+}: RequestJsonOptions): Promise<HttpResult<T>> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
     Accept: 'application/json',
+    ...extraHeaders,
   }
 
   if (auth) {
@@ -113,10 +146,10 @@ export async function postJson<T>({
     const timer = setTimeout(() => controller.abort(), timeoutMs)
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
+      const response = await fetch(withQuery(url, query), {
+        method,
         headers,
-        body: JSON.stringify(body),
+        ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
         signal: controller.signal,
         // Explicitly uncached. Next 16 makes fetch caching opt-in, and these
         // responses are large enough that caching them matters — but the cache

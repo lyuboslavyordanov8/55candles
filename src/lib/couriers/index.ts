@@ -9,6 +9,7 @@ import {
   type EcontSender,
   type EcontShipFrom,
 } from './econt'
+import { createPigeonClient, type PigeonPickup } from './pigeon'
 import { createSpeedyClient, type SpeedyCodProcessing, type SpeedySender } from './speedy'
 import type { CourierClient } from './types'
 
@@ -41,6 +42,8 @@ export type { EcontCodPayout, EcontSender, EcontShipFrom } from './econt'
 export { econtTrackingUrl } from './econt'
 export type { SpeedyCodProcessing, SpeedySender } from './speedy'
 export { speedyTrackingUrl } from './speedy'
+export type { PigeonPickup } from './pigeon'
+export { pigeonTrackingUrl } from './pigeon'
 
 /**
  * Which Econt nomenclature to read.
@@ -66,6 +69,7 @@ const ECONT_BASE_URL: Record<CourierEnvironment, string> = {
 const CREDENTIAL_VARS: Record<Courier, readonly [string, string]> = {
   econt: ['ECONT_USERNAME', 'ECONT_PASSWORD'],
   speedy: ['SPEEDY_USERNAME', 'SPEEDY_PASSWORD'],
+  pigeon: ['PIGEON_API_KEY', 'PIGEON_API_SECRET'],
 }
 
 /** Where parcels are handed over. See `econtShipFrom()`. */
@@ -100,6 +104,16 @@ const SPEEDY_VARS = {
   dropoffOffice: 'SPEEDY_DROPOFF_OFFICE_ID',
   serviceId: 'SPEEDY_SERVICE_ID',
   codProcessing: 'SPEEDY_COD_PROCESSING',
+} as const
+
+/**
+ * Where parcels are handed to Pigeon Express. Its sender is the account the keys
+ * belong to, so this is all there is to configure. See `pigeonPickup()`.
+ */
+const PIGEON_VARS = {
+  officeId: 'PIGEON_PICKUP_OFFICE_ID',
+  cityId: 'PIGEON_PICKUP_CITY_ID',
+  address: 'PIGEON_PICKUP_ADDRESS',
 } as const
 
 /**
@@ -223,6 +237,29 @@ export function speedySender(): SpeedySender | null {
 }
 
 /**
+ * Where parcels are handed over to Pigeon Express, or `null` for nowhere yet.
+ *
+ * 1. `PIGEON_PICKUP_OFFICE_ID` — the shop drops parcels at that office.
+ * 2. `PIGEON_PICKUP_CITY_ID` + `PIGEON_PICKUP_ADDRESS` — a courier collects
+ *    them. The city id is Pigeon's own, from `GET /cities`.
+ *
+ * No default from `company.ts`: the address there is a name, and Pigeon wants
+ * its city id — a guess would price the wrong pickup.
+ */
+export function pigeonPickup(): PigeonPickup | null {
+  const officeId = positiveInteger(process.env[PIGEON_VARS.officeId])
+  if (officeId !== null) return { officeId }
+
+  const cityId = positiveInteger(process.env[PIGEON_VARS.cityId])
+  const address = process.env[PIGEON_VARS.address]?.trim()
+
+  // Pigeon wants at least three characters of address with no street id.
+  if (cityId !== null && address && address.length >= 3) return { cityId, address }
+
+  return null
+}
+
+/**
  * A configured whole number, or `null` for anything else.
  *
  * Silent on a malformed value rather than throwing: a typo in a client id makes
@@ -273,7 +310,14 @@ export function speedyCodProcessing(): SpeedyCodProcessing {
 export function canQuoteLiveRates(courier: Courier): boolean {
   if (!isCourierConfigured(courier)) return false
 
-  return courier === 'econt' ? econtShipFrom() !== null : speedySender() !== null
+  switch (courier) {
+    case 'econt':
+      return econtShipFrom() !== null
+    case 'speedy':
+      return speedySender() !== null
+    case 'pigeon':
+      return pigeonPickup() !== null
+  }
 }
 
 /**
@@ -316,8 +360,10 @@ export function missingLiveRateRequirements(courier: Courier): string[] {
     if (econtShipFrom() === null) {
       missing.push(`${SENDER_VARS.officeCode} or the registered address in company.ts`)
     }
-  } else if (speedySender() === null) {
-    missing.push(SPEEDY_VARS.clientId)
+  } else if (courier === 'speedy') {
+    if (speedySender() === null) missing.push(SPEEDY_VARS.clientId)
+  } else if (pigeonPickup() === null) {
+    missing.push(`${PIGEON_VARS.officeId} or ${PIGEON_VARS.cityId} + ${PIGEON_VARS.address}`)
   }
 
   return missing
@@ -412,9 +458,60 @@ function speedyClient(): CourierClient {
   return created
 }
 
-/** Client for a courier. Both are real; each answers `unconfigured` on its own. */
+/**
+ * Pigeon Express has a separate sandbox, unlike Speedy: `PIGEON_ENV=sandbox`
+ * points the client at it, and keys issued for one do not work on the other.
+ * Ignored in production for the same reason `ECONT_ENV=demo` is.
+ */
+const PIGEON_BASE_URL = {
+  production: 'https://api.pigeonexpress.com/v1',
+  sandbox: 'https://api-demo.pigeonexpress.com/v1',
+} as const
+
+export function pigeonEnvironment(): keyof typeof PIGEON_BASE_URL {
+  if (process.env.PIGEON_ENV !== 'sandbox') return 'production'
+
+  if (process.env.NODE_ENV === 'production') {
+    console.error('PIGEON_ENV=sandbox is ignored in production. Using the live API instead.')
+    return 'production'
+  }
+
+  return 'sandbox'
+}
+
+function pigeonCredentials(): { key: string; secret: string } | null {
+  const credentials = credentialsFor('pigeon')
+
+  return credentials ? { key: credentials.username, secret: credentials.password } : null
+}
+
+function pigeonClient(): CourierClient {
+  const environment = pigeonEnvironment()
+  const key = `pigeon:${environment}`
+  const existing = clients.get(key)
+  if (existing) return existing
+
+  const created = createPigeonClient({
+    baseUrl: process.env.PIGEON_BASE_URL ?? PIGEON_BASE_URL[environment],
+    credentials: pigeonCredentials,
+    pickup: pigeonPickup,
+  })
+
+  clients.set(key, created)
+
+  return created
+}
+
+/** Client for a courier. All are real; each answers `unconfigured` on its own. */
 export function courierClient(courier: Courier): CourierClient {
-  return courier === 'econt' ? econtClient() : speedyClient()
+  switch (courier) {
+    case 'econt':
+      return econtClient()
+    case 'speedy':
+      return speedyClient()
+    case 'pigeon':
+      return pigeonClient()
+  }
 }
 
 /**
@@ -424,10 +521,14 @@ export function courierClient(courier: Courier): CourierClient {
  * where it works, and the free-text fallback appears everywhere else.
  *
  * Econt is unconditional because its nomenclature is *public* — no credentials,
- * so nothing can make the picker stop working. Speedy's is not: `/location/
+ * so nothing can make the picker stop working. Speedy's and Pigeon's are not: `/location/
  * office/` authenticates like every other Speedy call, so without credentials
  * there is no office list at all and the picker would render empty.
  */
 export function couriersWithOfficeLookup(): Courier[] {
-  return isCourierConfigured('speedy') ? ['econt', 'speedy'] : ['econt']
+  return [
+    'econt',
+    ...(isCourierConfigured('speedy') ? (['speedy'] as const) : []),
+    ...(isCourierConfigured('pigeon') ? (['pigeon'] as const) : []),
+  ]
 }

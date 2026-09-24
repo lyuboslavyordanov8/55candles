@@ -206,7 +206,7 @@ describe('courierClient', () => {
 })
 
 describe('the launch checklist', () => {
-  it('reports both couriers as unconfigured while credentials are missing', () => {
+  it('reports every courier as unconfigured while credentials are missing', () => {
     expect(isCourierConfigured('econt')).toBe(false)
     expect(isCourierConfigured('speedy')).toBe(false)
     expect(missingCourierCredentials()).toEqual([
@@ -214,6 +214,8 @@ describe('the launch checklist', () => {
       'ECONT_PASSWORD',
       'SPEEDY_USERNAME',
       'SPEEDY_PASSWORD',
+      'PIGEON_API_KEY',
+      'PIGEON_API_SECRET',
     ])
   })
 
@@ -222,7 +224,12 @@ describe('the launch checklist', () => {
     vi.stubEnv('ECONT_PASSWORD', 'secret')
 
     expect(isCourierConfigured('econt')).toBe(true)
-    expect(missingCourierCredentials()).toEqual(['SPEEDY_USERNAME', 'SPEEDY_PASSWORD'])
+    expect(missingCourierCredentials()).toEqual([
+      'SPEEDY_USERNAME',
+      'SPEEDY_PASSWORD',
+      'PIGEON_API_KEY',
+      'PIGEON_API_SECRET',
+    ])
   })
 
   it('does not count ECONT_ENV=demo as configured credentials', () => {

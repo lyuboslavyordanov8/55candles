@@ -43,6 +43,7 @@ const componentImages = [
   '/images/couriers/econt-blue-bg.svg',
   '/images/couriers/econt-blue-en.svg',
   '/images/couriers/speedy.webp',
+  '/images/couriers/pigeon.svg',
 ]
 
 function collectSourceFiles(dir: string, acc: string[] = []): string[] {

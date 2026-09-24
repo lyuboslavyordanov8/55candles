@@ -14,8 +14,19 @@ import { money, type Money } from './money'
  * arithmetic so it is trivially testable and can run anywhere.
  */
 
-export const COURIERS = ['econt', 'speedy'] as const
+export const COURIERS = ['econt', 'speedy', 'pigeon'] as const
 export type Courier = (typeof COURIERS)[number]
+
+/**
+ * Each courier's name as the back office writes it. The storefront translates
+ * its own (`checkout.delivery.couriers` in `messages/`); this is for the admin
+ * and the emails, which are Bulgarian-only and were each spelling it out.
+ */
+export const COURIER_LABELS: Record<Courier, string> = {
+  econt: 'Econt',
+  speedy: 'Speedy',
+  pigeon: 'Pigeon Express',
+}
 
 /**
  * The couriers an order may actually be placed with (AUDIT.md Q-22).
@@ -25,6 +36,11 @@ export type Courier = (typeof COURIERS)[number]
  * could not be labelled. It stays in `COURIERS` — the type, the database enum
  * and the tariff table all keep a place for it, and the checkout shows it as
  * coming soon rather than pretending it was never planned.
+ *
+ * Pigeon Express is in the same place for a different reason: its client is
+ * built from the published API but has not yet been run against it, because
+ * the keys come from Pigeon by hand. Add it here once a sandbox parcel has been
+ * booked, tracked and printed — see the header of `src/lib/couriers/pigeon.ts`.
  *
  * Client-safe on purpose, so the form can grey the option out and the server can
  * refuse it from the same list. It is a commercial fact, not a credential: see
@@ -134,13 +150,16 @@ const PLACEHOLDER_BANDS: WeightBand[] = [
  * ```
  */
 export const tariffs: Partial<Record<string, Tariff>> = {
-  // [TODO: Q-22 — replace with the real Econt and Speedy rate cards.]
+  // [TODO: Q-22 — replace with the real Econt, Speedy and Pigeon rate cards.]
   'econt:door': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
   'econt:office': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
   'econt:locker': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
   'speedy:door': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
   'speedy:office': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
   'speedy:locker': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
+  'pigeon:door': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
+  'pigeon:office': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
+  'pigeon:locker': { bands: PLACEHOLDER_BANDS, codFee: money(60) },
 }
 
 export function tariffKey(option: DeliveryOption): string {

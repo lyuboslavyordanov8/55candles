@@ -82,7 +82,7 @@ export const orderStatus = pgEnum('order_status', [
  * `ALTER TYPE … ADD VALUE`, which touches no existing row.
  */
 export const paymentMethod = pgEnum('payment_method', ['cod'])
-export const courier = pgEnum('courier', ['econt', 'speedy'])
+export const courier = pgEnum('courier', ['econt', 'speedy', 'pigeon'])
 export const deliveryMethod = pgEnum('delivery_method', ['door', 'office', 'locker'])
 
 // ---------------------------------------------------------------------------

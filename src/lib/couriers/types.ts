@@ -281,4 +281,11 @@ export interface CourierClient {
    * does not know lands in `missing` rather than failing the whole batch.
    */
   trackShipments(numbers: readonly string[]): Promise<LookupResult<TrackingReport>>
+
+  /**
+   * The label PDF for a booked parcel, for a courier that serves it only
+   * behind its API keys — Pigeon Express. Econt hands back a link at booking
+   * time instead (`Waybill.pdfUrl`), so it has no need of this.
+   */
+  labelPdf?(number: string): Promise<LookupResult<ArrayBuffer>>
 }

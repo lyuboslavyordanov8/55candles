@@ -7,7 +7,7 @@ import { orderEvents, orders, type Order, type OrderEvent, type OrderStatus } fr
 import { canBookWaybills, courierClient, missingWaybillRequirements } from './couriers'
 import type { Waybill, WaybillRequest } from './couriers/types'
 import { money, type Currency } from './money'
-import { isCourierBookable } from './shipping'
+import { COURIER_LABELS, isCourierBookable } from './shipping'
 
 /**
  * Issuing a waybill for an order (AUDIT.md Phase 4).
@@ -129,6 +129,15 @@ export function labelPdfUrl(events: readonly OrderEvent[]): string | null {
 }
 
 /**
+ * Whether the label is fetched from the courier by number rather than from a
+ * link in the history — Pigeon Express, whose label sits behind its API keys.
+ * See `CourierClient.labelPdf`.
+ */
+export function labelFromCourier(order: Pick<Order, 'courier' | 'waybillNumber'>): boolean {
+  return Boolean(order.waybillNumber) && Boolean(courierClient(order.courier).labelPdf)
+}
+
+/**
  * The order as a parcel.
  *
  * Every figure comes from the stored order rather than being recomputed: the
@@ -242,7 +251,10 @@ export async function issueWaybillForOrder(orderId: string): Promise<WaybillOutc
         warning: 'booked twice — cancel this waybill at the courier',
       })
 
-      return { status: 'failed', reason: `waybill ${waybill.number} is a duplicate and must be cancelled at Econt` }
+      return {
+        status: 'failed',
+        reason: `waybill ${waybill.number} is a duplicate and must be cancelled at ${COURIER_LABELS[order.courier]}`,
+      }
     }
 
     await note(orderId, order.status, {

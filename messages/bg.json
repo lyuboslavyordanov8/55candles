@@ -511,7 +511,8 @@
     },
     "courier": {
       "econt": "Еконт",
-      "speedy": "Спиди"
+      "speedy": "Спиди",
+      "pigeon": "Pigeon Express"
     },
     "method": {
       "door": "До моя адрес",

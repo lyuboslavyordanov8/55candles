@@ -118,7 +118,7 @@ const copy = {
 } as const
 
 /** Courier names as they are written on a waybill, in both languages. */
-const courierName = { econt: 'Econt', speedy: 'Speedy' } as const
+const courierName = { econt: 'Econt', speedy: 'Speedy', pigeon: 'Pigeon Express' } as const
 
 function dictionary(locale: string) {
   return copy[isLocale(locale) ? (locale as Locale) : defaultLocale]

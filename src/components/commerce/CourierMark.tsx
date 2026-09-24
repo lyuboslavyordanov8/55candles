@@ -70,8 +70,19 @@ const SPEEDY: Mark = {
   height: HEIGHT,
 }
 
+/**
+ * `pigeon.svg` — the wordmark from `pigeonexpress.com`'s own header
+ * (`/_design/assets/images/logo.svg`), 152×52, unmodified. Latin either way.
+ */
+const PIGEON: Mark = {
+  src: '/images/couriers/pigeon.svg',
+  width: 64,
+  height: HEIGHT,
+}
+
 function markFor(courier: Courier, locale: string): Mark {
   if (courier === 'speedy') return SPEEDY
+  if (courier === 'pigeon') return PIGEON
 
   // Econt publishes ЕКОНТ and ECONT as separate files; matching the page's
   // language is free here, and a Cyrillic mark on an English page reads as a

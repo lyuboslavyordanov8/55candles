@@ -511,7 +511,8 @@
     },
     "courier": {
       "econt": "Econt",
-      "speedy": "Speedy"
+      "speedy": "Speedy",
+      "pigeon": "Pigeon Express"
     },
     "method": {
       "door": "To my address",

@@ -6,7 +6,8 @@ import { getOrderDetail, refusalHistory, undoEligibility, UNDO_WINDOW_MS } from 
 import { nextStatuses, STATUS_LABELS, statusRequiresReason } from '@/lib/order-status'
 import { formatMoney, money } from '@/lib/money'
 import { defaultBuyerFor, getInvoiceForOrder, invoiceBlocker } from '@/lib/invoices'
-import { labelPath, labelPdfUrl, waybillBlocker } from '@/lib/waybills'
+import { labelFromCourier, labelPath, labelPdfUrl, waybillBlocker } from '@/lib/waybills'
+import { COURIER_LABELS, type Courier } from '@/lib/shipping'
 import { econtSender, econtShipFrom } from '@/lib/couriers'
 import CopyButton from '@/components/admin/CopyButton'
 import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
@@ -52,11 +53,18 @@ const methodLabels: Record<string, string> = {
   locker: 'до автомат',
 }
 
+/** Where a waybill is cancelled or made by hand, per courier. */
+const COURIER_PORTALS: Record<Courier, string> = {
+  econt: 'my.econt.com',
+  speedy: 'myspeedy.bg',
+  pigeon: 'client.pigeonexpress.com',
+}
+
 const notices: Record<string, string> = {
   stale: 'Поръчката вече е в друг статус — някой я е преместил. Виж историята по-долу.',
   reason_required: 'Тази стъпка изисква причина — попълни полето и опитай пак.',
   waybill_failed:
-    'Econt не издаде товарителница. Точната причина е записана в историята по-долу.',
+    'Куриерът не издаде товарителница. Точната причина е записана в историята по-долу.',
   waybill_busy: 'Товарителницата за тази поръчка се издава в момента. Изчакай и презареди.',
   waybill_blocked: 'Товарителница не може да се издаде за тази поръчка — виж по-долу защо.',
   waybill_confirm: 'Номерът на поръчката не съвпада — товарителница не е издадена.',
@@ -146,7 +154,8 @@ export default async function AdminOrderPage({
   const currency = order.currency as 'EUR'
   const amount = (minor: number) => formatMoney(money(minor, currency), 'bg')
   const blocker = waybillBlocker(order)
-  const pdfUrl = labelPdfUrl(events)
+  const hasLabel = labelFromCourier(order) || labelPdfUrl(events) !== null
+  const courierLabel = COURIER_LABELS[order.courier]
   const undo = undoEligibility(events, order.status)
   const refusals = await refusalHistory(order.phone, order.id)
 
@@ -208,7 +217,7 @@ export default async function AdminOrderPage({
 
       {waybill && (
         <Notice tone="success">
-          Товарителница {waybill} е издадена. Разпечатай етикета и подай пратката на Econt.
+          Товарителница {waybill} е издадена. Разпечатай етикета и подай пратката на {courierLabel}.
         </Notice>
       )}
 
@@ -296,7 +305,7 @@ export default async function AdminOrderPage({
         >
           <dl>
             <DetailRow label="Куриер">
-              {order.courier === 'econt' ? 'Econt' : 'Speedy'} ·{' '}
+              {courierLabel} ·{' '}
               {methodLabels[order.deliveryMethod] ?? order.deliveryMethod}
             </DetailRow>
             {order.deliveryMethod === 'door' ? (
@@ -358,12 +367,12 @@ export default async function AdminOrderPage({
       {tracking && (
         <Section
           title="Проследяване"
-          description={`На живо от ${order.courier === 'econt' ? 'Econt' : 'Speedy'} при всяко отваряне на страницата.`}
+          description={`На живо от ${courierLabel} при всяко отваряне на страницата.`}
         >
           <TrackingPanel
             lookup={tracking}
             orderStatus={order.status}
-            courierLabel={order.courier === 'econt' ? 'Econt' : 'Speedy'}
+            courierLabel={courierLabel}
           />
         </Section>
       )}
@@ -394,7 +403,7 @@ export default async function AdminOrderPage({
               dialog over one — `contentWindow.print()` throws. The tab is where
               printing is possible, so the tab is what this offers. See the route.
             */}
-            {pdfUrl && (
+            {hasLabel && (
               <div>
                 <a
                   href={labelPath(order.id)}
@@ -412,7 +421,7 @@ export default async function AdminOrderPage({
 
             <p className="text-ink-ghost">
               Втора товарителница за същата поръчка не се издава оттук. Ако тази е грешна, отмени я
-              в my.econt.com.
+              в {COURIER_PORTALS[order.courier]}.
             </p>
           </div>
         ) : blocker ? (
@@ -420,13 +429,13 @@ export default async function AdminOrderPage({
         ) : (
           <div className="space-y-3">
             <p className="text-xs text-ink-secondary">
-              Econt ще издаде истинска товарителница на {amount(order.totalMinor)} наложен
+              {courierLabel} ще издаде истинска товарителница на {amount(order.totalMinor)} наложен
               платеж — прегледай данните преди да я издадеш.
             </p>
             <WaybillPreviewModal
               orderId={order.id}
               orderNumber={order.orderNumber}
-              courierLabel={order.courier === 'econt' ? 'Econt' : 'Speedy'}
+              courierLabel={courierLabel}
               sender={senderPreview(order.courier)}
               recipientName={order.recipientName}
               recipientPhone={order.phone}
@@ -624,10 +633,17 @@ function blockerText(blocker: NonNullable<ReturnType<typeof waybillBlocker>>): s
       return BOOKABLE_AFTER.includes(blocker.status)
         ? `Поръчката е в статус „${STATUS_LABELS[blocker.status]}“ — товарителницата вече е трябвало да е издадена.`
         : `Първо потвърди поръчката (сега е „${STATUS_LABELS[blocker.status]}“).`
-    case 'notBookable':
-      return blocker.courier === 'speedy'
-        ? 'Speedy още не се поддържа — направи товарителницата ръчно в системата на Speedy.'
-        : `Econt не е настроен за товарителници. Липсва: ${blocker.missing.join(', ')}.`
+    case 'notBookable': {
+      const name = COURIER_LABELS[blocker.courier]
+
+      if (blocker.courier === 'speedy') {
+        return 'Speedy още не се поддържа — направи товарителницата ръчно в системата на Speedy.'
+      }
+
+      return blocker.missing.length > 0
+        ? `${name} не е настроен за товарителници. Липсва: ${blocker.missing.join(', ')}.`
+        : `${name} още не е пуснат за поръчки — направи товарителницата ръчно в ${COURIER_PORTALS[blocker.courier]}.`
+    }
   }
 }
 

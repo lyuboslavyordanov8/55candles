@@ -7,7 +7,7 @@ import { OPEN_STATUSES, STATUS_LABELS } from '@/lib/order-status'
 import { orderStatus, type OrderStatus } from '@/db/schema'
 import { formatMoney, money } from '@/lib/money'
 import { isMailerConfigured, orderRecipient } from '@/lib/mailer'
-import { COURIERS, type Courier } from '@/lib/shipping'
+import { COURIER_LABELS, COURIERS, type Courier } from '@/lib/shipping'
 import OrderStatusBadge from '@/components/admin/OrderStatusBadge'
 import { TrackingBadge } from '@/components/admin/ShipmentTracking'
 import { trackOrders } from '@/lib/tracking'
@@ -52,7 +52,6 @@ const methodLabels: Record<string, string> = {
   locker: 'автомат',
 }
 
-const COURIER_LABELS: Record<string, string> = { econt: 'Econt', speedy: 'Speedy' }
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 export default async function AdminOrdersPage({
@@ -262,7 +261,7 @@ export default async function AdminOrdersPage({
                     <span className="block text-ink-ghost tabular-nums">{row.phone}</span>
                   </td>
                   <td className={`${td} whitespace-nowrap`}>
-                    {row.courier === 'econt' ? 'Econt' : 'Speedy'}
+                    {COURIER_LABELS[row.courier]}
                     <span className="block text-ink-ghost">
                       {methodLabels[row.deliveryMethod] ?? row.deliveryMethod}, {row.city}
                     </span>
