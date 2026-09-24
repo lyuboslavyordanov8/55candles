@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/admin-auth'
 import { ACCOUNTANT_REQUIREMENTS, vatState, vatThresholdConfig } from '@/lib/accounting/config'
 import { accountantSettingsFor, companyProfile } from '@/lib/accounting/settings'
+import { econtCodPayout } from '@/lib/couriers'
 import { formatMoney, money } from '@/lib/money'
 import { saveAccountant } from '../actions'
 import {
@@ -45,6 +46,9 @@ export default async function AccountingSettingsPage({
   const [accountant, profile] = await Promise.all([accountantSettingsFor(), companyProfile()])
   const vat = vatState()
   const threshold = vatThresholdConfig()
+  // Only what the admin label button would send. A waybill made by hand in
+  // е-Еконт picks its own payout there, so this says nothing about those.
+  const codPayout = econtCodPayout()
 
   return (
     <>
@@ -86,6 +90,28 @@ export default async function AccountingSettingsPage({
               <span className="text-ink-ghost">
                 не е настроена (COMPANY_IBAN, COMPANY_BIC, COMPANY_BANK)
               </span>
+            )}
+          </DetailRow>
+          <DetailRow label="Наложен платеж (Еконт)">
+            {codPayout === null ? (
+              <span className="text-ink-ghost">
+                не е настроен — парите от товарителници от сайта остават на гише
+                (ECONT_COD_PAY_TEMPLATE)
+              </span>
+            ) : 'template' in codPayout ? (
+              <>
+                споразумение <span className="tabular-nums">{codPayout.template}</span>
+                <span className="block text-ink-ghost">
+                  за товарителници, създадени от сайта
+                </span>
+              </>
+            ) : (
+              <>
+                по сметка <span className="tabular-nums">{codPayout.iban}</span>
+                <span className="block text-ink-ghost">
+                  BIC {codPayout.bic} · за товарителници, създадени от сайта
+                </span>
+              </>
             )}
           </DetailRow>
         </dl>

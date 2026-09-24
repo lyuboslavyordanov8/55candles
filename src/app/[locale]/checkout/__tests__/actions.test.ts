@@ -106,6 +106,7 @@ function stubFindOffice(result: LookupResult<CourierOffice | null>) {
     priceShipment: async () => ({ status: 'unconfigured', courier }),
     // Nothing in the checkout books a parcel: that is the admin's button.
     createWaybill: async () => ({ status: 'unconfigured', courier }),
+    trackShipments: async () => ({ status: 'unconfigured', courier }),
   }))
 
   return findOffice
@@ -516,6 +517,7 @@ describe('submitCheckout, when the courier prices the parcel', () => {
       findOffice: async () => ({ status: 'unconfigured', courier }),
       priceShipment: async () => result,
       createWaybill: async () => ({ status: 'unconfigured', courier }),
+      trackShipments: async () => ({ status: 'unconfigured', courier }),
     }))
   }
 
@@ -568,6 +570,7 @@ describe('submitCheckout, when the courier prices the parcel', () => {
       officesIn: async () => ({ status: 'unconfigured', courier }),
       findOffice: async () => ({ status: 'unconfigured', courier }),
       createWaybill: async () => ({ status: 'unconfigured', courier }),
+      trackShipments: async () => ({ status: 'unconfigured', courier }),
       priceShipment: async (request) => {
         asked = request
         return { status: 'ok', data: { delivery: eur(3.44), codFee: eur(0.3), total: eur(3.74) } }
@@ -698,6 +701,7 @@ describe('a promo code at checkout', () => {
       findOffice: async () => ({ status: 'unconfigured', courier }),
       priceShipment: async () => ({ status: 'failed', courier, reason: 'HTTP 517' }),
       createWaybill: async () => ({ status: 'unconfigured', courier }),
+      trackShipments: async () => ({ status: 'unconfigured', courier }),
     }))
 
     const state = await submitCheckout(IDLE, formData({ promoCode: 'NOTACODE' }))

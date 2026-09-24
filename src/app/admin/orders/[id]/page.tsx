@@ -13,6 +13,8 @@ import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
 import WaybillPreviewModal from '@/components/admin/WaybillPreviewModal'
 import OrderStatusBadge from '@/components/admin/OrderStatusBadge'
 import OrderStatusRail from '@/components/admin/OrderStatusRail'
+import { TrackingPanel } from '@/components/admin/ShipmentTracking'
+import { trackOrder } from '@/lib/tracking'
 import {
   button,
   DetailRow,
@@ -148,7 +150,7 @@ export default async function AdminOrderPage({
   const undo = undoEligibility(events, order.status)
   const refusals = await refusalHistory(order.phone, order.id)
 
-  const issued = await getInvoiceForOrder(order.id)
+  const [issued, tracking] = await Promise.all([getInvoiceForOrder(order.id), trackOrder(order)])
   const invoiceStop = invoiceBlocker(order, issued)
   const buyer = defaultBuyerFor(order)
 
@@ -352,6 +354,19 @@ export default async function AdminOrderPage({
           </dl>
         </Section>
       </div>
+
+      {tracking && (
+        <Section
+          title="Проследяване"
+          description={`На живо от ${order.courier === 'econt' ? 'Econt' : 'Speedy'} при всяко отваряне на страницата.`}
+        >
+          <TrackingPanel
+            lookup={tracking}
+            orderStatus={order.status}
+            courierLabel={order.courier === 'econt' ? 'Econt' : 'Speedy'}
+          />
+        </Section>
+      )}
 
       <Section title="Товарителница">
         {order.waybillNumber ? (

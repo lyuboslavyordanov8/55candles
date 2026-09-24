@@ -901,7 +901,8 @@ describe('booking a parcel', () => {
 
   it('sends the bank account per shipment when there is no template', async () => {
     // What a personal е-Еконт profile can do without a signed contract. Field
-    // names are Econt's own: `IBAN`, `BIC`, `bankCurrency`.
+    // names are Econt's own: `IBAN`, `BIC`, `bankCurrency`. The payee goes with
+    // them — Econt refuses the label without a name and a phone for it.
     respondWithQuote(booked())
 
     await bookingClient({
@@ -914,6 +915,10 @@ describe('booking a parcel', () => {
     }).createWaybill(OFFICE_PARCEL_TO_BOOK)
 
     expect(bodyOf().label.services.cdPayOptions).toEqual({
+      client: {
+        name: bodyOf().label.senderClient.name,
+        phones: bodyOf().label.senderClient.phones,
+      },
       method: 'bank',
       IBAN: 'BG18RZBB91550123456789',
       BIC: 'RZBBBGSF',
@@ -1058,5 +1063,179 @@ describe('econtTrackingUrl', () => {
     expect(econtTrackingUrl('10 53/118')).toBe(
       'https://www.econt.com/services/track-shipment/10%2053%2F118'
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tracking
+// ---------------------------------------------------------------------------
+
+/**
+ * `getShipmentStatuses`, trimmed from a live production response of 2026-09-24:
+ * times are epoch milliseconds and the currency is the `€` symbol, both unlike
+ * the OpenAPI description, and the final hand-over is reported twice.
+ */
+function shipmentStatus(overrides: Record<string, unknown> = {}) {
+  return {
+    shipmentNumber: '1505005745538',
+    shortDeliveryStatus: 'Доставена',
+    deliveryTime: 1787297525000,
+    expectedDeliveryDate: 1787259600000,
+    cdCollectedAmount: 0,
+    cdCollectedCurrency: null,
+    cdCollectedTime: null,
+    cdPaidAmount: 0,
+    cdPaidCurrency: null,
+    cdPaidTime: null,
+    nextShipments: [],
+    trackingEvents: [
+      {
+        destinationType: 'in_pickup_office',
+        destinationDetails: 'София НЛЦ Орион',
+        officeName: 'София НЛЦ Орион',
+        time: 1787220092000,
+      },
+      {
+        destinationType: 'arrival_departure_from_hub',
+        destinationDetails: 'Стара Загора - София',
+        officeName: 'София НЛЦ Искър',
+        time: 1787268897000,
+      },
+      {
+        destinationType: 'courier',
+        destinationDetails: 'Диана Христова',
+        officeName: 'София - Стефан Тюрлесанов',
+        time: 1787292430000,
+      },
+      {
+        destinationType: 'client',
+        destinationDetails: 'Любослав Миленов Йорданов',
+        officeName: 'София - Стефан Тюрлесанов',
+        time: 1787297525000,
+      },
+      {
+        destinationType: 'client',
+        destinationDetails: 'Любослав Миленов Йорданов',
+        officeName: 'София - Стефан Тюрлесанов',
+        time: 1787297525000,
+      },
+    ],
+    ...overrides,
+  }
+}
+
+describe('tracking parcels', () => {
+  it('asks for every number in one request, with credentials when there are some', async () => {
+    respondWithQuote({ shipmentStatuses: [{ status: shipmentStatus() }, { status: shipmentStatus() }] })
+
+    await bookingClient().trackShipments(['1505005745538', '1505005745539'])
+
+    const [url, init] = fetchMock.mock.calls[0]
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(url).toBe(
+      'https://demo.example/services/Shipments/ShipmentService.getShipmentStatuses.json'
+    )
+    expect(bodyOf().shipmentNumbers).toEqual(['1505005745538', '1505005745539'])
+    expect(new Headers(init.headers).get('Authorization')).toMatch(/^Basic /)
+  })
+
+  it('does not call Econt for no numbers', async () => {
+    const result = await bookingClient().trackShipments([])
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(result).toEqual({ status: 'ok', data: { found: [], missing: [] } })
+  })
+
+  it('reads status, delivery and history, newest first and without the repeat', async () => {
+    respondWithQuote({ shipmentStatuses: [{ status: shipmentStatus() }] })
+
+    const result = await bookingClient().trackShipments(['1505005745538'])
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+
+    const [tracking] = result.data.found
+
+    expect(tracking.number).toBe('1505005745538')
+    expect(tracking.status).toBe('Доставена')
+    expect(tracking.deliveredAt).toBe(new Date(1787297525000).toISOString())
+    expect(tracking.events.map((event) => event.text)).toEqual([
+      'предадена на Любослав Миленов Йорданов',
+      'при куриер Диана Христова',
+      'преминава през Стара Загора - София',
+      'приета в офис София НЛЦ Орион',
+    ])
+    // Zero amounts are "nothing yet", not a payment of nothing.
+    expect(tracking.codCollected).toBeUndefined()
+    expect(tracking.codPaid).toBeUndefined()
+  })
+
+  it('tells collected cash from cash paid out to us, € symbol and all', async () => {
+    respondWithQuote({
+      shipmentStatuses: [
+        {
+          status: shipmentStatus({
+            cdCollectedAmount: 24.9,
+            cdCollectedCurrency: '€',
+            cdCollectedTime: 1787297525000,
+            cdPaidAmount: 24.9,
+            cdPaidCurrency: 'EUR',
+            cdPaidTime: '2026-09-24T09:00:00+03:00',
+          }),
+        },
+      ],
+    })
+
+    const result = await bookingClient().trackShipments(['1505005745538'])
+    if (result.status !== 'ok') throw new Error(result.status)
+
+    const [tracking] = result.data.found
+
+    expect(tracking.codCollected?.amount.amountMinor).toBe(2490)
+    expect(tracking.codPaid?.amount.amountMinor).toBe(2490)
+    expect(tracking.codPaid?.at).toBe('2026-09-24T06:00:00.000Z')
+  })
+
+  it('reports an unknown number on its own, matched by position', async () => {
+    respondWithQuote({
+      shipmentStatuses: [
+        { status: shipmentStatus() },
+        {
+          status: null,
+          error: { message: 'Не е намерена пратка с номер 1234567890123.' },
+        },
+      ],
+    })
+
+    const result = await bookingClient().trackShipments(['1505005745538', '1234567890123'])
+    if (result.status !== 'ok') throw new Error(result.status)
+
+    expect(result.data.found.map((found) => found.number)).toEqual(['1505005745538'])
+    expect(result.data.missing).toEqual([
+      { number: '1234567890123', reason: 'Не е намерена пратка с номер 1234567890123.' },
+    ])
+  })
+
+  it('names the waybill a returned parcel turned into', async () => {
+    respondWithQuote({
+      shipmentStatuses: [
+        { status: shipmentStatus({ nextShipments: [{ shipmentNumber: '1505005799999' }] }) },
+      ],
+    })
+
+    const result = await bookingClient().trackShipments(['1505005745538'])
+    if (result.status !== 'ok') throw new Error(result.status)
+
+    expect(result.data.found[0].followedBy).toBe('1505005799999')
+  })
+
+  it('fails the batch when Econt does not answer, without retrying', async () => {
+    respondWithQuote({ type: 'ExInvalidParam', message: 'down' }, 503)
+
+    const result = await bookingClient().trackShipments(['1505005745538'])
+
+    expect(result.status).toBe('failed')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

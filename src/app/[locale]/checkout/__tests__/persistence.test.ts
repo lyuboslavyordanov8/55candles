@@ -120,6 +120,7 @@ function stubFindOffice(result: LookupResult<CourierOffice | null>) {
     priceShipment: async () => ({ status: 'unconfigured', courier }),
     // Nothing in the checkout books a parcel: that is the admin's button.
     createWaybill: async () => ({ status: 'unconfigured', courier }),
+    trackShipments: async () => ({ status: 'unconfigured', courier }),
   }))
 }
 
@@ -384,6 +385,7 @@ describe('recording where the delivery price came from', () => {
       findOffice: async () => ({ status: 'unconfigured', courier }),
       priceShipment: async () => result,
       createWaybill: async () => ({ status: 'unconfigured', courier }),
+      trackShipments: async () => ({ status: 'unconfigured', courier }),
     }))
   }
 

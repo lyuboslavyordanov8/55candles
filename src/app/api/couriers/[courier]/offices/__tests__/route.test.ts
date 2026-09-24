@@ -41,6 +41,7 @@ function clientReturning(result: LookupResult<never>): CourierClient {
     findOffice: answer,
     priceShipment: answer,
     createWaybill: answer,
+    trackShipments: answer,
   }
 }
 
@@ -52,6 +53,7 @@ function stubClient(client: Partial<CourierClient>) {
     findOffice: () => Promise.resolve({ status: 'unconfigured', courier: 'econt' }),
     priceShipment: () => Promise.resolve({ status: 'unconfigured', courier: 'econt' }),
     createWaybill: () => Promise.resolve({ status: 'unconfigured', courier: 'econt' }),
+    trackShipments: () => Promise.resolve({ status: 'unconfigured', courier: 'econt' }),
     ...client,
   })
 }

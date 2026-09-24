@@ -889,5 +889,16 @@ export function createSpeedyClient(config: SpeedyConfig): CourierClient {
         },
       }
     },
+
+    /**
+     * Not built yet, deliberately: `BOOKABLE_COURIERS` is Econt-only until there
+     * is a Speedy contract, so no order carries a Speedy waybill to track, and a
+     * mapping of `/track` written without one real parcel to check it against
+     * would be a guess. `unconfigured` makes the admin say "no tracking" rather
+     * than "the courier failed".
+     */
+    async trackShipments() {
+      return unconfigured()
+    },
   }
 }

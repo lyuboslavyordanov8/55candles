@@ -59,6 +59,8 @@ export interface OrderListRow {
   totalMinor: number
   currency: string
   itemCount: number
+  /** For the live courier status column. */
+  waybillNumber: string | null
 }
 
 export interface OrderList {
@@ -96,6 +98,7 @@ export async function listOrders(filter: OrderListFilter = {}): Promise<OrderLis
         deliveryMethod: orders.deliveryMethod,
         totalMinor: orders.totalMinor,
         currency: orders.currency,
+        waybillNumber: orders.waybillNumber,
       })
       .from(orders)
       .where(where)

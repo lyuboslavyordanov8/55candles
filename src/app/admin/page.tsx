@@ -9,6 +9,8 @@ import { formatMoney, money } from '@/lib/money'
 import { isMailerConfigured, orderRecipient } from '@/lib/mailer'
 import { COURIERS, type Courier } from '@/lib/shipping'
 import OrderStatusBadge from '@/components/admin/OrderStatusBadge'
+import { TrackingBadge } from '@/components/admin/ShipmentTracking'
+import { trackOrders } from '@/lib/tracking'
 import {
   button,
   EmptyState,
@@ -102,6 +104,10 @@ export default async function AdminOrdersPage({
     }),
     countByStatus(),
   ])
+
+  // One request per courier for the whole page, after the list — it needs the
+  // waybill numbers, and a slow courier costs the table its last column only.
+  const tracking = await trackOrders(list.rows)
 
   const openCount = OPEN_STATUSES.reduce((sum, value) => sum + (counts[value] ?? 0), 0)
   const narrowed = Boolean(q || courier || dateFrom || dateTo)
@@ -234,6 +240,7 @@ export default async function AdminOrdersPage({
                 <th className={`${th} text-right`}>Бр.</th>
                 <th className={`${th} text-right`}>Сума</th>
                 <th className={th}>Статус</th>
+                <th className={th}>При куриера</th>
               </tr>
             </thead>
             <tbody>
@@ -266,6 +273,13 @@ export default async function AdminOrdersPage({
                   </td>
                   <td className={`${td} whitespace-nowrap`}>
                     <OrderStatusBadge status={row.status} />
+                  </td>
+                  <td className={td}>
+                    {row.waybillNumber ? (
+                      <TrackingBadge lookup={tracking.get(row.waybillNumber.trim())} />
+                    ) : (
+                      <span className="text-ink-ghost">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -177,6 +177,52 @@ export interface ShipmentRate {
   description?: string
 }
 
+/** One scan in a parcel's history, as the courier words it. */
+export interface TrackingEvent {
+  /** ISO timestamp. */
+  at: string
+  /** What happened and where, e.g. "София НЛЦ Искър" or "при куриер Диана Христова". */
+  text: string
+}
+
+/**
+ * Where one parcel is, read live from the courier.
+ *
+ * `status` is the courier's own short wording ("Доставена", "Приета в офис") and
+ * is shown as it comes rather than mapped onto `OrderStatus`: the courier has
+ * states we do not (a second delivery attempt, storage in an office), and a
+ * mapping would quietly decide which of them the admin gets to see.
+ *
+ * The money is the part the order statuses cannot see. `codCollected` is the
+ * courier saying the customer paid; `codPaid` is the courier saying it sent the
+ * money on to us. Neither is a bank receipt — `reconciled` still means someone
+ * saw it arrive.
+ */
+export interface ShipmentTracking {
+  number: string
+  status: string
+  /** Newest first. */
+  events: TrackingEvent[]
+  /** ISO timestamp of the hand-over to the customer, once there is one. */
+  deliveredAt?: string
+  expectedDeliveryDate?: string
+  codCollected?: { amount: Money; at: string }
+  codPaid?: { amount: Money; at: string }
+  /** The waybill this one turned into — a return to sender, most often. */
+  followedBy?: string
+}
+
+/** A waybill the courier could not report on, with its reason. */
+export interface TrackingMiss {
+  number: string
+  reason: string
+}
+
+export interface TrackingReport {
+  found: ShipmentTracking[]
+  missing: TrackingMiss[]
+}
+
 export interface CourierClient {
   readonly courier: Courier
 
@@ -226,4 +272,13 @@ export interface CourierClient {
    *   is never booked twice.
    */
   createWaybill(request: WaybillRequest): Promise<LookupResult<Waybill>>
+
+  /**
+   * Live status of parcels already booked, in one round trip.
+   *
+   * Read-only, so a failure is harmless and nothing is retried hard: the admin
+   * page shows "no answer" and the next load asks again. A number the courier
+   * does not know lands in `missing` rather than failing the whole batch.
+   */
+  trackShipments(numbers: readonly string[]): Promise<LookupResult<TrackingReport>>
 }

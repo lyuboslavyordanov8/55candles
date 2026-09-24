@@ -11,6 +11,9 @@ import type {
   ParcelDestination,
   ShipmentQuoteRequest,
   ShipmentRate,
+  ShipmentTracking,
+  TrackingEvent,
+  TrackingReport,
   Waybill,
   WaybillRequest,
 } from './types'
@@ -576,14 +579,22 @@ function codServices(codAmount: NonNullable<ShipmentQuoteRequest['codAmount']>) 
   }
 }
 
-/** The payout instruction, or nothing when the profile's default is to be used. */
-function payoutOf(payout: EcontCodPayout | null): Record<string, unknown> {
+/**
+ * The payout instruction, or nothing when the profile's default is to be used.
+ *
+ * A per-shipment account also needs the payee as a client of its own — without
+ * one Econt refuses the label with "Името на клиента не може да бъде празно;
+ * Необходим е телефон на клиента" (checked on production, 2026-09-24). The payee
+ * is the sender: the money goes to the company the parcel is sent as.
+ */
+function payoutOf(payout: EcontCodPayout | null, sender: EcontSender): Record<string, unknown> {
   if (!payout) return {}
 
   if ('template' in payout) return { cdPayOptionsTemplate: payout.template }
 
   return {
     cdPayOptions: {
+      client: { name: sender.name, phones: [sender.phone] },
       method: payout.method,
       IBAN: payout.iban,
       BIC: payout.bic,
@@ -627,7 +638,7 @@ function waybillBody(
       orderNumber: request.orderNumber,
       ...PAYMENT_SIDE,
       ...(request.codAmount
-        ? { services: { ...codServices(request.codAmount), ...payoutOf(payout) } }
+        ? { services: { ...codServices(request.codAmount), ...payoutOf(payout, sender) } }
         : {}),
     },
     mode: 'create',
@@ -761,6 +772,163 @@ function toRate(response: EcontLabelResponse, hasCod: boolean): LookupResult<Shi
       ...(carriage.length > 0 ? { description: carriage.join('; ') } : {}),
     },
   }
+}
+
+// ---------------------------------------------------------------------------
+// Tracking
+// ---------------------------------------------------------------------------
+
+/**
+ * `Shipments/ShipmentService.getShipmentStatuses`, the fields we read.
+ *
+ * Probed against production on 2026-09-24. Two things differ from the OpenAPI
+ * description, and both are handled rather than trusted: times arrive as epoch
+ * milliseconds, not `date-time` strings, and `currency` is the symbol `€`, not
+ * `EUR`. A number Econt does not know comes back as an element with `status:
+ * null` and an `error`, in request order, so elements are matched by position.
+ */
+interface EcontTrackingEvent {
+  destinationType?: string | null
+  destinationDetails?: string | null
+  officeName?: string | null
+  time?: number | string | null
+}
+
+interface EcontShipmentStatus {
+  shortDeliveryStatus?: string | null
+  deliveryTime?: number | string | null
+  expectedDeliveryDate?: number | string | null
+  cdCollectedAmount?: number | null
+  cdCollectedCurrency?: string | null
+  cdCollectedTime?: number | string | null
+  cdPaidAmount?: number | null
+  cdPaidCurrency?: string | null
+  cdPaidTime?: number | string | null
+  nextShipments?: Array<{ shipmentNumber?: string | null }> | null
+  trackingEvents?: EcontTrackingEvent[] | null
+}
+
+interface EcontShipmentStatusesResponse {
+  shipmentStatuses?: Array<{
+    status?: EcontShipmentStatus | null
+    error?: { message?: string | null } | null
+  }>
+}
+
+/** Tracking is read on every admin page load; a slow answer is dropped, not waited for. */
+const TRACKING_TIMEOUT_MS = 6_000
+
+/** An Econt time, either form, to ISO — or `undefined` for none. */
+function toInstant(value: unknown): string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return new Date(value).toISOString()
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Date.parse(value)
+    return Number.isNaN(parsed) ? undefined : new Date(parsed).toISOString()
+  }
+
+  return undefined
+}
+
+/** A collected or paid-out amount. Zero is Econt's "nothing yet", not a payment. */
+function toCodMoney(amount: unknown, currency: unknown, time: unknown) {
+  const at = toInstant(time)
+  const symbol = typeof currency === 'string' && currency.trim() === '€' ? CURRENCY : currency
+  const value = toMoney(amount, symbol || CURRENCY)
+
+  if (!at || !value || value.amountMinor === 0) return undefined
+
+  return { amount: value, at }
+}
+
+/** Econt's `destinationType` in words. Unknown types keep Econt's own details. */
+function eventText(event: EcontTrackingEvent): string {
+  const details = event.destinationDetails?.trim() || event.officeName?.trim() || ''
+
+  // Probed on production 2026-09-24: `in_pickup_office`, `arrival_departure_from_hub`,
+  // `courier_direction`, `courier` and `client` on one parcel, and `office` on the
+  // same parcel an hour earlier. None of them is in the OpenAPI description.
+  switch (event.destinationType) {
+    case 'in_pickup_office':
+      return `приета в офис ${details}`
+    case 'arrival_departure_from_hub':
+      return `преминава през ${details}`
+    case 'office':
+      return `в офис ${details}`
+    case 'courier_direction':
+      return `на път: ${details}`
+    case 'courier':
+      return `при куриер ${details}`
+    case 'client':
+      return `предадена на ${details}`
+    default:
+      return details || event.destinationType || 'събитие'
+  }
+}
+
+function toTracking(raw: EcontShipmentStatus, number: string): ShipmentTracking {
+  const events: TrackingEvent[] = []
+
+  for (const event of raw.trackingEvents ?? []) {
+    const at = toInstant(event.time)
+    if (!at) continue
+
+    const text = eventText(event)
+    // Econt repeats the final hand-over as two identical events.
+    const previous = events[events.length - 1]
+    if (previous && previous.at === at && previous.text === text) continue
+
+    events.push({ at, text })
+  }
+
+  events.reverse()
+
+  const deliveredAt = toInstant(raw.deliveryTime)
+  const expected = toDeliveryDate(raw.expectedDeliveryDate)
+  const codCollected = toCodMoney(
+    raw.cdCollectedAmount,
+    raw.cdCollectedCurrency,
+    raw.cdCollectedTime
+  )
+  const codPaid = toCodMoney(raw.cdPaidAmount, raw.cdPaidCurrency, raw.cdPaidTime)
+  const followedBy = raw.nextShipments?.find((next) => next.shipmentNumber)?.shipmentNumber
+
+  return {
+    // The number we asked with, so the caller can key on what it sent.
+    number,
+    status: raw.shortDeliveryStatus?.trim() || 'няма статус',
+    events,
+    ...(deliveredAt ? { deliveredAt } : {}),
+    ...(expected ? { expectedDeliveryDate: expected } : {}),
+    ...(codCollected ? { codCollected } : {}),
+    ...(codPaid ? { codPaid } : {}),
+    ...(followedBy ? { followedBy } : {}),
+  }
+}
+
+function toTrackingReport(
+  response: EcontShipmentStatusesResponse,
+  numbers: readonly string[]
+): TrackingReport {
+  const report: TrackingReport = { found: [], missing: [] }
+  const elements = response.shipmentStatuses ?? []
+
+  numbers.forEach((number, index) => {
+    const element = elements[index]
+
+    if (element?.status) {
+      report.found.push(toTracking(element.status, number))
+    } else {
+      report.missing.push({
+        number,
+        reason: element?.error?.message?.trim() || 'Econt не върна данни за тази пратка',
+      })
+    }
+  })
+
+  return report
 }
 
 // ---------------------------------------------------------------------------
@@ -966,6 +1134,29 @@ export function createEcontClient(config: EcontConfig): CourierClient {
       }
 
       return { status: 'ok', data: waybill }
+    },
+
+    async trackShipments(numbers) {
+      if (numbers.length === 0) return { status: 'ok', data: { found: [], missing: [] } }
+
+      // Sent when we have them, though the endpoint answers without: tracking is
+      // about our own parcels, and the COD fields are the ones worth being
+      // authenticated for.
+      const credentials = config.credentials?.() ?? null
+
+      const response = await postJson<EcontShipmentStatusesResponse>({
+        url: `${config.baseUrl}/Shipments/ShipmentService.getShipmentStatuses.json`,
+        body: { shipmentNumbers: numbers },
+        ...(credentials ? { auth: credentials } : {}),
+        timeoutMs: TRACKING_TIMEOUT_MS,
+        attempts: 1,
+      })
+
+      if (!response.ok) {
+        return { status: 'failed', courier: COURIER, reason: response.reason }
+      }
+
+      return { status: 'ok', data: toTrackingReport(response.data, numbers) }
     },
   }
 }
