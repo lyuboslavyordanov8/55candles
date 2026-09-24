@@ -11,6 +11,8 @@ import { COURIER_LABELS, COURIERS, type Courier } from '@/lib/shipping'
 import OrderStatusBadge from '@/components/admin/OrderStatusBadge'
 import { TrackingBadge } from '@/components/admin/ShipmentTracking'
 import { trackOrders } from '@/lib/tracking'
+import { bannerChecks } from '@/lib/speedy-contract'
+import { loadSpeedyContractReport } from '@/lib/speedy-contract-data'
 import {
   button,
   EmptyState,
@@ -92,7 +94,7 @@ export default async function AdminOrdersPage({
   const dateFromValue = DATE_PATTERN.test(dateFrom) ? dateFrom : undefined
   const dateToValue = DATE_PATTERN.test(dateTo) ? dateTo : undefined
 
-  const [list, counts] = await Promise.all([
+  const [list, counts, speedy] = await Promise.all([
     listOrders({
       statuses,
       query: q,
@@ -102,7 +104,9 @@ export default async function AdminOrdersPage({
       dateTo: dateToValue,
     }),
     countByStatus(),
+    loadSpeedyContractReport(),
   ])
+  const speedyAlerts = bannerChecks(speedy)
 
   // One request per courier for the whole page, after the list — it needs the
   // waybill numbers, and a slow courier costs the table its last column only.
@@ -134,6 +138,15 @@ export default async function AdminOrdersPage({
 
       {isMailerConfigured() && orderRecipient().length === 0 && (
         <Notice>Клиентите получават потвърждение, но ние не: задай ORDER_EMAIL_TO.</Notice>
+      )}
+
+      {speedyAlerts.length > 0 && (
+        <Notice tone={speedy.worst === 'danger' ? 'danger' : 'warning'}>
+          Договор Speedy: {speedyAlerts.map((check) => check.title.toLowerCase()).join(', ')}.{' '}
+          <Link href="/admin/speedy" className="font-medium underline underline-offset-2">
+            Виж какво да направиш
+          </Link>
+        </Notice>
       )}
 
       <div className="-mx-1 flex flex-wrap items-center gap-1.5 px-1">

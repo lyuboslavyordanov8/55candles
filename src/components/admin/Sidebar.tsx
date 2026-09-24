@@ -10,6 +10,7 @@ import {
   DocumentIcon,
   LedgerIcon,
   ReceiptIcon,
+  SealIcon,
   TagIcon,
 } from './icons'
 
@@ -42,6 +43,7 @@ const GROUPS = [
       { href: '/admin', label: 'Поръчки', icon: BoxIcon },
       { href: '/admin/invoices', label: 'Фактури', icon: DocumentIcon },
       { href: '/admin/proformas', label: 'Проформи', icon: TagIcon },
+      { href: '/admin/speedy', label: 'Договор Speedy', icon: SealIcon },
     ],
   },
   {

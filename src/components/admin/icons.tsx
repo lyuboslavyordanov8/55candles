@@ -101,3 +101,15 @@ export function ReceiptIcon({ className = '' }: { className?: string }) {
     </svg>
   )
 }
+
+/** A courier contract: a sheet with a seal on it. */
+export function SealIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 2h8v7M4 2v12h4" />
+      <path d="M6 5h4M6 7.5h3" />
+      <circle cx="11" cy="11.5" r="2" />
+      <path d="m10 13.3-.5 1.9 1.5-.7 1.5.7-.5-1.9" />
+    </svg>
+  )
+}
