@@ -14,6 +14,7 @@ import {
   missingLiveRateRequirements,
   missingWaybillRequirements,
   speedyCodProcessing,
+  speedyFiscalReceipt,
   speedySender,
   speedyServiceId,
 } from '..'
@@ -453,11 +454,11 @@ describe('the Speedy tariff and payout', () => {
     expect(speedyServiceId()).toBe(515)
   })
 
-  it('collects наложен платеж in cash by default, which needs no COD annex', () => {
+  it('books the ordinary наложен платеж by default, paid out as the contract says', () => {
     expect(speedyCodProcessing()).toBe('CASH')
   })
 
-  it('wires the money instead when the contract allows it', () => {
+  it('books a пощенски паричен превод only when asked to by name', () => {
     vi.stubEnv('SPEEDY_COD_PROCESSING', 'POSTAL_MONEY_TRANSFER')
 
     expect(speedyCodProcessing()).toBe('POSTAL_MONEY_TRANSFER')
@@ -469,6 +470,21 @@ describe('the Speedy tariff and payout', () => {
     vi.stubEnv('SPEEDY_COD_PROCESSING', 'BANK')
 
     expect(speedyCodProcessing()).toBe('CASH')
+  })
+
+  it('asks Speedy for no касов бон until the annex is switched on', () => {
+    expect(speedyFiscalReceipt()).toBeNull()
+
+    vi.stubEnv('SPEEDY_COD_FISCAL_RECEIPT', 'yes')
+    expect(speedyFiscalReceipt()).toBeNull()
+  })
+
+  it('issues the receipt in the VAT group the company is in', () => {
+    vi.stubEnv('SPEEDY_COD_FISCAL_RECEIPT', ' ON ')
+
+    expect(speedyFiscalReceipt()).toEqual(
+      company.isVatRegistered ? { vatGroup: 'Б', vatRate: 0.2 } : { vatGroup: 'А', vatRate: 0 }
+    )
   })
 })
 

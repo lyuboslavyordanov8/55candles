@@ -132,6 +132,20 @@ export interface WaybillRequest extends ParcelDestination {
    * record, so a parcel found on a shelf can be traced back to an order.
    */
   orderNumber: string
+  /**
+   * What was sold, line by line, adding up to `codAmount` exactly. Present on a
+   * наложен платеж parcel only, and read only by a courier that issues the
+   * fiscal receipt on the shop's behalf (Speedy under its Н-18 annex). See
+   * `receiptLinesFor()` in `src/lib/waybills.ts`.
+   */
+  receipt?: readonly ReceiptLine[]
+}
+
+/** One line of the касов бон a courier issues for us. */
+export interface ReceiptLine {
+  description: string
+  /** With VAT, if there is any. Always positive. */
+  amount: Money
 }
 
 /**

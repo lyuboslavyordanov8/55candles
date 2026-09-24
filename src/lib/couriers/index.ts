@@ -10,7 +10,12 @@ import {
   type EcontShipFrom,
 } from './econt'
 import { createPigeonClient, type PigeonPickup } from './pigeon'
-import { createSpeedyClient, type SpeedyCodProcessing, type SpeedySender } from './speedy'
+import {
+  createSpeedyClient,
+  type SpeedyCodProcessing,
+  type SpeedyFiscalReceipt,
+  type SpeedySender,
+} from './speedy'
 import type { CourierClient } from './types'
 
 /**
@@ -104,6 +109,7 @@ const SPEEDY_VARS = {
   dropoffOffice: 'SPEEDY_DROPOFF_OFFICE_ID',
   serviceId: 'SPEEDY_SERVICE_ID',
   codProcessing: 'SPEEDY_COD_PROCESSING',
+  fiscalReceipt: 'SPEEDY_COD_FISCAL_RECEIPT',
 } as const
 
 /**
@@ -286,18 +292,38 @@ export function speedyServiceId(): number | undefined {
 }
 
 /**
- * How Speedy hands the наложен платеж money over.
+ * Which Speedy service the наложен платеж is.
  *
- * `CASH` — collect it at a Speedy counter — is the default, for the same reason
- * Econt's payout defaults to the profile's own arrangement: it works without a
- * COD annex. `POSTAL_MONEY_TRANSFER` wires it to the account on the contract and
- * is the better answer once that annex exists. An unrecognised value falls back
- * to `CASH` rather than being sent on to be rejected at booking time.
+ * `CASH` is the ordinary наложен платеж, and the default. The name is about the
+ * service, not the payout: *where the money goes* — a counter or a bank
+ * account — is set on the contract, and Speedy's own payout records pair
+ * `docType: CASH` with `paymentType: BANK`. Contract №515803 pays out by bank
+ * with `CASH`.
+ *
+ * `POSTAL_MONEY_TRANSFER` is a different service, the пощенски паричен превод,
+ * with its own tariff and its own contract flag (`moneyTransferAllowed`) — not
+ * "COD to a bank account", whatever the name suggests. An unrecognised value
+ * falls back to `CASH` rather than being sent on to be rejected at booking time.
  */
 export function speedyCodProcessing(): SpeedyCodProcessing {
   return process.env[SPEEDY_VARS.codProcessing]?.trim() === 'POSTAL_MONEY_TRANSFER'
     ? 'POSTAL_MONEY_TRANSFER'
     : 'CASH'
+}
+
+/**
+ * Whether Speedy issues the касов бон for our наложен платеж sales (the Н-18
+ * annex to the contract), and in which VAT group.
+ *
+ * Off unless `SPEEDY_COD_FISCAL_RECEIPT=on`: receipt items on a contract without
+ * the annex are refused, so this follows the contract rather than assuming it.
+ * The group follows `company.isVatRegistered` — `А` (0 %) while the company is
+ * not registered, `Б` (20 %) once it is.
+ */
+export function speedyFiscalReceipt(): SpeedyFiscalReceipt | null {
+  if (process.env[SPEEDY_VARS.fiscalReceipt]?.trim().toLowerCase() !== 'on') return null
+
+  return company.isVatRegistered ? { vatGroup: 'Б', vatRate: 0.2 } : { vatGroup: 'А', vatRate: 0 }
 }
 
 /**
@@ -451,6 +477,7 @@ function speedyClient(): CourierClient {
     sender: speedySender,
     serviceId: speedyServiceId,
     codProcessing: speedyCodProcessing,
+    fiscalReceipt: speedyFiscalReceipt,
   })
 
   clients.set(key, created)

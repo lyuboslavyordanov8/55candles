@@ -48,3 +48,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# signed contracts: IBAN and confidential prices, never committed
+docs/*.pdf

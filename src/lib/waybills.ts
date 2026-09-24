@@ -3,9 +3,17 @@ import 'server-only'
 import { and, eq, isNull } from 'drizzle-orm'
 
 import { getDb } from '@/db'
-import { orderEvents, orders, type Order, type OrderEvent, type OrderStatus } from '@/db/schema'
+import {
+  orderEvents,
+  orderItems,
+  orders,
+  type Order,
+  type OrderEvent,
+  type OrderItem,
+  type OrderStatus,
+} from '@/db/schema'
 import { canBookWaybills, courierClient, missingWaybillRequirements } from './couriers'
-import type { Waybill, WaybillRequest } from './couriers/types'
+import type { ReceiptLine, Waybill, WaybillRequest } from './couriers/types'
 import { money, type Currency } from './money'
 import { COURIER_LABELS, isCourierBookable } from './shipping'
 
@@ -148,8 +156,12 @@ export function labelFromCourier(order: Pick<Order, 'courier' | 'waybillNumber'>
  * `officeId` is populated for both in the schema's defaults, and sending both
  * would let Econt choose which one it delivers to.
  */
-export function waybillRequestFor(order: Order): WaybillRequest {
+export function waybillRequestFor(
+  order: Order,
+  items: readonly Pick<OrderItem, 'name' | 'quantity' | 'lineTotalMinor'>[] = []
+): WaybillRequest {
   const toDoor = order.deliveryMethod === 'door'
+  const receipt = order.paymentMethod === 'cod' ? receiptLinesFor(order, items) : null
 
   return {
     method: order.deliveryMethod,
@@ -169,7 +181,67 @@ export function waybillRequestFor(order: Order): WaybillRequest {
       ...(order.email ? { email: order.email } : {}),
     },
     orderNumber: order.orderNumber,
+    ...(receipt ? { receipt } : {}),
   }
+}
+
+/** Speedy's limit on a receipt line's description. */
+const RECEIPT_DESCRIPTION_MAX = 50
+
+/**
+ * The касов бон for an order, line by line, or `null` when the stored figures
+ * do not add up to what the courier will collect.
+ *
+ * One line per product, then one for delivery — the delivery charge and the
+ * наложен платеж fee together, both being what the customer paid to have the
+ * parcel brought. The promo discount is not a line of its own, because a
+ * receipt line must be positive: it is spread over the product lines in
+ * proportion to their value, the rounding remainder landing on the largest, so
+ * the receipt shows what each item was actually sold for.
+ *
+ * `null` rather than a best guess when the sum is off: a receipt that disagrees
+ * with the money collected is worse than a booking that stops and says why.
+ */
+export function receiptLinesFor(
+  order: Pick<
+    Order,
+    'currency' | 'goodsMinor' | 'discountMinor' | 'shippingMinor' | 'codFeeMinor' | 'totalMinor'
+  >,
+  items: readonly Pick<OrderItem, 'name' | 'quantity' | 'lineTotalMinor'>[]
+): ReceiptLine[] | null {
+  const currency = order.currency as Currency
+  const goods = items.reduce((sum, item) => sum + item.lineTotalMinor, 0)
+
+  if (items.length === 0 || goods !== order.goodsMinor || goods <= 0) return null
+
+  const discount = Math.min(Math.max(order.discountMinor, 0), goods)
+  const shares = items.map((item) => Math.floor((discount * item.lineTotalMinor) / goods))
+  const largest = items.reduce(
+    (best, item, index) => (item.lineTotalMinor > items[best].lineTotalMinor ? index : best),
+    0
+  )
+  shares[largest] += discount - shares.reduce((sum, share) => sum + share, 0)
+
+  const lines: ReceiptLine[] = items.map((item, index) => ({
+    description: describe(item.name, item.quantity),
+    amount: money(item.lineTotalMinor - shares[index], currency),
+  }))
+
+  const delivery = order.shippingMinor + (order.codFeeMinor ?? 0)
+  if (delivery > 0) lines.push({ description: 'Доставка', amount: money(delivery, currency) })
+
+  const sum = lines.reduce((total, line) => total + line.amount.amountMinor, 0)
+  if (sum !== order.totalMinor || lines.some((line) => line.amount.amountMinor <= 0)) return null
+
+  return lines
+}
+
+/** `Свещ „Смокиня“ × 2`, cut to fit rather than rejected for its length. */
+function describe(name: string, quantity: number): string {
+  const suffix = quantity > 1 ? ` × ${quantity}` : ''
+  const room = RECEIPT_DESCRIPTION_MAX - suffix.length
+
+  return `${name.trim().slice(0, room).trim()}${suffix}`
 }
 
 export type WaybillOutcome =
@@ -211,7 +283,18 @@ export async function issueWaybillForOrder(orderId: string): Promise<WaybillOutc
   inFlight.add(orderId)
 
   try {
-    const result = await courierClient(order.courier).createWaybill(waybillRequestFor(order))
+    const items = await db
+      .select({
+        name: orderItems.name,
+        quantity: orderItems.quantity,
+        lineTotalMinor: orderItems.lineTotalMinor,
+      })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId))
+
+    const result = await courierClient(order.courier).createWaybill(
+      waybillRequestFor(order, items)
+    )
 
     if (result.status !== 'ok') {
       const reason =

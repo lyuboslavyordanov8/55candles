@@ -5,6 +5,7 @@ import {
   BOOKABLE_ORDER_STATUSES,
   labelPath,
   labelPdfUrl,
+  receiptLinesFor,
   waybillBlocker,
   waybillRequestFor,
 } from '@/lib/waybills'
@@ -212,6 +213,79 @@ describe('the parcel we ask for', () => {
     // The column is `not null default ''`, and Econt would take '' as an address
     // to notify.
     expect(waybillRequestFor(order({ email: '' })).recipient.email).toBeUndefined()
+  })
+})
+
+/**
+ * The касов бон lines, for a courier that issues the receipt for us (Speedy's
+ * Н-18 annex). Whatever else they do, they must add up to what is collected.
+ */
+describe('the receipt lines', () => {
+  const ITEMS = [
+    { name: 'Свещ „Смокиня“', quantity: 2, lineTotalMinor: 1000 },
+    { name: 'Свещ „Кедър“', quantity: 1, lineTotalMinor: 500 },
+  ]
+
+  function sum(lines: ReturnType<typeof receiptLinesFor>) {
+    return lines!.reduce((total, line) => total + line.amount.amountMinor, 0)
+  }
+
+  it('has one line per product and one for delivery, adding up to the total', () => {
+    expect(receiptLinesFor(order(), ITEMS)).toEqual([
+      { description: 'Свещ „Смокиня“ × 2', amount: { amountMinor: 1000, currency: 'EUR' } },
+      { description: 'Свещ „Кедър“', amount: { amountMinor: 500, currency: 'EUR' } },
+      { description: 'Доставка', amount: { amountMinor: 499, currency: 'EUR' } },
+    ])
+  })
+
+  it('counts the наложен платеж fee as delivery', () => {
+    const lines = receiptLinesFor(order({ codFeeMinor: 100, totalMinor: 2099 }), ITEMS)
+
+    expect(lines!.at(-1)).toEqual({
+      description: 'Доставка',
+      amount: { amountMinor: 599, currency: 'EUR' },
+    })
+  })
+
+  it('leaves the delivery line out when delivery was free', () => {
+    const lines = receiptLinesFor(order({ shippingMinor: 0, totalMinor: 1500 }), ITEMS)
+
+    expect(lines!.map((line) => line.description)).not.toContain('Доставка')
+  })
+
+  it('spreads a discount over the products, the remainder on the largest', () => {
+    // 1 € off 15 €: 66.67 and 33.33 cents, which floor to 66 and 33 — the
+    // lost cent goes to the larger line so nothing is left over.
+    const lines = receiptLinesFor(order({ discountMinor: 100, totalMinor: 1899 }), ITEMS)
+
+    expect(lines!.map((line) => line.amount.amountMinor)).toEqual([933, 467, 499])
+    expect(sum(lines)).toBe(1899)
+  })
+
+  it('refuses to invent a receipt when the stored figures disagree', () => {
+    expect(receiptLinesFor(order(), [])).toBeNull()
+    expect(receiptLinesFor(order({ goodsMinor: 1600 }), ITEMS)).toBeNull()
+    expect(receiptLinesFor(order({ totalMinor: 2000 }), ITEMS)).toBeNull()
+  })
+
+  it('refuses a line of zero, which no receipt can carry', () => {
+    const items = [...ITEMS, { name: 'Подарък', quantity: 1, lineTotalMinor: 0 }]
+
+    expect(receiptLinesFor(order(), items)).toBeNull()
+  })
+
+  it('cuts a long name to fit, keeping the quantity', () => {
+    const [line] = receiptLinesFor(order({ goodsMinor: 1000, totalMinor: 1499 }), [
+      { name: 'Ароматна соева свещ с дървен фитил „Зимна приказка“ в стъкло', quantity: 3, lineTotalMinor: 1000 },
+    ])!
+
+    expect(line.description.length).toBeLessThanOrEqual(50)
+    expect(line.description.endsWith(' × 3')).toBe(true)
+  })
+
+  it('travels with the parcel only when there are items to put on it', () => {
+    expect(waybillRequestFor(order(), ITEMS).receipt).toHaveLength(3)
+    expect(waybillRequestFor(order())).not.toHaveProperty('receipt')
   })
 })
 

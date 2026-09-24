@@ -119,6 +119,27 @@ export interface SpeedyConfig {
   serviceId?: () => number | undefined
   /** COD payout arrangement, same lazy reasoning as `credentials`. */
   codProcessing?: () => SpeedyCodProcessing
+  /**
+   * Whether Speedy issues the касов бон for our наложен платеж sales, and in
+   * which VAT group; `null` while it does not. See `SpeedyFiscalReceipt`.
+   */
+  fiscalReceipt?: () => SpeedyFiscalReceipt | null
+}
+
+/**
+ * The Н-18 annex: Speedy registers a наложен платеж sale in its own system and
+ * hands the recipient a системен бон in the shop's name — but only for a
+ * shipment that carries `cod.fiscalReceiptItems`. Without them there is no
+ * receipt, silently, which is why this is either configured or failed, never
+ * skipped.
+ *
+ * `vatGroup` is Speedy's Cyrillic letter: `А` for 0 % (a shop that is not VAT
+ * registered), `Б` for 20 %. `vatRate` is the matching fraction, used to split
+ * each line into the before-VAT amount Speedy also wants.
+ */
+export interface SpeedyFiscalReceipt {
+  vatGroup: string
+  vatRate: number
 }
 
 const COURIER: Courier = 'speedy'
@@ -589,7 +610,8 @@ function waybillRecipientOf(request: WaybillRequest): Record<string, unknown> | 
 /** The наложен платеж block, shared between a quote and a booking. */
 function codOf(
   codAmount: NonNullable<ShipmentQuoteRequest['codAmount']>,
-  processing: SpeedyCodProcessing
+  processing: SpeedyCodProcessing,
+  fiscalReceiptItems?: ReturnType<typeof fiscalItemsOf>
 ) {
   return {
     cod: {
@@ -599,8 +621,41 @@ function codOf(
       // Off, deliberately: see the header. On, Speedy would add its carriage to
       // the amount collected at the door — shipping the customer already paid.
       includeShippingPrice: false,
+      ...(fiscalReceiptItems ? { fiscalReceiptItems } : {}),
     },
   }
+}
+
+/** Speedy's limit on a receipt line's description. */
+const FISCAL_DESCRIPTION_MAX = 50
+
+/**
+ * Our receipt lines in Speedy's shape, or `null` when they cannot be the
+ * receipt for this parcel: none, or not adding up to the amount collected —
+ * Speedy takes the COD amount *from* the items when there are any, so a
+ * mismatch would change what the courier collects.
+ */
+function fiscalItemsOf(
+  request: WaybillRequest,
+  receipt: SpeedyFiscalReceipt
+): { description: string; vatGroup: string; amount: number; amountWithVat: number }[] | null {
+  const lines = request.receipt ?? []
+  const sum = lines.reduce((total, line) => total + line.amount.amountMinor, 0)
+
+  if (!request.codAmount || lines.length === 0 || sum !== request.codAmount.amountMinor) {
+    return null
+  }
+
+  return lines.map((line) => {
+    const withVat = line.amount.amountMinor
+
+    return {
+      description: line.description.slice(0, FISCAL_DESCRIPTION_MAX),
+      vatGroup: receipt.vatGroup,
+      amount: Math.round(withVat / (1 + receipt.vatRate)) / MINOR_PER_MAJOR,
+      amountWithVat: withVat / MINOR_PER_MAJOR,
+    }
+  })
 }
 
 /** Grams to the kilograms Speedy prices on, never zero. */
@@ -820,6 +875,15 @@ export function createSpeedyClient(config: SpeedyConfig): CourierClient {
 
       if (!recipient) return failed('the parcel has no addressable destination')
 
+      // With the Н-18 annex on, a наложен платеж parcel without its receipt is
+      // a sale with no касов бон — refused here rather than booked.
+      const fiscal = request.codAmount ? (config.fiscalReceipt?.() ?? null) : null
+      const fiscalItems = fiscal ? fiscalItemsOf(request, fiscal) : undefined
+
+      if (fiscalItems === null) {
+        return failed('the receipt lines do not add up to the наложен платеж amount')
+      }
+
       const response = await postJson<SpeedyShipmentResponse>({
         url: `${config.baseUrl}/shipment/`,
         body: withCredentials(credentials, {
@@ -829,7 +893,7 @@ export function createSpeedyClient(config: SpeedyConfig): CourierClient {
             serviceId: serviceId(),
             autoAdjustPickupDate: true,
             ...(request.codAmount
-              ? { additionalServices: codOf(request.codAmount, codProcessing()) }
+              ? { additionalServices: codOf(request.codAmount, codProcessing(), fiscalItems) }
               : {}),
           },
           content: {

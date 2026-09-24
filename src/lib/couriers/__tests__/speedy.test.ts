@@ -967,6 +967,87 @@ describe('booking a waybill', () => {
   })
 })
 
+describe('the касов бон on a наложен платеж parcel', () => {
+  const BOOKED = { id: '63751169468', parcels: [{ id: '63751169468', seqNo: 1 }] }
+  const NOT_REGISTERED = () => ({ vatGroup: 'А', vatRate: 0 })
+
+  const WITH_RECEIPT: WaybillRequest = {
+    ...WAYBILL_REQUEST,
+    receipt: [
+      { description: 'Свещ „Смокиня“ × 2', amount: eur(15) },
+      { description: 'Доставка', amount: eur(4.99) },
+    ],
+  }
+
+  it('sends the lines for Speedy to put on the receipt', async () => {
+    respondWith(BOOKED)
+
+    await client({ fiscalReceipt: NOT_REGISTERED }).createWaybill(WITH_RECEIPT)
+
+    expect(sentBody().service.additionalServices.cod.fiscalReceiptItems).toEqual([
+      { description: 'Свещ „Смокиня“ × 2', vatGroup: 'А', amount: 15, amountWithVat: 15 },
+      { description: 'Доставка', vatGroup: 'А', amount: 4.99, amountWithVat: 4.99 },
+    ])
+  })
+
+  it('takes the VAT out of each line once the company is registered', async () => {
+    respondWith(BOOKED)
+
+    await client({ fiscalReceipt: () => ({ vatGroup: 'Б', vatRate: 0.2 }) }).createWaybill(
+      WITH_RECEIPT
+    )
+
+    expect(sentBody().service.additionalServices.cod.fiscalReceiptItems[0]).toEqual({
+      description: 'Свещ „Смокиня“ × 2',
+      vatGroup: 'Б',
+      amount: 12.5,
+      amountWithVat: 15,
+    })
+  })
+
+  it('books nothing when the lines do not add up to the amount collected', async () => {
+    // Speedy takes the COD amount *from* the items, so a mismatch would change
+    // what the courier collects at the door.
+    const result = await client({ fiscalReceipt: NOT_REGISTERED }).createWaybill({
+      ...WITH_RECEIPT,
+      receipt: [{ description: 'Свещ', amount: eur(15) }],
+    })
+
+    expect(result.status).toBe('failed')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('books nothing when the receipt is on but the order has no lines', async () => {
+    const result = await client({ fiscalReceipt: NOT_REGISTERED }).createWaybill(WAYBILL_REQUEST)
+
+    expect(result.status).toBe('failed')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('sends no lines while the contract has no receipt annex', async () => {
+    respondWith(BOOKED)
+
+    await client().createWaybill(WITH_RECEIPT)
+
+    expect(sentBody().service.additionalServices.cod.fiscalReceiptItems).toBeUndefined()
+  })
+
+  it('never sends the lines with a quote', async () => {
+    respondWith(calculation())
+
+    await client({ fiscalReceipt: NOT_REGISTERED }).priceShipment({
+      method: 'office',
+      officeId: '9016',
+      weightGrams: 550,
+      codAmount: eur(19.99),
+    })
+
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(String(init.body)).not.toContain('fiscalReceiptItems')
+    }
+  })
+})
+
 describe('speedyTrackingUrl', () => {
   it('is the public tracking page for the number', () => {
     expect(speedyTrackingUrl('63751169468')).toBe(
