@@ -6,7 +6,13 @@ import { getOrderDetail, refusalHistory, undoEligibility, UNDO_WINDOW_MS } from 
 import { nextStatuses, STATUS_LABELS, statusRequiresReason } from '@/lib/order-status'
 import { formatMoney, money } from '@/lib/money'
 import { defaultBuyerFor, getInvoiceForOrder, invoiceBlocker } from '@/lib/invoices'
-import { labelFromCourier, labelPath, labelPdfUrl, waybillBlocker } from '@/lib/waybills'
+import {
+  labelFromCourier,
+  labelPath,
+  labelPdfUrl,
+  waybillBlocker,
+  waybillCancellable,
+} from '@/lib/waybills'
 import { COURIER_LABELS, type Courier } from '@/lib/shipping'
 import { econtSender, econtShipFrom } from '@/lib/couriers'
 import CopyButton from '@/components/admin/CopyButton'
@@ -26,7 +32,14 @@ import {
   panel,
   Section,
 } from '@/components/admin/ui'
-import { addNote, changeStatus, issueInvoice, issueWaybill, undoStatusChange } from '../../actions'
+import {
+  addNote,
+  cancelWaybill,
+  changeStatus,
+  issueInvoice,
+  issueWaybill,
+  undoStatusChange,
+} from '../../actions'
 
 /**
  * One order: everything needed to pack it, ship it and settle it.
@@ -68,6 +81,11 @@ const notices: Record<string, string> = {
   waybill_busy: 'Товарителницата за тази поръчка се издава в момента. Изчакай и презареди.',
   waybill_blocked: 'Товарителница не може да се издаде за тази поръчка — виж по-долу защо.',
   waybill_confirm: 'Номерът на поръчката не съвпада — товарителница не е издадена.',
+  cancel_confirm: 'Номерът на поръчката не съвпада — товарителницата не е анулирана.',
+  cancel_failed:
+    'Куриерът не анулира товарителницата — най-често защото пратката вече е предадена. Причината е в историята по-долу.',
+  cancel_busy: 'За тази поръчка вече има заявка към куриера. Изчакай и презареди.',
+  cancel_blocked: 'Тази товарителница не може да се анулира оттук.',
   invoice_buyer: 'Фактурата не беше издадена: липсва име на получателя.',
   invoice_blocked: 'Фактура не може да се издаде за тази поръчка — виж по-долу защо.',
   invoice_confirm: 'Номерът на поръчката не съвпада — фактура не е издадена.',
@@ -139,6 +157,7 @@ export default async function AdminOrderPage({
     reverted?: string
     noted?: string
     waybill?: string
+    cancelled?: string
     invoice?: string
   }>
 }) {
@@ -149,7 +168,7 @@ export default async function AdminOrderPage({
   if (!detail) notFound()
 
   const { order, items, events } = detail
-  const { error, changed, reverted, noted, waybill, invoice } = await searchParams
+  const { error, changed, reverted, noted, waybill, cancelled, invoice } = await searchParams
 
   const currency = order.currency as 'EUR'
   const amount = (minor: number) => formatMoney(money(minor, currency), 'bg')
@@ -218,6 +237,12 @@ export default async function AdminOrderPage({
       {waybill && (
         <Notice tone="success">
           Товарителница {waybill} е издадена. Разпечатай етикета и подай пратката на {courierLabel}.
+        </Notice>
+      )}
+
+      {cancelled && (
+        <Notice tone="success">
+          Товарителница {cancelled} е анулирана в {courierLabel}. Поръчката може да получи нова.
         </Notice>
       )}
 
@@ -419,10 +444,21 @@ export default async function AdminOrderPage({
               </div>
             )}
 
-            <p className="text-ink-ghost">
-              Втора товарителница за същата поръчка не се издава оттук. Ако тази е грешна, отмени я
-              в {COURIER_PORTALS[order.courier]}.
-            </p>
+            {waybillCancellable(order) ? (
+              <form action={cancelWaybill} className="space-y-1.5 border-t border-border/60 pt-3">
+                <input type="hidden" name="orderId" value={order.id} />
+                <p>
+                  Грешна е? Анулирай я, докато пратката още не е предадена на {courierLabel} — след
+                  това поръчката може да получи нова товарителница.
+                </p>
+                <ConfirmSubmit expected={order.orderNumber} buttonLabel="Анулирай товарителницата" />
+              </form>
+            ) : (
+              <p className="text-ink-ghost">
+                Втора товарителница за същата поръчка не се издава оттук. Ако тази е грешна, отмени я
+                в {COURIER_PORTALS[order.courier]}.
+              </p>
+            )}
           </div>
         ) : blocker ? (
           <p className="text-xs text-ink-secondary">{blockerText(blocker)}</p>

@@ -194,6 +194,21 @@ const QUOTE_TIMEOUT_MS = 4_000
 const BOOKING_TIMEOUT_MS = 15_000
 const BOOKING_ATTEMPTS = 1
 
+/** Somebody is holding a print dialog open, not a checkout. */
+const LABEL_TIMEOUT_MS = 10_000
+
+/**
+ * `A4` — the label on a quarter of an ordinary sheet, as MySpeedy prints it.
+ * `A6` is the label alone, for a label printer. Both checked on 2026-09-25.
+ */
+const LABEL_PAPER = 'A4'
+
+/** `/print` answers 200 with a JSON error for a parcel it cannot print. */
+const PDF_SIGNATURE = '%PDF'
+
+/** Why a cancellation happened, as Speedy records it. Required by the API. */
+const CANCEL_COMMENT = 'Анулирана от админа на 55candles.com'
+
 // ---------------------------------------------------------------------------
 // Wire types — only the fields we read
 // ---------------------------------------------------------------------------
@@ -964,5 +979,87 @@ export function createSpeedyClient(config: SpeedyConfig): CourierClient {
     async trackShipments() {
       return unconfigured()
     },
+
+    /**
+     * `POST /print` — the same label MySpeedy prints, as bytes.
+     *
+     * The field is `paperSize`, not `paper`: with the wrong one Speedy answers
+     * "Print paper size expected". An unknown parcel is a 200 carrying a JSON
+     * `error`, so only the `%PDF` signature is taken as a label.
+     */
+    async labelPdf(number) {
+      const credentials = config.credentials?.() ?? null
+      if (!credentials) return unconfigured()
+
+      try {
+        const response = await fetch(`${config.baseUrl}/print/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/pdf' },
+          body: JSON.stringify(
+            withCredentials(credentials, {
+              paperSize: LABEL_PAPER,
+              parcels: [{ parcel: { id: number } }],
+            })
+          ),
+          signal: AbortSignal.timeout(LABEL_TIMEOUT_MS),
+          cache: 'no-store',
+        })
+
+        if (!response.ok) return failed(`HTTP ${response.status}`)
+
+        const bytes = await response.arrayBuffer()
+        const head = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, PDF_SIGNATURE.length))
+
+        if (String.fromCharCode(...head) !== PDF_SIGNATURE) {
+          return failed(labelErrorOf(bytes))
+        }
+
+        return { status: 'ok', data: bytes }
+      } catch (error) {
+        return failed(error instanceof Error ? error.message : 'unknown error')
+      }
+    },
+
+    /**
+     * `POST /shipment/cancel`. Only possible before the parcel is handed over;
+     * after that Speedy refuses, and says why.
+     *
+     * **An empty answer is success only because a number was sent.** Speedy
+     * also answers `{}` to a request with no `shipmentId` at all — verified
+     * 2026-09-25 — so the guard below is what makes `{}` mean something.
+     * Not retried: the call has a side effect, and a second attempt after a
+     * lost answer would only be refused as already cancelled.
+     */
+    async cancelWaybill(number) {
+      const credentials = config.credentials?.() ?? null
+      if (!credentials) return unconfigured()
+
+      const shipmentId = number.trim()
+      if (!shipmentId) return failed('no waybill number to cancel')
+
+      const response = await postJson<{ error?: SpeedyError }>({
+        url: `${config.baseUrl}/shipment/cancel/`,
+        body: withCredentials(credentials, { shipmentId, comment: CANCEL_COMMENT }),
+        timeoutMs: BOOKING_TIMEOUT_MS,
+        attempts: BOOKING_ATTEMPTS,
+      })
+
+      if (!response.ok) return failed(response.reason)
+      if (response.data.error) return failed(reasonOf(response.data.error))
+
+      return { status: 'ok', data: null }
+    },
   }
+}
+
+/** Speedy's own wording from a `/print` that did not return a PDF. */
+function labelErrorOf(bytes: ArrayBuffer): string {
+  try {
+    const body = JSON.parse(new TextDecoder().decode(bytes)) as { error?: SpeedyError }
+    if (body.error) return reasonOf(body.error)
+  } catch {
+    // Not JSON either: fall through to the size, which is all there is to say.
+  }
+
+  return `${bytes.byteLength} bytes that are not a PDF`
 }

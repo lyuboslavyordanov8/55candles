@@ -16,7 +16,7 @@ import { advanceOrderStatus, orderNumberOf, revertLastStatusChange } from '@/lib
 import { statusRequiresReason } from '@/lib/order-status'
 import { addOrderNote, NOTE_MAX } from '@/lib/order-notes'
 import { issueInvoiceForOrder, type InvoiceBuyer } from '@/lib/invoices'
-import { issueWaybillForOrder } from '@/lib/waybills'
+import { cancelWaybillForOrder, issueWaybillForOrder } from '@/lib/waybills'
 import { orderStatus, type OrderStatus } from '@/db/schema'
 
 /**
@@ -250,6 +250,37 @@ export async function issueWaybill(formData: FormData): Promise<void> {
   // lose, so it is written to the order's history instead and the page points
   // there. See `issueWaybillForOrder`.
   redirect(`/admin/orders/${orderId}?error=waybill_${result.status}`)
+}
+
+/**
+ * Cancel the order's waybill at the courier — Speedy, before hand-over.
+ *
+ * Type-to-confirm like the booking, because it cannot be undone either: a
+ * cancelled number is gone, and the parcel needs a new one. On success the order
+ * can be booked again from the same page.
+ */
+export async function cancelWaybill(formData: FormData): Promise<void> {
+  await requireAdmin()
+
+  const orderId = String(formData.get('orderId') ?? '')
+  if (!orderId) redirect('/admin')
+
+  if (!(await confirmedOrderNumber(orderId, formData))) {
+    redirect(`/admin/orders/${orderId}?error=cancel_confirm`)
+  }
+
+  const result = await cancelWaybillForOrder(orderId)
+
+  if (result.status === 'missing') redirect('/admin?error=missing')
+
+  revalidatePath(`/admin/orders/${orderId}`)
+  revalidatePath('/admin')
+
+  if (result.status === 'ok') {
+    redirect(`/admin/orders/${orderId}?cancelled=${encodeURIComponent(result.waybillNumber)}`)
+  }
+
+  redirect(`/admin/orders/${orderId}?error=cancel_${result.status}`)
 }
 
 /**

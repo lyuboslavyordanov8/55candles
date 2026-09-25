@@ -1050,6 +1050,56 @@ describe('booking a parcel', () => {
   })
 })
 
+describe('cancelling a waybill', () => {
+  // Answers copied from the demo service, 2026-09-25: a label created and then
+  // deleted, then deleted a second time.
+  const deleted = { results: [{ shipmentNum: '1051604294349', error: null }] }
+  const notFound = {
+    results: [
+      {
+        shipmentNum: '1051604294349',
+        error: { type: 'ExException', message: 'Пратка 1051604294349 не е открита', fields: [] },
+      },
+    ],
+  }
+
+  it('asks deleteLabels for the one number, once, with the credentials', async () => {
+    respondWithQuote(deleted)
+
+    const result = await bookingClient().cancelWaybill!(' 1051604294349 ')
+
+    expect(result).toEqual({ status: 'ok', data: null })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://demo.example/services/Shipments/LabelService.deleteLabels.json')
+    expect(init.headers.Authorization).toMatch(/^Basic /)
+    expect(bodyOf()).toEqual({ shipmentNumbers: ['1051604294349'] })
+  })
+
+  it("fails with Econt's wording when the number is not found", async () => {
+    respondWithQuote(notFound)
+
+    expect(await bookingClient().cancelWaybill!('1051604294349')).toMatchObject({
+      status: 'failed',
+      reason: 'Пратка 1051604294349 не е открита',
+    })
+  })
+
+  it('does not take a 200 with no result for our number as done', async () => {
+    respondWithQuote({ results: [] })
+
+    expect((await bookingClient().cancelWaybill!('1051604294349')).status).toBe('failed')
+  })
+
+  it('asks nothing without credentials or a number', async () => {
+    expect(
+      (await bookingClient({ credentials: () => null }).cancelWaybill!('1051604294349')).status
+    ).toBe('unconfigured')
+    expect((await bookingClient().cancelWaybill!('  ')).status).toBe('failed')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('econtTrackingUrl', () => {
   it('points at the public page, not the API host', async () => {
     // It is stored on the order and sent to the customer, so it has to be a page

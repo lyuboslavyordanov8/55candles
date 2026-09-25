@@ -1048,6 +1048,84 @@ describe('the касов бон on a наложен платеж parcel', () => 
   })
 })
 
+describe('the label', () => {
+  it('asks /print for an A4 sheet by parcel id, with the credentials in the body', async () => {
+    fetchMock.mockImplementation(async () => new Response('%PDF-1.5 …', { status: 200 }))
+
+    const result = await client().labelPdf!('63756228009')
+
+    expect(result.status).toBe('ok')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://api.example/v1/print/')
+    expect(init.method).toBe('POST')
+    expect(sentBody()).toMatchObject({
+      userName: '1996702',
+      password: 'secret',
+      paperSize: 'A4',
+      parcels: [{ parcel: { id: '63756228009' } }],
+    })
+  })
+
+  it("reports Speedy's own error from a 200 that is not a PDF", async () => {
+    // Observed 2026-09-25 for a parcel id that is not ours.
+    respondWith({ error: { message: 'Parcel 11111111111 not found', code: 1 } })
+
+    const result = await client().labelPdf!('11111111111')
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      reason: expect.stringContaining('Parcel 11111111111 not found'),
+    })
+  })
+
+  it('asks nothing without credentials', async () => {
+    expect(await client({ credentials: () => null }).labelPdf!('1')).toEqual({
+      status: 'unconfigured',
+      courier: 'speedy',
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('cancelling a waybill', () => {
+  it('sends the number and a comment, once, and takes an empty answer as done', async () => {
+    respondWith({})
+
+    const result = await client().cancelWaybill!(' 63756228009 ')
+
+    expect(result).toEqual({ status: 'ok', data: null })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.example/v1/shipment/cancel/')
+    expect(sentBody()).toMatchObject({
+      shipmentId: '63756228009',
+      comment: expect.any(String),
+    })
+  })
+
+  it('never sends a request without a number, which Speedy would also answer with {}', async () => {
+    respondWith({})
+
+    expect((await client().cancelWaybill!('  ')).status).toBe('failed')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('fails on a refusal, such as a parcel already handed over', async () => {
+    respondWith({ error: { message: 'Пратката е приета и не може да бъде анулирана' } })
+
+    const result = await client().cancelWaybill!('63756228009')
+
+    expect(result).toMatchObject({ status: 'failed', reason: expect.stringContaining('приета') })
+  })
+
+  it('is not retried after a server error, because the call has a side effect', async () => {
+    respondWith({ message: 'Server Error' }, 503)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    expect((await client().cancelWaybill!('63756228009')).status).toBe('failed')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('speedyTrackingUrl', () => {
   it('is the public tracking page for the number', () => {
     expect(speedyTrackingUrl('63751169468')).toBe(

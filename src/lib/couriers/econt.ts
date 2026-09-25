@@ -1158,5 +1158,66 @@ export function createEcontClient(config: EcontConfig): CourierClient {
 
       return { status: 'ok', data: toTrackingReport(response.data, numbers) }
     },
+
+    /**
+     * `LabelService.deleteLabels`: one result per number, each with its own
+     * `error`. Checked on the demo service on 2026-09-25 — a label created and
+     * deleted answers `error: null`; deleting it again, or a number that is not
+     * ours, answers "Пратка … не е открита" inside a 200.
+     *
+     * So success is **our number in the results with no error**, not the 200:
+     * an empty `results` (what an empty list gets) proves nothing was deleted.
+     */
+    async cancelWaybill(number) {
+      const credentials = config.credentials?.() ?? null
+      if (!credentials) return { status: 'unconfigured', courier: COURIER }
+
+      const shipmentNumber = number.trim()
+      if (!shipmentNumber) {
+        return { status: 'failed', courier: COURIER, reason: 'no waybill number to cancel' }
+      }
+
+      const response = await postJson<EcontDeleteLabelsResponse>({
+        url: `${config.baseUrl}/Shipments/LabelService.deleteLabels.json`,
+        body: { shipmentNumbers: [shipmentNumber] },
+        auth: credentials,
+        timeoutMs: BOOKING_TIMEOUT_MS,
+        attempts: BOOKING_ATTEMPTS,
+      })
+
+      if (!response.ok) {
+        return { status: 'failed', courier: COURIER, reason: response.reason }
+      }
+
+      const result = response.data.results?.find(
+        (entry) => String(entry.shipmentNum ?? '') === shipmentNumber
+      )
+
+      if (!result) {
+        return {
+          status: 'failed',
+          courier: COURIER,
+          reason: 'the courier did not report on this waybill',
+        }
+      }
+
+      if (result.error) {
+        return {
+          status: 'failed',
+          courier: COURIER,
+          reason: result.error.message || result.error.type || 'refused',
+        }
+      }
+
+      return { status: 'ok', data: null }
+    },
   }
+}
+
+/** `LabelService.deleteLabels` — only the fields read. */
+interface EcontDeleteLabelsResponse {
+  results?: {
+    shipmentNum?: string | number
+    error?: { type?: string; message?: string } | null
+  }[]
 }

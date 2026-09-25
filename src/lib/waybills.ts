@@ -355,6 +355,78 @@ export async function issueWaybillForOrder(orderId: string): Promise<WaybillOutc
 }
 
 /**
+ * Whether this order's waybill can be cancelled from the admin — Econt's and
+ * Speedy's can; Pigeon's is cancelled in its own portal.
+ */
+export function waybillCancellable(order: Pick<Order, 'courier' | 'waybillNumber'>): boolean {
+  return Boolean(order.waybillNumber) && Boolean(courierClient(order.courier).cancelWaybill)
+}
+
+export type CancelWaybillOutcome =
+  | { status: 'ok'; waybillNumber: string }
+  | { status: 'missing' }
+  /** No waybill on the order, or a courier this cannot cancel at. */
+  | { status: 'blocked' }
+  | { status: 'busy' }
+  | { status: 'failed'; reason: string }
+
+/**
+ * Cancel the order's waybill at the courier, then forget it here.
+ *
+ * In that order, and only on the courier's word: an order that lost its number
+ * while the parcel still existed at Speedy would be billed, trackable nowhere and
+ * booked a second time. So the number is cleared only after the courier said
+ * "cancelled", and only if it is still the same number — a conditional write, as
+ * in `issueWaybillForOrder`.
+ *
+ * The status is left where it is. A cancelled waybill is not a cancelled order:
+ * the usual reason is a wrong detail, and the next step is a new waybill.
+ */
+export async function cancelWaybillForOrder(orderId: string): Promise<CancelWaybillOutcome> {
+  const db = getDb()
+
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1)
+  if (!order) return { status: 'missing' }
+
+  const number = order.waybillNumber
+  const client = courierClient(order.courier)
+  if (!number || !client.cancelWaybill) return { status: 'blocked' }
+
+  if (inFlight.has(orderId)) return { status: 'busy' }
+  inFlight.add(orderId)
+
+  try {
+    const result = await client.cancelWaybill(number)
+
+    if (result.status !== 'ok') {
+      const reason =
+        result.status === 'failed' ? result.reason : 'the courier is not configured'
+
+      await note(orderId, order.status, {
+        waybillCancelError: reason,
+        attemptedWaybill: number,
+        courier: order.courier,
+      })
+
+      return { status: 'failed', reason }
+    }
+
+    await db
+      .update(orders)
+      .set({ waybillNumber: null, trackingUrl: null, updatedAt: new Date() })
+      .where(and(eq(orders.id, orderId), eq(orders.waybillNumber, number)))
+
+    // `cancelledWaybill`, not `waybillNumber`: the contract page counts booking
+    // events by `waybillNumber` and leaves out any number named here.
+    await note(orderId, order.status, { cancelledWaybill: number, courier: order.courier })
+
+    return { status: 'ok', waybillNumber: number }
+  } finally {
+    inFlight.delete(orderId)
+  }
+}
+
+/**
  * Append a note to an order's history without moving it.
  *
  * `from` and `to` are the same status on purpose: `order_events` is the audit

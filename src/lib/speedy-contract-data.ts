@@ -15,7 +15,9 @@ import { speedyContractReport, type SpeedyContractReport, type SpeedyParcel } fr
  * *when* the waybill was issued and *what Speedy said it costs* — the order only
  * holds what the customer paid. A duplicate booking is logged under
  * `orphanedWaybill`, not `waybillNumber`, so it is not counted twice. Cancelled
- * orders are left out: their waybill is cancelled at Speedy and not billed.
+ * orders are left out: their waybill is cancelled at Speedy and not billed. So
+ * is a waybill cancelled from the admin, which the order's history names under
+ * `cancelledWaybill` (`cancelWaybillForOrder`).
  */
 export async function speedyParcels(): Promise<SpeedyParcel[]> {
   const rows = await getDb()
@@ -31,7 +33,12 @@ export async function speedyParcels(): Promise<SpeedyParcel[]> {
         eq(orders.courier, 'speedy'),
         ne(orders.status, 'cancelled'),
         sql`${orderEvents.detail}->>'source' = 'waybill'`,
-        sql`${orderEvents.detail}->>'waybillNumber' is not null`
+        sql`${orderEvents.detail}->>'waybillNumber' is not null`,
+        sql`not exists (
+          select 1 from ${orderEvents} as cancelled
+          where cancelled.order_id = ${orderEvents.orderId}
+            and cancelled.detail->>'cancelledWaybill' = ${orderEvents.detail}->>'waybillNumber'
+        )`
       )
     )
 

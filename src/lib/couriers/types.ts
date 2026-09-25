@@ -302,4 +302,13 @@ export interface CourierClient {
    * time instead (`Waybill.pdfUrl`), so it has no need of this.
    */
   labelPdf?(number: string): Promise<LookupResult<ArrayBuffer>>
+
+  /**
+   * Cancel a waybill the parcel has not yet been handed over on — Econt, Speedy.
+   *
+   * `ok` means the courier said so. It is the shop's record that changes on the
+   * strength of it (`cancelWaybillForOrder`), so an answer that does not clearly
+   * say "cancelled" is `failed`, and the admin is sent to the courier's portal.
+   */
+  cancelWaybill?(number: string): Promise<LookupResult<null>>
 }
