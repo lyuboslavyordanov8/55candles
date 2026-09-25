@@ -367,6 +367,49 @@ describe('submitCheckout, once orders can be stored', () => {
 
     expect(state.messageKey).toBe('orderPlacedCod')
   })
+
+  it('stores the company a customer wants the фактура made out to', async () => {
+    await submitCheckout(
+      IDLE,
+      formData({
+        wantsInvoice: 'on',
+        invoiceCompany: 'Свещи ЕООД',
+        invoiceEik: '208 907 603',
+        invoiceAddress: 'гр. София, ул. Шипка 1',
+      })
+    )
+
+    expect(vi.mocked(createOrder).mock.calls[0][0].billing).toEqual({
+      company: 'Свещи ЕООД',
+      eik: '208907603',
+      vatNumber: '',
+      address: 'гр. София, ул. Шипка 1',
+      accountable: '',
+    })
+  })
+
+  it('stores no company when the box was not ticked, whatever the fields hold', async () => {
+    await submitCheckout(IDLE, formData({ invoiceCompany: 'Свещи ЕООД' }))
+
+    expect(vi.mocked(createOrder).mock.calls[0][0].billing).toBeNull()
+  })
+
+  it('stores nothing when the ЕИК is wrong, and keeps what was typed', async () => {
+    const state = await submitCheckout(
+      IDLE,
+      formData({
+        wantsInvoice: 'on',
+        invoiceCompany: 'Свещи ЕООД',
+        invoiceEik: '208907604',
+        invoiceAddress: 'гр. София, ул. Шипка 1',
+      })
+    )
+
+    expect(createOrder).not.toHaveBeenCalled()
+    expect(state.status).toBe('invalid')
+    expect(state.fieldErrors).toEqual({ invoiceEik: 'invalid' })
+    expect(state.values?.invoiceCompany).toBe('Свещи ЕООД')
+  })
 })
 
 describe('recording where the delivery price came from', () => {

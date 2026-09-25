@@ -400,6 +400,19 @@ export default async function AdminOrderPage({
                 '— (без имейл, потвърждение не е изпратено)'
               )}
             </DetailRow>
+            {order.invoiceRequested && (
+              <DetailRow label="Фактура на фирма">
+                <span className="block font-medium">{order.invoiceCompany}</span>
+                <span className="block tabular-nums">
+                  ЕИК {order.invoiceEik}
+                  {order.invoiceVatNumber ? ` · ДДС № ${order.invoiceVatNumber}` : ''}
+                </span>
+                <span className="block">{order.invoiceAddress}</span>
+                {order.invoiceAccountable && (
+                  <span className="block">МОЛ: {order.invoiceAccountable}</span>
+                )}
+              </DetailRow>
+            )}
           </dl>
         </Section>
       </div>
@@ -537,17 +550,26 @@ export default async function AdminOrderPage({
             <input type="hidden" name="orderId" value={order.id} />
             <p className="text-xs text-ink-secondary">
               Фактура на {amount(order.totalMinor)} без ДДС (дружеството не е регистрирано по ЗДДС).
-              По подразбиране на физическото лице от поръчката — попълни полетата само ако клиентът
-              иска фактура на фирма.
+              {order.invoiceRequested
+                ? ' Клиентът поиска фактура на фирма при поръчката — полетата са попълнени с данните, които въведе. Провери ги в Търговския регистър преди издаване.'
+                : ' По подразбиране на физическото лице от поръчката — попълни полетата само ако клиентът иска фактура на фирма.'}
             </p>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Field name="buyerName" label="Получател" defaultValue={buyer.name} required />
               <Field name="buyerAddress" label="Адрес" defaultValue={buyer.address ?? ''} />
-              <Field name="buyerCompany" label="Фирма (ако е на фирма)" />
-              <Field name="buyerEik" label="ЕИК / Булстат" />
-              <Field name="buyerVatNumber" label="ДДС № (ако има)" />
-              <Field name="buyerAccountable" label="МОЛ" />
+              <Field
+                name="buyerCompany"
+                label="Фирма (ако е на фирма)"
+                defaultValue={buyer.company ?? ''}
+              />
+              <Field name="buyerEik" label="ЕИК / Булстат" defaultValue={buyer.eik ?? ''} />
+              <Field
+                name="buyerVatNumber"
+                label="ДДС № (ако има)"
+                defaultValue={buyer.vatNumber ?? ''}
+              />
+              <Field name="buyerAccountable" label="МОЛ" defaultValue={buyer.accountable ?? ''} />
             </div>
 
             <ConfirmSubmit expected={order.orderNumber} buttonLabel="Издай фактура" />

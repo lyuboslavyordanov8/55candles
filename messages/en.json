@@ -488,6 +488,11 @@
     "recipient": "Recipient",
     "delivery": "Delivery",
     "payment": "Payment",
+    "invoice": {
+      "legend": "Invoice",
+      "toggle": "I need an invoice for a company",
+      "hint": "We issue it after the order and send it to you. The parcel still goes to the recipient above."
+    },
     "optional": "(optional)",
     "submit": "Calculate the final price",
     "confirm": "Confirm the order",
@@ -507,7 +512,12 @@
       "street": "Street, number and any block details",
       "officeId": "Office or locker",
       "note": "Note for the courier",
-      "promoCode": "Promo code"
+      "promoCode": "Promo code",
+      "invoiceCompany": "Company name",
+      "invoiceEik": "EIK / Bulstat",
+      "invoiceAddress": "Registered address",
+      "invoiceVatNumber": "VAT number",
+      "invoiceAccountable": "Responsible person (MOL)"
     },
     "courier": {
       "econt": "Econt",
@@ -602,6 +612,24 @@
       },
       "note": {
         "tooLong": "Please shorten the note."
+      },
+      "invoiceCompany": {
+        "required": "Please enter the company name.",
+        "tooLong": "That company name is too long."
+      },
+      "invoiceEik": {
+        "required": "Please enter the company's EIK.",
+        "invalid": "That EIK is not valid — check the digits (9 or 13)."
+      },
+      "invoiceAddress": {
+        "required": "Please enter the registered address.",
+        "tooLong": "That address is too long."
+      },
+      "invoiceVatNumber": {
+        "invalid": "A VAT number is BG followed by 9 or 10 digits."
+      },
+      "invoiceAccountable": {
+        "tooLong": "That name is too long."
       }
     },
     "message": {

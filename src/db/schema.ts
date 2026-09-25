@@ -174,6 +174,24 @@ export const orders = pgTable(
     officeName: text('office_name').notNull().default(''),
     officeAddress: text('office_address').notNull().default(''),
 
+    // --- Invoice to a company, asked for at checkout ---
+    /**
+     * The customer ticked "invoice to a company" and gave the details below.
+     *
+     * A request, not an invoice: nothing is issued at checkout (see
+     * `src/lib/billing-schema.ts`). These prefill the admin's invoice form, and
+     * the фактура itself keeps its own snapshot of the buyer when it is issued,
+     * so correcting a column here never changes an issued document.
+     */
+    invoiceRequested: boolean('invoice_requested').notNull().default(false),
+    invoiceCompany: text('invoice_company').notNull().default(''),
+    /** ЕИК/Булстат, checksum-verified at checkout. */
+    invoiceEik: text('invoice_eik').notNull().default(''),
+    invoiceVatNumber: text('invoice_vat_number').notNull().default(''),
+    /** The registered address, which is not the delivery address. */
+    invoiceAddress: text('invoice_address').notNull().default(''),
+    invoiceAccountable: text('invoice_accountable').notNull().default(''),
+
     // --- Money, all integer minor units ---
     currency: text('currency').notNull().default('EUR'),
     goodsMinor: integer('goods_minor').notNull(),

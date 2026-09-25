@@ -243,6 +243,16 @@ export default function DeliveryForm({
   const [edited, setEdited] = useState(false)
 
   /**
+   * Whether the customer wants a фактура made out to a company.
+   *
+   * Kept in state and fed back as `defaultChecked`, for the reason the courier
+   * radios are: React resets the form when the action returns, and a controlled
+   * checkbox would come back unticked while its fields were still showing. The
+   * company fields themselves are ordinary `Field`s restored from the echo.
+   */
+  const [wantsInvoice, setWantsInvoice] = useState(false)
+
+  /**
    * Reset on every answer from the server, which is by definition a price for the
    * form as it was just submitted.
    *
@@ -727,6 +737,43 @@ export default function DeliveryForm({
             className={`${inputClass} resize-none`}
           />
         </div>
+      </fieldset>
+
+      {/*
+        A фактура to a company — off by default, because most orders are a person
+        buying a candle and should never see an ЕИК field.
+
+        Only rendered while ticked, so an unticked box submits no company fields
+        at all; the server ignores them anyway unless `wantsInvoice` is sent. The
+        invoice is not issued here: the details are stored with the order and
+        fill the shop's invoice form (`src/lib/billing-schema.ts`).
+      */}
+      <fieldset className="space-y-4">
+        <legend className="sr-only">{t('invoice.legend')}</legend>
+        <label className="flex cursor-pointer items-start gap-3 text-sm text-charcoal">
+          <input
+            type="checkbox"
+            name="wantsInvoice"
+            value="on"
+            defaultChecked={wantsInvoice}
+            onChange={(event) => setWantsInvoice(event.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            {t('invoice.toggle')}
+            <span className="block text-xs text-ink-ghost">{t('invoice.hint')}</span>
+          </span>
+        </label>
+
+        {wantsInvoice && (
+          <div className="space-y-4">
+            <Field {...fieldProps('invoiceCompany')} autoComplete="organization" />
+            <Field {...fieldProps('invoiceEik')} inputMode="numeric" />
+            <Field {...fieldProps('invoiceAddress')} />
+            <Field {...fieldProps('invoiceVatNumber')} required={false} />
+            <Field {...fieldProps('invoiceAccountable')} required={false} />
+          </div>
+        )}
       </fieldset>
 
       {/*

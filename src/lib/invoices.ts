@@ -114,8 +114,26 @@ export interface InvoiceBuyer {
   address?: string
 }
 
-/** The buyer as the order knows them: a person at the delivery address. */
+/**
+ * The buyer as the order knows them.
+ *
+ * A person at the delivery address — unless the customer asked at checkout for a
+ * фактура to a company, in which case the company they typed, with its
+ * registered address rather than wherever the parcel went. The person stays as
+ * the name: the document prints them as the contact beside the company.
+ */
 export function defaultBuyerFor(order: Order): InvoiceBuyer {
+  if (order.invoiceRequested) {
+    return {
+      name: order.recipientName,
+      company: order.invoiceCompany,
+      eik: order.invoiceEik,
+      ...(order.invoiceVatNumber ? { vatNumber: order.invoiceVatNumber } : {}),
+      ...(order.invoiceAccountable ? { accountable: order.invoiceAccountable } : {}),
+      address: order.invoiceAddress,
+    }
+  }
+
   const place =
     order.deliveryMethod === 'door'
       ? [order.street, `${order.postCode} ${order.city}`.trim()]

@@ -219,3 +219,44 @@ describe('buildShopOrderEmail', () => {
     expect(buildCustomerOrderEmail(data()).replyTo).toBeUndefined()
   })
 })
+
+describe('a company invoice in the order emails', () => {
+  const billing = {
+    company: 'Свещи <ЕООД>',
+    eik: '208907603',
+    vatNumber: 'BG208907603',
+    address: 'гр. София, ул. Шипка 1',
+    accountable: 'Иван Петров',
+  }
+
+  it('gives the shop everything the фактура prints', () => {
+    const text = buildShopOrderEmail(data({ billing }), 'orders@example.com').text
+
+    expect(text).toContain('Фактура на фирма:')
+    expect(text).toContain('Свещи <ЕООД>')
+    expect(text).toContain('ЕИК 208907603 · ДДС № BG208907603')
+    expect(text).toContain('гр. София, ул. Шипка 1')
+    expect(text).toContain('МОЛ: Иван Петров')
+  })
+
+  it('tells the customer an invoice is coming, in their language', () => {
+    expect(buildCustomerOrderEmail(data({ billing })).text).toContain(
+      'Ще издадем фактура на Свещи <ЕООД>, ЕИК 208907603'
+    )
+    expect(buildCustomerOrderEmail(data({ billing, locale: 'en' })).text).toContain(
+      'We will issue an invoice to Свещи <ЕООД>, EIK 208907603'
+    )
+  })
+
+  it('escapes the company name in the HTML part', () => {
+    const html = buildCustomerOrderEmail(data({ billing })).html ?? ''
+
+    expect(html).toContain('Свещи &lt;ЕООД&gt;')
+    expect(html).not.toContain('Свещи <ЕООД>')
+  })
+
+  it('says nothing about an invoice when none was asked for', () => {
+    expect(buildShopOrderEmail(data(), 'orders@example.com').text).not.toContain('Фактура')
+    expect(buildCustomerOrderEmail(data()).text).not.toContain('фактура')
+  })
+})

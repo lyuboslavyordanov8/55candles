@@ -4,6 +4,12 @@ import { headers } from 'next/headers'
 import { createRateLimiter } from '@/lib/rate-limit'
 import { CHECKOUT_MAX_PER_WINDOW, CHECKOUT_WINDOW_MS } from './rate-limit-config'
 import { validateDelivery, type DeliveryDetails, type FieldErrors } from '@/lib/delivery-schema'
+import {
+  validateBilling,
+  type BillingDetails,
+  type BillingErrors,
+  type BillingField,
+} from '@/lib/billing-schema'
 import { calculateTotal, priceCart, type AppliedDiscount, type CartLine } from '@/lib/order-total'
 import { evaluatePromoCode, PROMO_CODE_MAX, type PromoOutcome } from '@/lib/promo'
 import { resolveDeliveryRate } from '@/lib/shipping-rates'
@@ -101,7 +107,14 @@ async function clientKey(): Promise<string> {
  * own; these are plain uncontrolled inputs, and React clears those when an
  * action completes unless it is handed something to restore them to.
  */
-export type EchoedField = 'recipientName' | 'phone' | 'email' | 'street' | 'officeId' | 'note'
+export type EchoedField =
+  | 'recipientName'
+  | 'phone'
+  | 'email'
+  | 'street'
+  | 'officeId'
+  | 'note'
+  | BillingField
 
 /**
  * Hard ceiling on an echoed value, in characters.
@@ -141,7 +154,7 @@ export interface CheckoutState {
     /** Prices or courier tariffs are not configured yet (B-03, Q-22). */
     | 'unconfigured'
     | 'error'
-  fieldErrors?: FieldErrors
+  fieldErrors?: FieldErrors & BillingErrors
   /**
    * What was submitted, sent straight back so the form can put it in the boxes
    * again. Present on every outcome: one wrong field must not cost the customer
@@ -220,17 +233,20 @@ export async function submitCheckout(
   const raw = Object.fromEntries(formData) as Record<string, unknown>
 
   const delivery = validateDelivery(raw)
+  // Checked with the delivery, not after it, so a customer with a wrong street
+  // and a mistyped ЕИК hears about both at once.
+  const billing = validateBilling(raw)
 
   // Attached to every return below, including the successful one. Built from the
   // validated values rather than `raw`, so what comes back is trimmed and the
   // phone number is in its canonical form.
-  const values = echo(delivery.value)
+  const values = echo(delivery.value, billing.value)
 
-  if (!delivery.valid) {
+  if (!delivery.valid || !billing.valid) {
     return {
       status: 'invalid',
       values,
-      fieldErrors: delivery.errors,
+      fieldErrors: { ...delivery.errors, ...billing.errors },
       messageKey: 'fixTheFields',
     }
   }
@@ -391,6 +407,7 @@ export async function submitCheckout(
       delivery: delivery.value,
       office: office.snapshot,
       officeVerified: office.verified,
+      billing: billing.value,
       paymentMethod: PAYMENT_METHOD,
       total,
       rateSource: rate.source,
@@ -430,6 +447,7 @@ export async function submitCheckout(
       delivery: delivery.value,
       office: office.snapshot,
       officeVerified: office.verified,
+      billing: billing.value,
       total,
     })
   }
@@ -512,7 +530,10 @@ function appliedDiscount(outcome: PromoOutcome): AppliedDiscount | undefined {
  * form fall back to its own default, which is what "the customer left this
  * blank" should mean, and it keeps the payload to the fields actually filled in.
  */
-function echo(delivery: DeliveryDetails): Partial<Record<EchoedField, string>> {
+function echo(
+  delivery: DeliveryDetails,
+  billing: BillingDetails | null
+): Partial<Record<EchoedField, string>> {
   const submitted: Record<EchoedField, string> = {
     recipientName: delivery.recipientName,
     phone: delivery.phone,
@@ -520,6 +541,11 @@ function echo(delivery: DeliveryDetails): Partial<Record<EchoedField, string>> {
     street: delivery.street,
     officeId: delivery.officeId,
     note: delivery.note,
+    invoiceCompany: billing?.company ?? '',
+    invoiceEik: billing?.eik ?? '',
+    invoiceVatNumber: billing?.vatNumber ?? '',
+    invoiceAddress: billing?.address ?? '',
+    invoiceAccountable: billing?.accountable ?? '',
   }
 
   const values: Partial<Record<EchoedField, string>> = {}

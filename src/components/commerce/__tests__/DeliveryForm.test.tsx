@@ -305,6 +305,29 @@ describe('DeliveryForm', () => {
     expect(screen.getByLabelText(/email address/i)).not.toBeRequired()
   })
 
+  describe('an invoice to a company', () => {
+    it('asks for no company details until the customer wants an invoice', () => {
+      renderForm()
+
+      expect(screen.getByLabelText(/invoice for a company/i)).not.toBeChecked()
+      expect(screen.queryByLabelText(/company name/i)).not.toBeInTheDocument()
+      expect(checkoutForm().querySelector('[name^="invoice"]')).toBeNull()
+    })
+
+    it('asks for the company, its EIK and registered address once ticked', async () => {
+      renderForm()
+
+      await userEvent.click(screen.getByLabelText(/invoice for a company/i))
+
+      expect(screen.getByLabelText(/company name/i)).toBeRequired()
+      expect(screen.getByLabelText(/eik/i)).toBeRequired()
+      expect(screen.getByLabelText(/registered address/i)).toBeRequired()
+      expect(screen.getByLabelText(/vat number/i)).not.toBeRequired()
+      expect(screen.getByLabelText(/responsible person/i)).not.toBeRequired()
+      expect(new FormData(checkoutForm()).get('wantsInvoice')).toBe('on')
+    })
+  })
+
   it('starts on the courier it can actually book, and offers all three delivery methods', () => {
     renderForm()
 

@@ -4,6 +4,7 @@ import { formatMoney } from '@/lib/money'
 import { defaultLocale, isLocale, type Locale } from '@/i18n/locales'
 import type { OrderTotal } from '@/lib/order-total'
 import type { DeliveryDetails } from '@/lib/delivery-schema'
+import type { BillingDetails } from '@/lib/billing-schema'
 import type { OutboundEmail } from '@/lib/mailer'
 
 /**
@@ -50,6 +51,8 @@ export interface OrderEmailData {
    * it would mean nothing to the customer.
    */
   officeVerified?: boolean
+  /** The company the customer asked the фактура to be made out to, if any. */
+  billing?: BillingDetails | null
 }
 
 const copy = {
@@ -77,6 +80,9 @@ const copy = {
     paymentBody: (amount: string) =>
       `Плащаш на куриера при получаване (наложен платеж) — ${amount}. ` +
       'Приготви сумата в брой или провери дали куриерът приема карта.',
+    invoiceHeading: 'Фактура',
+    invoiceBody: (company: string, eik: string) =>
+      `Ще издадем фактура на ${company}, ЕИК ${eik}, и ще ти я изпратим след поръчката.`,
     nextHeading: 'Какво следва',
     nextBody:
       'Ще получиш съобщение с номера за проследяване, когато пратката тръгне. ' +
@@ -108,6 +114,9 @@ const copy = {
     paymentBody: (amount: string) =>
       `You pay the courier on delivery (cash on delivery) — ${amount}. ` +
       'Please have the amount in cash, or check whether your courier takes a card.',
+    invoiceHeading: 'Invoice',
+    invoiceBody: (company: string, eik: string) =>
+      `We will issue an invoice to ${company}, EIK ${eik}, and send it to you after the order.`,
     nextHeading: 'What happens next',
     nextBody:
       'We will send you the tracking number once the parcel is on its way. ' +
@@ -248,6 +257,9 @@ export function buildCustomerOrderEmail(
     '',
     `${t.paymentHeading}: ${t.paymentBody(formatMoney(data.total.total, locale))}`,
     '',
+    ...(data.billing
+      ? [`${t.invoiceHeading}: ${t.invoiceBody(data.billing.company, data.billing.eik)}`, '']
+      : []),
     `${t.nextHeading}: ${t.nextBody}`,
     '',
     t.footerContact(contactChannel()),
@@ -300,6 +312,7 @@ export function buildShopOrderEmail(
     `  ${delivery.email || '(без имейл)'}`,
     ...(delivery.note ? [`  Бележка: ${delivery.note}`] : []),
     '',
+    ...(data.billing ? [...billingLines(data.billing), ''] : []),
     'Плащане: наложен платеж — куриерът събира ' + formatMoney(total.total, locale),
   ].join('\n')
 
@@ -311,6 +324,20 @@ export function buildShopOrderEmail(
     ...(delivery.email ? { replyTo: delivery.email } : {}),
     text,
   }
+}
+
+/**
+ * The company block of the shop's copy: everything the фактура prints, so it can
+ * be checked against the register before the invoice is issued in the admin.
+ */
+function billingLines(billing: BillingDetails): string[] {
+  return [
+    'Фактура на фирма:',
+    `  ${billing.company}`,
+    `  ЕИК ${billing.eik}${billing.vatNumber ? ` · ДДС № ${billing.vatNumber}` : ''}`,
+    `  ${billing.address}`,
+    ...(billing.accountable ? [`  МОЛ: ${billing.accountable}`] : []),
+  ]
 }
 
 // ---------------------------------------------------------------------------
@@ -397,7 +424,16 @@ ${data.delivery.note ? `<br>${escapeHtml(`${t.note}: ${data.delivery.note}`)}` :
 <p style="margin:0;font-size:14px;line-height:1.7;">${escapeHtml(
     t.paymentBody(formatMoney(data.total.total, locale))
   )}</p>
-
+${
+  data.billing
+    ? `
+<h2 style="margin:24px 0 8px;font-size:15px;">${escapeHtml(t.invoiceHeading)}</h2>
+<p style="margin:0;font-size:14px;line-height:1.7;">${escapeHtml(
+        t.invoiceBody(data.billing.company, data.billing.eik)
+      )}</p>
+`
+    : ''
+}
 <h2 style="margin:24px 0 8px;font-size:15px;">${escapeHtml(t.nextHeading)}</h2>
 <p style="margin:0;font-size:14px;line-height:1.7;">${escapeHtml(t.nextBody)}</p>
 

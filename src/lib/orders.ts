@@ -7,6 +7,7 @@ import { getDb } from '@/db'
 import { orderEvents, orderItems, orders, type OrderStatus } from '@/db/schema'
 import { isDatabaseConfigured } from '@/lib/env'
 import { products } from '@/data/products'
+import type { BillingDetails } from './billing-schema'
 import type { DeliveryDetails } from './delivery-schema'
 import type { OrderTotal } from './order-total'
 import type { PaymentMethod } from './payments'
@@ -55,6 +56,11 @@ export interface OrderDraft {
   office?: { name: string; address: string }
   /** True when a courier confirmed the office code, rather than us echoing it. */
   officeVerified?: boolean
+  /**
+   * The company to invoice, when the customer asked for a фактура — validated
+   * by `validateBilling`. Absent or null for an ordinary order.
+   */
+  billing?: BillingDetails | null
   /**
    * Where the delivery charge came from: `'courier'` when the courier priced this
    * parcel from its contracted tariff, `'placeholder'` when the stand-in card in
@@ -214,6 +220,17 @@ export async function createOrder(draft: OrderDraft): Promise<PlacedOrder> {
     officeName: draft.office?.name ?? '',
     officeAddress: draft.office?.address ?? '',
 
+    ...(draft.billing
+      ? {
+          invoiceRequested: true,
+          invoiceCompany: draft.billing.company,
+          invoiceEik: draft.billing.eik,
+          invoiceVatNumber: draft.billing.vatNumber,
+          invoiceAddress: draft.billing.address,
+          invoiceAccountable: draft.billing.accountable,
+        }
+      : {}),
+
     currency: total.total.currency,
     goodsMinor: total.goods.amountMinor,
     discountMinor: total.discount?.amountMinor ?? 0,
@@ -267,6 +284,7 @@ export async function createOrder(draft: OrderDraft): Promise<PlacedOrder> {
           // on trust because the courier could not be reached. Read this before
           // printing a waybill.
           officeVerified: draft.officeVerified ?? false,
+          ...(draft.billing ? { invoiceRequested: true } : {}),
           // Whether the shipping figure above is the courier's own price or the
           // stand-in card's.
           rateSource: draft.rateSource ?? 'placeholder',

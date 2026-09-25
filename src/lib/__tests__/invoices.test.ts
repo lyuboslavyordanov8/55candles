@@ -46,6 +46,12 @@ const PLACED: Order = {
   officeId: '4015',
   officeName: 'Пловдив Кършияка',
   officeAddress: 'бул. Дунав 5',
+  invoiceRequested: false,
+  invoiceCompany: '',
+  invoiceEik: '',
+  invoiceVatNumber: '',
+  invoiceAddress: '',
+  invoiceAccountable: '',
   currency: 'EUR',
   goodsMinor: 1500,
   discountMinor: 0,
@@ -415,5 +421,40 @@ describe('readSnapshot', () => {
 describe('snapshotCurrency', () => {
   it('is the currency the invoice was issued in', () => {
     expect(snapshotCurrency(snapshot())).toBe('EUR')
+  })
+})
+
+describe('defaultBuyerFor, when the customer asked for a company invoice', () => {
+  const company = order({
+    invoiceRequested: true,
+    invoiceCompany: 'Свещи ЕООД',
+    invoiceEik: '208907603',
+    invoiceVatNumber: 'BG208907603',
+    invoiceAddress: 'гр. София, ул. Шипка 1',
+    invoiceAccountable: 'Иван Петров',
+  })
+
+  it('fills in the company exactly as the customer typed it', () => {
+    expect(defaultBuyerFor(company)).toEqual({
+      name: 'Мария Иванова',
+      company: 'Свещи ЕООД',
+      eik: '208907603',
+      vatNumber: 'BG208907603',
+      accountable: 'Иван Петров',
+      address: 'гр. София, ул. Шипка 1',
+    })
+  })
+
+  it('leaves out the optional details the customer left blank', () => {
+    const buyer = defaultBuyerFor(order({ ...company, invoiceVatNumber: '', invoiceAccountable: '' }))
+
+    expect(buyer).not.toHaveProperty('vatNumber')
+    expect(buyer).not.toHaveProperty('accountable')
+  })
+
+  it('ignores stale company columns on an order that did not ask', () => {
+    expect(defaultBuyerFor(order({ ...company, invoiceRequested: false }))).not.toHaveProperty(
+      'company'
+    )
   })
 })
