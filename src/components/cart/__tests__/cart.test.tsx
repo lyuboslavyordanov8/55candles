@@ -7,6 +7,7 @@ import { CartProvider } from '../CartProvider'
 import CartButton from '../CartButton'
 import CartDrawer from '../CartDrawer'
 import AddToCartButton from '../AddToCartButton'
+import { products } from '@/data/products'
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/en' }))
 vi.mock('next/image', () => ({
@@ -195,16 +196,22 @@ describe('cart', () => {
   })
 
   it('drops a stored product that can no longer be bought', async () => {
-    // Winter Wonderland is out of season, so it is not orderable even though it
-    // is priced. A cart left over from when it was must not resurrect it.
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify([{ slug: 'winter-wonderland', quantity: 1 }, { slug: 'cherry', quantity: 2 }])
-    )
+    // Out of season, Winter Wonderland is not orderable even though it is
+    // priced. A cart left over from its season must not resurrect it.
+    const winter = products.find((p) => p.slug === 'winter-wonderland')!
+    winter.seasonal = { active: false }
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify([{ slug: 'winter-wonderland', quantity: 1 }, { slug: 'cherry', quantity: 2 }])
+      )
 
-    renderShop()
+      renderShop()
 
-    expect(await screen.findByRole('button', { name: /cart, 2 items/i })).toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: /cart, 2 items/i })).toBeInTheDocument()
+    } finally {
+      winter.seasonal = { active: true }
+    }
   })
 
   it('ignores corrupt stored data instead of crashing', async () => {

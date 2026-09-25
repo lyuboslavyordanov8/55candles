@@ -36,7 +36,8 @@ export interface ProductPricing {
 }
 
 /**
- * Owner's price as of 2026-08-06, applied uniformly. Real, not a placeholder —
+ * Owner's price as of 2026-08-06 for the year-round range (the winter edition
+ * has its own). Real, not a placeholder —
  * but "the same for every scent" is itself a decision worth revisiting once the
  * seasonal and larger formats exist.
  */
@@ -79,9 +80,9 @@ export const pricing: Partial<Record<string, ProductPricing>> = {
   strawberry: { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
   vanilla: { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
   'espresso-martini': { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
-  // Priced like the rest, but still unpurchasable: it is out of season, and
-  // `isPurchasable` checks that independently of pricing.
-  'winter-wonderland': { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
+  // The owner's price for the winter edition (2026-09-25). Only buyable while
+  // in season — `isPurchasable` checks that independently of pricing.
+  'winter-wonderland': { price: eur(22), packedWeightGrams: CANDLE_WEIGHT_GRAMS },
 }
 
 /** Referenced so the `eur` import documents the intended authoring style. */

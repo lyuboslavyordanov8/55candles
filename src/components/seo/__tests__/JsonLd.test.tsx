@@ -107,14 +107,19 @@ describe('ProductJsonLd', () => {
   })
 
   it('reports OutOfStock, not InStock, for a priced but out-of-season product', () => {
-    // winter-wonderland has a price but isPurchasable() is false — the season
-    // check, not the pricing table, is what must decide this.
-    const { container } = render(
-      <ProductJsonLd locale="en" product={winterWonderland} description="A winter candle." />
-    )
-    const [data] = parseScripts(container)
+    // winter-wonderland keeps its price out of season, when isPurchasable() is
+    // false — the season check, not the pricing table, is what must decide this.
+    winterWonderland.seasonal = { active: false }
+    try {
+      const { container } = render(
+        <ProductJsonLd locale="en" product={winterWonderland} description="A winter candle." />
+      )
+      const [data] = parseScripts(container)
 
-    expect(data.offers.availability).toBe('https://schema.org/OutOfStock')
+      expect(data.offers.availability).toBe('https://schema.org/OutOfStock')
+    } finally {
+      winterWonderland.seasonal = { active: true }
+    }
   })
 
   it('omits offers entirely for a product with no price, rather than inventing one', () => {

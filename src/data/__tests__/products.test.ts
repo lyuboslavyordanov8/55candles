@@ -81,15 +81,18 @@ describe('products', () => {
       }
     })
 
-    // The grid is three across, so five is the count the "fifth card alone on
-    // the second row" layout was built for. Changing it is fine — but it is a
-    // layout decision, not a data one, so make it deliberately.
-    it('holds five candles', () => {
-      expect(HOMEPAGE_PRODUCT_SLUGS).toHaveLength(5)
+    // The grid is three across, so six fills two rows exactly — the winter
+    // edition made it six. Changing it is fine — but it is a layout decision,
+    // not a data one, so make it deliberately.
+    it('holds six candles', () => {
+      expect(HOMEPAGE_PRODUCT_SLUGS).toHaveLength(6)
     })
 
-    it('gives every homepage card a rating to show', () => {
+    // A new candle has no reviews yet and shows no stars rather than invented
+    // ones; what is never fine is a rating without a count, or one off the scale.
+    it('gives every rated homepage card a sensible rating and a count', () => {
       for (const p of homepageProducts()) {
+        if (p.rating === undefined && p.reviewCount === undefined) continue
         expect(typeof p.rating, `${p.slug} has no rating`).toBe('number')
         expect(typeof p.reviewCount, `${p.slug} has no review count`).toBe('number')
         expect(p.rating!).toBeGreaterThan(0)

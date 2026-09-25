@@ -68,7 +68,7 @@ export type Product = {
    *
    * Rendered on a pastel chip — never a dark or black one.
    */
-  badge?: 'new' | 'bestseller'
+  badge?: 'new' | 'bestseller' | 'winter'
 
   /**
    * Price deliberately does NOT live here.
@@ -103,10 +103,9 @@ export type Product = {
    * ordered list and cannot accidentally show the primary image twice.
    *
    * A product with none of these renders a single static image: the gallery
-   * hides its own controls rather than showing a strip of one thumbnail —
-   * Winter Wonderland at present, until it is photographed. The rest carry three studio shots of the closed tin (front,
-   * side, tilted), square-cropped from the 2026-09 shoot; the primary image
-   * stays the lit-candle illustration.
+   * hides its own controls rather than showing a strip of one thumbnail. Every
+   * candle has some today: studio shots of the closed tin, square-cropped from
+   * the 2026-09 shoot, after the lit-candle primary image.
    */
   extraImages?: string[]
 }

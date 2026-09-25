@@ -79,8 +79,13 @@ describe('ProductCard', () => {
   })
 
   it('shows out-of-season overlay when seasonal product is inactive', () => {
-    renderCard(winter) // winter.seasonal.active = false
+    renderCard({ ...winter, seasonal: { active: false } })
     expect(screen.getByText(/seasonal/i)).toBeInTheDocument()
+  })
+
+  it('shows no overlay on a seasonal product while it is in season', () => {
+    renderCard({ ...winter, seasonal: { active: true } })
+    expect(screen.queryByText(/out of season/i)).not.toBeInTheDocument()
   })
 
   it('does not show seasonal overlay for a year-round product', () => {

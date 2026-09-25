@@ -176,11 +176,20 @@ export const products: Product[] = [
 
     emoji: '❄️',
 
-    seasonal: { active: false },
+    // In season: on sale for the winter. Set `active: false` when it ends — the
+    // card then shows its out-of-season overlay and checkout refuses it.
+    seasonal: { active: true },
+    badge: 'winter',
 
     imagePath: '/images/products/winter-wonderland.webp',
-    imageWidth: 1200,
-    imageHeight: 1200,
+    imageWidth: 1087,
+    imageHeight: 1087,
+    extraImages: [
+      '/images/products/winter-wonderland-front.webp',
+      '/images/products/winter-wonderland-back.webp',
+      '/images/products/winter-wonderland-tilted.webp',
+      '/images/products/winter-wonderland-top.webp',
+    ],
   },
 ]
 
@@ -205,14 +214,16 @@ export function productImages(product: Product): string[] {
  *
  * **This is the list to edit to change the homepage grid.** It is deliberately
  * separate from `products`: the catalogue holds everything we sell, this holds
- * the five we lead with. Winter Wonderland is absent because it is out of
- * season — it still appears on `/products` with its seasonal overlay.
+ * the ones we lead with. Winter Wonderland leads while it is in season; take
+ * it out of this list when its season ends, or the homepage shows a candle
+ * nobody can buy (`products.test.ts` fails if you forget).
  *
  * Note these are slugs, not display names. The slugs are load-bearing: they key
  * `pricing.ts`, the cart URL parameters and the product routes, so renaming a
  * candle means editing its `name` above, never its `slug`.
  */
 export const HOMEPAGE_PRODUCT_SLUGS = [
+  'winter-wonderland',
   'vanilla',
   'orange',
   'strawberry',

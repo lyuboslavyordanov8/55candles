@@ -84,9 +84,9 @@ describe('HomePage', () => {
     expect(cardHrefs).toEqual(HOMEPAGE_PRODUCT_SLUGS.map((slug) => `/en/products/${slug}`))
   })
 
-  it('does not show the out-of-season candle on the homepage', async () => {
+  it('leads with the winter edition while it is in season', async () => {
     await renderPage()
-    expect(screen.queryByText('Winter Wonderland')).not.toBeInTheDocument()
+    expect(screen.getByText('Winter Wonderland')).toBeInTheDocument()
   })
 
   /*

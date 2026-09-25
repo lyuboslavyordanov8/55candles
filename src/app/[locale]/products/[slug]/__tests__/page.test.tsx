@@ -81,17 +81,31 @@ describe('ProductDetailPage', () => {
   })
 
   it('omits the picker for a product with a single photo', async () => {
-    await renderPage('winter-wonderland')
-    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    // Every candle is photographed now, so one is made single-photo here.
+    const cherry = products.find((p) => p.slug === 'cherry')!
+    const extras = cherry.extraImages
+    cherry.extraImages = undefined
+    try {
+      await renderPage('cherry')
+      expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    } finally {
+      cherry.extraImages = extras
+    }
   })
 
   it('keeps an out-of-season product unbuyable, priced or not', async () => {
-    // winter-wonderland has a price, so only the season stops it. A link here
-    // would lead to a checkout that refuses the order.
-    await renderPage('winter-wonderland')
+    // winter-wonderland keeps its price out of season, so only the season stops
+    // it. A link here would lead to a checkout that refuses the order.
+    const winter = products.find((p) => p.slug === 'winter-wonderland')!
+    winter.seasonal = { active: false }
+    try {
+      await renderPage('winter-wonderland')
 
-    expect(screen.queryByRole('link', { name: /order now/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /not available yet/i })).toBeDisabled()
+      expect(screen.queryByRole('link', { name: /order now/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /not available yet/i })).toBeDisabled()
+    } finally {
+      winter.seasonal = { active: true }
+    }
   })
 
   it('calls notFound for unknown slug', async () => {

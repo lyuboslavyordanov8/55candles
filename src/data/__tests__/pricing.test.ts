@@ -23,14 +23,18 @@ afterEach(() => {
 })
 
 describe('pricing table', () => {
-  it("prices every product at the owner's 19,99 EUR (Q-11)", () => {
+  it("prices the year-round range at the owner's 19,99 EUR (Q-11)", () => {
     expect(UNIFORM_PRICE.amountMinor).toBe(1999)
     expect(unpricedSlugs()).toEqual([])
     expect(isCatalogueFullyPriced()).toBe(true)
 
-    for (const product of products) {
+    for (const product of products.filter((p) => p.seasonal === null)) {
       expect(getPricing(product.slug)?.price).toEqual(UNIFORM_PRICE)
     }
+  })
+
+  it("prices the winter edition at the owner's 22 EUR", () => {
+    expect(getPricing('winter-wonderland')?.price).toEqual({ amountMinor: 2200, currency: 'EUR' })
   })
 
   it('stores the price as integer cents, never a float', () => {
@@ -64,11 +68,11 @@ describe('pricing table', () => {
 })
 
 describe('isPurchasable', () => {
-  it('is true for the five in-season products', () => {
+  it('is true for every product while Winter Wonderland is in season', () => {
     const purchasable = products.filter((p) => isPurchasable(p.slug)).map((p) => p.slug)
 
-    expect(purchasable).toHaveLength(5)
-    expect(purchasable).not.toContain('winter-wonderland')
+    expect(purchasable).toHaveLength(6)
+    expect(purchasable).toContain('winter-wonderland')
   })
 
   it('needs a weight as well as a price', () => {
@@ -81,12 +85,16 @@ describe('isPurchasable', () => {
   })
 
   it('stays false for an out-of-season product even when priced', () => {
-    const winter = products.find((p) => p.slug === 'winter-wonderland')
+    const winter = products.find((p) => p.slug === 'winter-wonderland')!
 
     // It *is* priced — the exclusion is the season, checked independently.
     expect(getPricing('winter-wonderland')).toBeDefined()
-    expect(winter?.seasonal).not.toBeNull()
-    expect(isPurchasable('winter-wonderland')).toBe(winter?.seasonal?.active === true)
+    winter.seasonal = { active: false }
+    try {
+      expect(isPurchasable('winter-wonderland')).toBe(false)
+    } finally {
+      winter.seasonal = { active: true }
+    }
   })
 
   it('is false for a slug that is not in the catalogue', () => {

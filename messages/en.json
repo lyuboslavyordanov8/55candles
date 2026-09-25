@@ -36,7 +36,8 @@
     "ratingLabel": "{rating} out of 5 stars, {count} reviews",
     "badge": {
       "new": "New",
-      "bestseller": "Bestseller"
+      "bestseller": "Bestseller",
+      "winter": "Winter edition"
     },
     "photoOf": "Photo {index} of {total}",
     "scentCount": "{count, plural, one {# scent} other {# scents}}",
@@ -150,13 +151,13 @@
         }
       },
       "winter-wonderland": {
-        "mood": "Seasonal",
-        "descriptor": "Crisp pine & spice",
-        "description": "A winter blend of pine, spice, and soft vanilla. Cool, comforting, and only here for a short time.",
+        "mood": "Festive",
+        "descriptor": "Warm Christmas cookies",
+        "description": "Like a kitchen on a snowy evening, just as the cookies come out of the oven. Cinnamon, ginger and butter, with soft vanilla and brown sugar. A winter edition — here only while the season lasts.",
         "notes": {
-          "top": "Pine, Eucalyptus",
-          "heart": "Cinnamon, Clove",
-          "base": "Vanilla, Amber"
+          "top": "Cinnamon, Orange Peel",
+          "heart": "Gingerbread, Butter",
+          "base": "Vanilla, Brown Sugar"
         }
       }
     }
