@@ -31,13 +31,10 @@ export const COURIER_LABELS: Record<Courier, string> = {
 /**
  * The couriers an order may actually be placed with (AUDIT.md Q-22).
  *
- * Econt only, by decision: Speedy needs a signed contract and credentials
- * issued by hand before its API answers anything, so a parcel chosen for it
- * could not be labelled. It stays in `COURIERS` — the type, the database enum
- * and the tariff table all keep a place for it, and the checkout shows it as
- * coming soon rather than pretending it was never planned.
+ * Econt, and Speedy since contract №515803 went live on 2026-09-25 — its
+ * client, sender and касов бон were checked against the real contract that day.
  *
- * Pigeon Express is in the same place for a different reason: its client is
+ * Pigeon Express is not, yet: its client is
  * built from the published API but has not yet been run against it, because
  * the keys come from Pigeon by hand. Add it here once a sandbox parcel has been
  * booked, tracked and printed — see the header of `src/lib/couriers/pigeon.ts`.
@@ -47,7 +44,7 @@ export const COURIER_LABELS: Record<Courier, string> = {
  * `couriersWithOfficeLookup()` in `src/lib/couriers/` for the separate question
  * of whose office list can be searched.
  */
-export const BOOKABLE_COURIERS: readonly Courier[] = ['econt']
+export const BOOKABLE_COURIERS: readonly Courier[] = ['econt', 'speedy']
 
 export function isCourierBookable(courier: Courier): boolean {
   return BOOKABLE_COURIERS.includes(courier)

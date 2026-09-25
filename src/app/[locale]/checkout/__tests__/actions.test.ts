@@ -144,10 +144,10 @@ describe('submitCheckout', () => {
   })
 
   it('refuses a courier the shop cannot book, even when everything else is valid', async () => {
-    // Speedy is greyed out in the form, but the form is not a boundary. Without
+    // Pigeon is greyed out in the form, but the form is not a boundary. Without
     // this the shop would store an order for a parcel nobody can label, and the
     // customer would hear about it only when it failed to arrive.
-    const state = await submitCheckout(IDLE, formData({ courier: 'speedy' }))
+    const state = await submitCheckout(IDLE, formData({ courier: 'pigeon' }))
 
     expect(state.status).toBe('invalid')
     expect(state.fieldErrors?.courier).toBe('unavailable')
@@ -405,9 +405,9 @@ describe('submitCheckout', () => {
     })
 
     it('looks the office up by its code, at the submitted courier', async () => {
-      // The courier comes from the submission, not from a constant: Econt is the
-      // only one an order may name today (`BOOKABLE_COURIERS`), and a second one
-      // must reach its own nomenclature rather than Econt's.
+      // The courier comes from the submission, not from a constant: each one an
+      // order may name (`BOOKABLE_COURIERS`) must reach its own nomenclature
+      // rather than Econt's.
       const findOffice = stubFindOffice({ status: 'ok', data: null })
 
       await submitCheckout(IDLE, formData({ officeId: '77', officeName: 'Русе Централен' }))

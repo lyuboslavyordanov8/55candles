@@ -86,15 +86,18 @@ describe('CheckoutPage', () => {
     expect(screen.getByText(/does not affect the candle prices/i)).toBeInTheDocument()
   })
 
-  it('stops calling the rates illustrative once Econt prices them', async () => {
+  it('stops calling the rates illustrative once every bookable courier prices them', async () => {
     // The other half of the notice above, and the half that is easy to forget:
-    // once the courier quotes each parcel, telling the customer their delivery
+    // once the couriers quote each parcel, telling the customer their delivery
     // cost is a placeholder is false in the opposite direction. Credentials plus
-    // a hand-over point are what flips it, so both are set here.
+    // a hand-over point are what flips it, for Econt and Speedy both.
     const saved = { ...process.env }
     process.env.ECONT_USERNAME = 'iasp-dev'
     process.env.ECONT_PASSWORD = '1Asp-dev'
     process.env.ECONT_SENDER_OFFICE_CODE = '1120'
+    process.env.SPEEDY_USERNAME = 'test-user'
+    process.env.SPEEDY_PASSWORD = 'test-password'
+    process.env.SPEEDY_SENDER_CLIENT_ID = '1'
 
     try {
       await renderPage('cherry:1')

@@ -315,20 +315,21 @@ describe('DeliveryForm', () => {
     expect(screen.getByRole('radio', { name: /parcel locker/i })).toBeInTheDocument()
   })
 
-  it('shows Speedy as coming soon rather than as a choice or an absence', async () => {
-    // Speedy has no contract and no credentials yet, so a parcel chosen for it
-    // could not be labelled — but it was announced, and removing it outright
-    // would read as "never". Disabled keeps it out of the tab order and out of
-    // the submitted data; `delivery-schema.ts` refuses it server-side too.
+  it('shows Pigeon as coming soon rather than as a choice or an absence', async () => {
+    // Pigeon's client has not yet been run against its API, so a parcel chosen
+    // for it could not be relied on to label — but it was announced, and
+    // removing it outright would read as "never". Disabled keeps it out of the
+    // tab order and out of the submitted data; `delivery-schema.ts` refuses it
+    // server-side too.
     const user = userEvent.setup()
     renderForm()
 
-    const speedy = screen.getByRole('radio', { name: /speedy/i })
-    expect(speedy).toBeDisabled()
-    expect(speedy).not.toBeChecked()
-    expect(speedy).toHaveAccessibleName(/coming soon/i)
+    const pigeon = screen.getByRole('radio', { name: /pigeon/i })
+    expect(pigeon).toBeDisabled()
+    expect(pigeon).not.toBeChecked()
+    expect(pigeon).toHaveAccessibleName(/coming soon/i)
 
-    await user.click(speedy)
+    await user.click(pigeon)
 
     expect(screen.getByRole('radio', { name: 'Econt' })).toBeChecked()
   })
