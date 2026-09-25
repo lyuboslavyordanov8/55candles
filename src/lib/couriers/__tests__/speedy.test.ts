@@ -1058,6 +1058,8 @@ describe('the label', () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://api.example/v1/print/')
     expect(init.method).toBe('POST')
+    // Speedy answers `Accept: application/pdf` with a 406 — the production 502.
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
     expect(sentBody()).toMatchObject({
       userName: '1996702',
       password: 'secret',

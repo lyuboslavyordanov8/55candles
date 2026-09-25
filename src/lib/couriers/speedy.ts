@@ -986,6 +986,9 @@ export function createSpeedyClient(config: SpeedyConfig): CourierClient {
      * The field is `paperSize`, not `paper`: with the wrong one Speedy answers
      * "Print paper size expected". An unknown parcel is a 200 carrying a JSON
      * `error`, so only the `%PDF` signature is taken as a label.
+     *
+     * No `Accept: application/pdf`: Speedy answers that with a 406 (verified
+     * 2026-09-25), because the error answer it may send is JSON.
      */
     async labelPdf(number) {
       const credentials = config.credentials?.() ?? null
@@ -994,7 +997,7 @@ export function createSpeedyClient(config: SpeedyConfig): CourierClient {
       try {
         const response = await fetch(`${config.baseUrl}/print/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/pdf' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             withCredentials(credentials, {
               paperSize: LABEL_PAPER,
