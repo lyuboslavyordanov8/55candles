@@ -1139,3 +1139,117 @@ describe('speedyTrackingUrl', () => {
     expect(speedyTrackingUrl('63751169468 ?x')).toContain('63751169468%20%3Fx')
   })
 })
+
+describe('tracking', () => {
+  // The real answer of 2026-09-25 for a waybill that was booked and cancelled,
+  // next to a number that is not ours.
+  const TRACK = {
+    parcels: [
+      {
+        parcelId: '11111111111',
+        operations: [],
+        error: { context: 'parcel-not-found', message: 'Пакетът не е намерен (EE1)', code: 1 },
+      },
+      {
+        parcelId: '63756228009',
+        externalCarrierParcelNumbers: [],
+        operations: [
+          {
+            dateTime: '2026-09-25T10:25:35+0300',
+            operationCode: 148,
+            description: 'Получена информация за пратка',
+            exceptionCodes: [],
+            additionalInfo: {},
+          },
+          {
+            dateTime: '2026-09-25T10:46:28+0300',
+            operationCode: 128,
+            place: 'ГР. СОФИЯ',
+            description: 'Анулиране',
+            exceptionCodes: [],
+            additionalInfo: {},
+          },
+        ],
+      },
+    ],
+  }
+
+  it('asks /track for every number at once, with the credentials in the body', async () => {
+    respondWith(TRACK)
+
+    await client().trackShipments(['63756228009', '11111111111'])
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.example/v1/track/')
+    expect(sentBody()).toMatchObject({
+      userName: '1996702',
+      password: 'secret',
+      parcels: [{ id: '63756228009' }, { id: '11111111111' }],
+    })
+  })
+
+  it('reads the newest operation as the status and lists the history newest first', async () => {
+    respondWith(TRACK)
+
+    const result = await client().trackShipments(['63756228009', '11111111111'])
+
+    expect(result).toEqual({
+      status: 'ok',
+      data: {
+        found: [
+          {
+            number: '63756228009',
+            status: 'Анулиране',
+            events: [
+              { at: '2026-09-25T07:46:28.000Z', text: 'Анулиране · ГР. СОФИЯ' },
+              { at: '2026-09-25T07:25:35.000Z', text: 'Получена информация за пратка' },
+            ],
+          },
+        ],
+        missing: [{ number: '11111111111', reason: 'Пакетът не е намерен (EE1)' }],
+      },
+    })
+  })
+
+  it('claims nothing about the наложен платеж, which /track does not report', async () => {
+    respondWith(TRACK)
+
+    const result = await client().trackShipments(['63756228009'])
+
+    expect(result.status === 'ok' && result.data.found[0]).not.toHaveProperty('codCollected')
+  })
+
+  it('reports a parcel Speedy left out of the answer as missing', async () => {
+    respondWith({ parcels: [] })
+
+    expect(await client().trackShipments(['63756228009'])).toEqual({
+      status: 'ok',
+      data: {
+        found: [],
+        missing: [{ number: '63756228009', reason: 'Speedy не върна данни за тази пратка' }],
+      },
+    })
+  })
+
+  it('fails on an error for the whole request, such as a bad login', async () => {
+    respondWith({ error: { message: 'Невалидно потребителско име или парола' } })
+
+    expect(await client().trackShipments(['63756228009'])).toEqual({
+      status: 'failed',
+      courier: 'speedy',
+      reason: 'Невалидно потребителско име или парола',
+    })
+  })
+
+  it('asks nothing for no numbers, and nothing without credentials', async () => {
+    expect(await client().trackShipments([])).toEqual({
+      status: 'ok',
+      data: { found: [], missing: [] },
+    })
+    expect(await client({ credentials: () => null }).trackShipments(['1'])).toEqual({
+      status: 'unconfigured',
+      courier: 'speedy',
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})

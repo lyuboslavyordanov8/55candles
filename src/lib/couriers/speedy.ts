@@ -11,6 +11,9 @@ import type {
   ParcelDestination,
   ShipmentQuoteRequest,
   ShipmentRate,
+  ShipmentTracking,
+  TrackingEvent,
+  TrackingReport,
   Waybill,
   WaybillRequest,
 } from './types'
@@ -196,6 +199,9 @@ const BOOKING_ATTEMPTS = 1
 
 /** Somebody is holding a print dialog open, not a checkout. */
 const LABEL_TIMEOUT_MS = 10_000
+
+/** Tracking is read on every admin page load; a slow answer is dropped, not waited for. */
+const TRACKING_TIMEOUT_MS = 6_000
 
 /**
  * `A4` — the label on a quarter of an ordinary sheet, as MySpeedy prints it.
@@ -698,6 +704,77 @@ interface CacheEntry {
   fetchedAt: number
 }
 
+/** `POST /track` — only the fields read. */
+interface SpeedyTrackResponse {
+  parcels?: {
+    parcelId?: string
+    operations?: SpeedyOperation[]
+    error?: SpeedyError
+  }[]
+  error?: SpeedyError
+}
+
+interface SpeedyOperation {
+  /** `2026-09-25T10:46:28+0300` — the offset has no colon. */
+  dateTime?: string
+  operationCode?: number
+  description?: string
+  /** Absent on some operations, e.g. "Получена информация за пратка". */
+  place?: string
+}
+
+/** Speedy's `+0300` offset as `+03:00`, then an ISO instant; `null` when unreadable. */
+function toInstant(dateTime: string | undefined): string | null {
+  if (!dateTime) return null
+  const date = new Date(dateTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2'))
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function toTracking(operations: readonly SpeedyOperation[], number: string): ShipmentTracking {
+  const read: (TrackingEvent & { description: string })[] = []
+
+  for (const operation of operations) {
+    const at = toInstant(operation.dateTime)
+    const description = operation.description?.trim()
+    if (!at || !description) continue
+
+    const place = operation.place?.trim()
+    read.push({ at, description, text: place ? `${description} · ${place}` : description })
+  }
+
+  // Speedy lists oldest first; the admin reads newest first.
+  read.sort((a, b) => b.at.localeCompare(a.at))
+
+  return {
+    // The number we asked with, so the caller can key on what it sent.
+    number,
+    // The newest operation is Speedy's own word for where the parcel is.
+    status: read[0]?.description ?? 'няма статус',
+    events: read.map(({ at, text }) => ({ at, text })),
+  }
+}
+
+function toTrackingReport(response: SpeedyTrackResponse, numbers: readonly string[]): TrackingReport {
+  const report: TrackingReport = { found: [], missing: [] }
+  const parcels = response.parcels ?? []
+
+  for (const number of numbers) {
+    // Matched by id rather than position: the answer is Speedy's to order.
+    const parcel = parcels.find((entry) => String(entry.parcelId ?? '') === number)
+
+    if (parcel && !parcel.error) {
+      report.found.push(toTracking(parcel.operations ?? [], number))
+    } else {
+      report.missing.push({
+        number,
+        reason: parcel?.error ? reasonOf(parcel.error) : 'Speedy не върна данни за тази пратка',
+      })
+    }
+  }
+
+  return report
+}
+
 /** The human part of an error Speedy reported in a `200` body. */
 function reasonOf(error: SpeedyError): string {
   return error.message?.trim() || error.context?.trim() || 'the courier reported an error'
@@ -970,14 +1047,33 @@ export function createSpeedyClient(config: SpeedyConfig): CourierClient {
     },
 
     /**
-     * Not built yet, deliberately: `BOOKABLE_COURIERS` is Econt-only until there
-     * is a Speedy contract, so no order carries a Speedy waybill to track, and a
-     * mapping of `/track` written without one real parcel to check it against
-     * would be a guess. `unconfigured` makes the admin say "no tracking" rather
-     * than "the courier failed".
+     * `POST /track`: one entry per parcel asked about, each with its own
+     * `error`, so an unknown number does not fail the others. Checked on
+     * 2026-09-25 against waybill 63756228009, booked and then cancelled.
+     *
+     * Status and history only. The money is left out on purpose: `/track` has no
+     * "collected" field, only operation codes, and the only codes seen so far
+     * are 148 (data received) and 128 (cancelled). Reading "delivered" off a
+     * guessed code would tell the admin the cash was taken when it may not have
+     * been — so `codCollected` waits for the first real delivered parcel.
      */
-    async trackShipments() {
-      return unconfigured()
+    async trackShipments(numbers) {
+      if (numbers.length === 0) return { status: 'ok', data: { found: [], missing: [] } }
+
+      const credentials = config.credentials?.() ?? null
+      if (!credentials) return unconfigured()
+
+      const response = await postJson<SpeedyTrackResponse>({
+        url: `${config.baseUrl}/track/`,
+        body: withCredentials(credentials, { parcels: numbers.map((id) => ({ id })) }),
+        timeoutMs: TRACKING_TIMEOUT_MS,
+        attempts: 1,
+      })
+
+      if (!response.ok) return failed(response.reason)
+      if (response.data.error) return failed(reasonOf(response.data.error))
+
+      return { status: 'ok', data: toTrackingReport(response.data, numbers) }
     },
 
     /**
