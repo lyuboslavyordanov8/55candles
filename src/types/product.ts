@@ -104,8 +104,7 @@ export type Product = {
    *
    * A product with none of these renders a single static image: the gallery
    * hides its own controls rather than showing a strip of one thumbnail —
-   * Strawberry Cake and Winter Wonderland at present, until they are
-   * photographed. The rest carry three studio shots of the closed tin (front,
+   * Winter Wonderland at present, until it is photographed. The rest carry three studio shots of the closed tin (front,
    * side, tilted), square-cropped from the 2026-09 shoot; the primary image
    * stays the lit-candle illustration.
    */

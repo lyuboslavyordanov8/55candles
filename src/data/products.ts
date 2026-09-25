@@ -130,6 +130,11 @@ export const products: Product[] = [
     imagePath: '/images/products/strawberry-cake.webp',
     imageWidth: 1087,
     imageHeight: 1087,
+    extraImages: [
+      '/images/products/strawberry-cake-front.webp',
+      '/images/products/strawberry-cake-side.webp',
+      '/images/products/strawberry-cake-tilted.webp',
+    ],
   },
 
   {
