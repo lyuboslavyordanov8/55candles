@@ -103,11 +103,11 @@ export type Product = {
    * ordered list and cannot accidentally show the primary image twice.
    *
    * A product with none of these renders a single static image: the gallery
-   * hides its own controls rather than showing a strip of one thumbnail. That
-   * is every candle at present — the owner asked for the tin shots to come off,
-   * so the whole catalogue is on the single-image path. The field stays for the
-   * next set of photographs; `ProductGallery.test.tsx` keeps the multi-photo
-   * path honest in the meantime, since no product data exercises it.
+   * hides its own controls rather than showing a strip of one thumbnail —
+   * Strawberry Cake and Winter Wonderland at present, until they are
+   * photographed. The rest carry three studio shots of the closed tin (front,
+   * side, tilted), square-cropped from the 2026-09 shoot; the primary image
+   * stays the lit-candle illustration.
    */
   extraImages?: string[]
 }

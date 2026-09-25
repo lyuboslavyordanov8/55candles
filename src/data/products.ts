@@ -45,6 +45,11 @@ export const products: Product[] = [
     imagePath: '/images/products/electric-cherry.webp',
     imageWidth: 1087,
     imageHeight: 1087,
+    extraImages: [
+      '/images/products/electric-cherry-front.webp',
+      '/images/products/electric-cherry-side.webp',
+      '/images/products/electric-cherry-tilted.webp',
+    ],
   },
 
   {
@@ -68,6 +73,11 @@ export const products: Product[] = [
     imagePath: '/images/products/sweet-orange.webp',
     imageWidth: 1088,
     imageHeight: 1088,
+    extraImages: [
+      '/images/products/sweet-orange-front.webp',
+      '/images/products/sweet-orange-side.webp',
+      '/images/products/sweet-orange-tilted.webp',
+    ],
   },
 
   {
@@ -90,6 +100,11 @@ export const products: Product[] = [
     imagePath: '/images/products/vanilla-egg.webp',
     imageWidth: 1087,
     imageHeight: 1087,
+    extraImages: [
+      '/images/products/vanilla-egg-front.webp',
+      '/images/products/vanilla-egg-side.webp',
+      '/images/products/vanilla-egg-tilted.webp',
+    ],
   },
 
   {
@@ -137,6 +152,11 @@ export const products: Product[] = [
     imagePath: '/images/products/espresso-martini.webp',
     imageWidth: 1087,
     imageHeight: 1087,
+    extraImages: [
+      '/images/products/espresso-martini-front.webp',
+      '/images/products/espresso-martini-side.webp',
+      '/images/products/espresso-martini-tilted.webp',
+    ],
   },
 
   {

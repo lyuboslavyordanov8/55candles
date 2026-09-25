@@ -6,13 +6,9 @@ import ProductGallery from '../ProductGallery'
 /**
  * The gallery's multi-photo behaviour, tested on the component directly.
  *
- * It used to be covered through the product detail page, which was fine while
- * some candle in `src/data/products.ts` happened to have a second photo. None
- * does now — the tin shots were removed — so that coverage went with them,
- * even though `extraImages` and `productImages()` are still there for the next
- * photo shoot. Testing the component with its own images keeps the picker, the
- * arrow keys and the aria-hidden panels honest regardless of what the
- * catalogue currently holds.
+ * Tested with its own images rather than through the catalogue, so the picker,
+ * the arrow keys and the aria-hidden panels stay covered whatever photos the
+ * products in `src/data/products.ts` happen to carry.
  */
 
 vi.mock('next/image', () => ({

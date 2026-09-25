@@ -64,14 +64,11 @@ describe('ProductDetailPage', () => {
     expect(screen.queryByRole('link', { name: /order now/i })).not.toBeInTheDocument()
   })
 
-  // Driven off the catalogue rather than hard-coded, because no candle carries
-  // a second photo at the moment — the tin shots were removed and every product
-  // is down to its one illustration. So this asserts the wiring, not a count:
-  // the gallery is handed one frame per `productImages()` entry and shows its
-  // picker only when that is more than one. Add an `extraImages` entry to any
-  // product and this test follows it without being edited. The picker's own
-  // behaviour is covered in `ProductGallery.test.tsx`, which does not depend on
-  // the catalogue and so keeps working while nothing here has two photos.
+  // Driven off the catalogue rather than hard-coded, so it asserts the wiring,
+  // not a count: the gallery is handed one frame per `productImages()` entry
+  // and shows its picker only when that is more than one. Change a product's
+  // `extraImages` and this test follows it without being edited. The picker's
+  // own behaviour is covered in `ProductGallery.test.tsx`.
   it('gives the gallery every photo the product has', async () => {
     const { container } = await renderPage('cherry')
     const photos = productImages(products.find((p) => p.slug === 'cherry')!)
