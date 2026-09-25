@@ -66,6 +66,7 @@ export default async function AdminOrdersPage({
     courier?: string
     dateFrom?: string
     dateTo?: string
+    deleted?: string
   }>
 }) {
   await requireAdmin()
@@ -85,6 +86,7 @@ export default async function AdminOrdersPage({
     courier = '',
     dateFrom = '',
     dateTo = '',
+    deleted = '',
   } = await searchParams
   const statuses = statusFilter(status)
   const courierValue = COURIERS.includes(courier as Courier) ? (courier as Courier) : undefined
@@ -126,6 +128,8 @@ export default async function AdminOrdersPage({
           </>
         }
       />
+
+      {deleted && <Notice tone="success">Поръчка {deleted} е изтрита.</Notice>}
 
       {!isMailerConfigured() && (
         // The shop is not being emailed about new orders, so this list is the only

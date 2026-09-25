@@ -17,6 +17,9 @@ import { COURIER_LABELS, type Courier } from '@/lib/shipping'
 import { econtSender, econtShipFrom } from '@/lib/couriers'
 import CopyButton from '@/components/admin/CopyButton'
 import ConfirmSubmit from '@/components/admin/ConfirmSubmit'
+import OrderEditForm from '@/components/admin/OrderEditForm'
+import { deleteBlocker, deliveryDetailsOf, editBlocker } from '@/lib/order-edit'
+import bgMessages from '../../../../../messages/bg.json'
 import WaybillPreviewModal from '@/components/admin/WaybillPreviewModal'
 import OrderStatusBadge from '@/components/admin/OrderStatusBadge'
 import OrderStatusRail from '@/components/admin/OrderStatusRail'
@@ -36,6 +39,7 @@ import {
   addNote,
   cancelWaybill,
   changeStatus,
+  deleteOrder,
   issueInvoice,
   issueWaybill,
   undoStatusChange,
@@ -95,6 +99,9 @@ const notices: Record<string, string> = {
   undo_notLastTransition:
     'Няма какво да се отмени — статусът се е променил отново след последната стъпка.',
   note_empty: 'Бележката е празна — нищо не е записано.',
+  delete_confirm: 'Номерът на поръчката не съвпада — поръчката не е изтрита.',
+  delete_blocked:
+    'Поръчката не може да се изтрие — междувременно е получила фактура или товарителница, или е изпратена.',
 }
 
 /**
@@ -159,6 +166,7 @@ export default async function AdminOrderPage({
     waybill?: string
     cancelled?: string
     invoice?: string
+    edited?: string
   }>
 }) {
   await requireAdmin()
@@ -168,7 +176,8 @@ export default async function AdminOrderPage({
   if (!detail) notFound()
 
   const { order, items, events } = detail
-  const { error, changed, reverted, noted, waybill, cancelled, invoice } = await searchParams
+  const { error, changed, reverted, noted, waybill, cancelled, invoice, edited } =
+    await searchParams
 
   const currency = order.currency as 'EUR'
   const amount = (minor: number) => formatMoney(money(minor, currency), 'bg')
@@ -181,6 +190,8 @@ export default async function AdminOrderPage({
   const [issued, tracking] = await Promise.all([getInvoiceForOrder(order.id), trackOrder(order)])
   const invoiceStop = invoiceBlocker(order, issued)
   const buyer = defaultBuyerFor(order)
+  const editStop = editBlocker(order)
+  const deleteStop = deleteBlocker(order, issued?.number ?? null)
 
   const upcoming = nextStatuses(order.status)
   const normalNext = upcoming.filter((status) => !statusRequiresReason(status))
@@ -257,6 +268,10 @@ export default async function AdminOrderPage({
       )}
 
       {noted && <Notice tone="success">Бележката е записана.</Notice>}
+
+      {edited && (
+        <Notice tone="success">Данните са променени. Промените са записани в историята.</Notice>
+      )}
 
       {changed && STATUS_LABELS[changed as keyof typeof STATUS_LABELS] && (
         <Notice tone="success">
@@ -388,6 +403,18 @@ export default async function AdminOrderPage({
           </dl>
         </Section>
       </div>
+
+      <Section title="Корекция на данните">
+        {editStop ? (
+          <p className="text-xs text-ink-secondary">{editBlockerText(editStop)}</p>
+        ) : (
+          <OrderEditForm
+            orderId={order.id}
+            current={deliveryDetailsOf(order)}
+            messages={{ checkout: bgMessages.checkout }}
+          />
+        )}
+      </Section>
 
       {tracking && (
         <Section
@@ -651,6 +678,21 @@ export default async function AdminOrderPage({
           </button>
         </form>
       </Section>
+
+      <Section title="Изтриване">
+        {deleteStop ? (
+          <p className="text-xs text-ink-secondary">{deleteBlockerText(deleteStop)}</p>
+        ) : (
+          <form action={deleteOrder} className="space-y-1.5 text-xs text-ink-secondary">
+            <input type="hidden" name="orderId" value={order.id} />
+            <p>
+              За тестови поръчки и спам. Изтрива поръчката, артикулите и историята ѝ от базата —
+              безвъзвратно. Номерът {order.orderNumber} няма да се използва отново.
+            </p>
+            <ConfirmSubmit expected={order.orderNumber} buttonLabel="Изтрий поръчката" />
+          </form>
+        )}
+      </Section>
     </>
   )
 }
@@ -692,6 +734,28 @@ function invoiceBlockerText(blocker: NonNullable<ReturnType<typeof invoiceBlocke
       return `Фактура се издава от „потвърдена“ нататък (сега е „${STATUS_LABELS[blocker.status]}“). За отказана или върната поръчка не се издава фактура.`
     case 'sellerIncomplete':
       return `Данните на продавача не са пълни, а фактурата ги носи. Липсва: ${blocker.missing.join(', ')}.`
+  }
+}
+
+/** Why the details cannot be corrected, and what to do instead. */
+function editBlockerText(blocker: NonNullable<ReturnType<typeof editBlocker>>): string {
+  switch (blocker.reason) {
+    case 'hasWaybill':
+      return `Има товарителница ${blocker.waybillNumber} и етикетът носи сегашните данни. Анулирай я първо — после данните могат да се променят и да се издаде нова.`
+    case 'wrongStatus':
+      return `Данните се коригират само преди изпращане (сега е „${STATUS_LABELS[blocker.status]}“).`
+  }
+}
+
+/** The same, for deleting the order. */
+function deleteBlockerText(blocker: NonNullable<ReturnType<typeof deleteBlocker>>): string {
+  switch (blocker.reason) {
+    case 'hasInvoice':
+      return `Има издадена фактура № ${blocker.number}, затова поръчката не се изтрива — номерът е част от поредица без пропуски.`
+    case 'hasWaybill':
+      return `Има товарителница ${blocker.waybillNumber}. Анулирай я първо, после поръчката може да се изтрие.`
+    case 'wrongStatus':
+      return `Изпратена поръчка не се изтрива (сега е „${STATUS_LABELS[blocker.status]}“).`
   }
 }
 

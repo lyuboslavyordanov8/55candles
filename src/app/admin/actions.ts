@@ -17,6 +17,8 @@ import { statusRequiresReason } from '@/lib/order-status'
 import { addOrderNote, NOTE_MAX } from '@/lib/order-notes'
 import { issueInvoiceForOrder, type InvoiceBuyer } from '@/lib/invoices'
 import { cancelWaybillForOrder, issueWaybillForOrder } from '@/lib/waybills'
+import { deleteOrder as deleteOrderRow, updateOrderDetails } from '@/lib/order-edit'
+import type { FieldErrors } from '@/lib/delivery-schema'
 import { orderStatus, type OrderStatus } from '@/db/schema'
 
 /**
@@ -281,6 +283,83 @@ export async function cancelWaybill(formData: FormData): Promise<void> {
   }
 
   redirect(`/admin/orders/${orderId}?error=cancel_${result.status}`)
+}
+
+/** What the edit form shows after a submission that did not save. */
+export interface OrderEditState {
+  status: 'idle' | 'invalid' | 'blocked' | 'unchanged'
+  errors?: FieldErrors
+}
+
+/**
+ * Correct the customer's name, phone, email or delivery point.
+ *
+ * Posted through `useActionState`, because a mistyped phone should come back as
+ * a message beside the field rather than as a redirect that throws the rest of
+ * the form away. Only a save redirects. The rules — same validation as the
+ * checkout, no edit once a waybill exists — are `updateOrderDetails`'s.
+ */
+export async function editOrder(
+  _previous: OrderEditState,
+  formData: FormData
+): Promise<OrderEditState> {
+  const actor = await requireAdmin()
+
+  const orderId = String(formData.get('orderId') ?? '')
+  if (!orderId) redirect('/admin')
+
+  const input = Object.fromEntries(
+    [
+      'recipientName',
+      'phone',
+      'email',
+      'courier',
+      'method',
+      'city',
+      'postCode',
+      'street',
+      'officeId',
+      'officeName',
+      'officeAddress',
+      'note',
+    ].map((key) => [key, String(formData.get(key) ?? '')])
+  )
+
+  const result = await updateOrderDetails(orderId, input, actor)
+
+  if (result.status === 'missing') redirect('/admin?error=missing')
+  if (result.status === 'invalid') return { status: 'invalid', errors: result.errors }
+  if (result.status === 'blocked') return { status: 'blocked' }
+  if (result.status === 'unchanged') return { status: 'unchanged' }
+
+  revalidatePath(`/admin/orders/${orderId}`)
+  revalidatePath('/admin')
+  redirect(`/admin/orders/${orderId}?edited=1`)
+}
+
+/**
+ * Delete an order — a test, or spam — with everything recorded about it.
+ *
+ * Type-to-confirm, and refused for an order with a фактура or a live waybill:
+ * see `deleteOrder` in `src/lib/order-edit.ts`.
+ */
+export async function deleteOrder(formData: FormData): Promise<void> {
+  const actor = await requireAdmin()
+
+  const orderId = String(formData.get('orderId') ?? '')
+  if (!orderId) redirect('/admin')
+
+  if (!(await confirmedOrderNumber(orderId, formData))) {
+    redirect(`/admin/orders/${orderId}?error=delete_confirm`)
+  }
+
+  const result = await deleteOrderRow(orderId, actor)
+
+  if (result.status === 'missing') redirect('/admin?error=missing')
+  if (result.status === 'blocked') redirect(`/admin/orders/${orderId}?error=delete_blocked`)
+
+  revalidatePath('/admin')
+  redirect(`/admin?deleted=${encodeURIComponent(result.orderNumber)}`)
 }
 
 /**
