@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
 import { CartProvider } from '@/components/cart/CartProvider'
@@ -29,7 +29,24 @@ describe('Navbar', () => {
 
   it('renders the announcement bar above it', () => {
     renderNavbar()
-    expect(screen.getByText(messages.announcement.text)).toBeInTheDocument()
+    expect(screen.getByText(messages.announcement.slogan)).toBeInTheDocument()
+  })
+
+  it('takes turns between the slogan and the free-delivery offer', () => {
+    vi.useFakeTimers()
+    try {
+      renderNavbar()
+      const slogan = screen.getByText(messages.announcement.slogan)
+      const offer = screen.getByText('Free delivery from 3 candles')
+      expect(slogan).toHaveAttribute('aria-hidden', 'false')
+      expect(offer).toHaveAttribute('aria-hidden', 'true')
+
+      act(() => vi.advanceTimersByTime(5000))
+      expect(slogan).toHaveAttribute('aria-hidden', 'true')
+      expect(offer).toHaveAttribute('aria-hidden', 'false')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   // The links moved out of the bar and into the menu panel at every breakpoint,

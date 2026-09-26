@@ -1,6 +1,7 @@
 {
   "announcement": {
-    "text": "Natural candles for cool people"
+    "slogan": "Natural candles for cool people",
+    "freeDelivery": "Free delivery from {count} candles"
   },
   "nav": {
     "home": "Home",
