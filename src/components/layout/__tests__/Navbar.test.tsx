@@ -37,13 +37,20 @@ describe('Navbar', () => {
     try {
       renderNavbar()
       const slogan = screen.getByText(messages.announcement.slogan)
-      const offer = screen.getByText('Free delivery from 3 candles')
+      const offer = screen.getByText('Order 3 candles and delivery is on us')
       expect(slogan).toHaveAttribute('aria-hidden', 'false')
       expect(offer).toHaveAttribute('aria-hidden', 'true')
 
-      act(() => vi.advanceTimersByTime(5000))
+      // The slogan for two seconds…
+      act(() => vi.advanceTimersByTime(2000))
       expect(slogan).toHaveAttribute('aria-hidden', 'true')
       expect(offer).toHaveAttribute('aria-hidden', 'false')
+
+      // …the offer for five.
+      act(() => vi.advanceTimersByTime(4900))
+      expect(offer).toHaveAttribute('aria-hidden', 'false')
+      act(() => vi.advanceTimersByTime(100))
+      expect(slogan).toHaveAttribute('aria-hidden', 'false')
     } finally {
       vi.useRealTimers()
     }
