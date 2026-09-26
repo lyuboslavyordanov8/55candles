@@ -8,6 +8,7 @@ import Footer from '@/components/layout/Footer'
 import { CartProvider } from '@/components/cart/CartProvider'
 import CartDrawer from '@/components/cart/CartDrawer'
 import MotionProvider from '@/components/providers/MotionProvider'
+import PageViewBeacon from '@/components/providers/PageViewBeacon'
 import { OrganizationJsonLd } from '@/components/seo/JsonLd'
 import { homeBanner, bannerText } from '@/content/home-banner'
 import { fontVariables } from '@/fonts'
@@ -152,6 +153,7 @@ export default async function LocaleLayout({
               <Footer />
               <CartDrawer />
             </CartProvider>
+            <PageViewBeacon />
           </MotionProvider>
         </NextIntlClientProvider>
       </body>

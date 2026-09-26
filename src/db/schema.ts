@@ -663,3 +663,39 @@ export type Expense = typeof expenses.$inferSelect
 export type NewExpense = typeof expenses.$inferInsert
 export type AccountingEvent = typeof accountingEvents.$inferSelect
 export type AccountantSettingsRow = typeof accountantSettings.$inferSelect
+
+/**
+ * One page opened on the storefront — the admin's traffic page.
+ *
+ * Counted without cookies and without keeping anything that identifies a
+ * person: no IP address and no user agent are stored. `visitorHash` is an HMAC
+ * of the IP and the user agent under a key that changes every day, so it can
+ * tell two visitors apart within a day and nothing more — tomorrow the same
+ * browser hashes to something unrelated, and without the secret no hash leads
+ * back to an address. See `src/lib/analytics.ts`.
+ *
+ * Rows older than `ANALYTICS_RETENTION_DAYS` are deleted; the privacy policy
+ * promises that period.
+ */
+export const pageViews = pgTable(
+  'page_views',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Path only, with the locale prefix and never the query string. */
+    path: text('path').notNull(),
+    /** The first page of a visit — the one that carries where the visitor came from. */
+    entry: boolean('entry').notNull().default(false),
+    /** Host of an external referrer (`www.google.com`), or empty for none. */
+    referrerHost: text('referrer_host').notNull().default(''),
+    /** ISO 3166 code from the edge (`BG`), or empty when unknown. */
+    country: text('country').notNull().default(''),
+    /** `mobile`, `tablet` or `desktop`, guessed from the user agent. */
+    device: text('device').notNull(),
+    visitorHash: text('visitor_hash').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('page_views_created_at_idx').on(table.createdAt)]
+)
+
+export type PageView = typeof pageViews.$inferSelect
+export type NewPageView = typeof pageViews.$inferInsert

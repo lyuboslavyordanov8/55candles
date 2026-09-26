@@ -113,3 +113,12 @@ export function SealIcon({ className = '' }: { className?: string }) {
     </svg>
   )
 }
+
+/** Traffic: three bars. */
+export function ChartIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M2.5 13.5h11M4.5 13.5V9M8 13.5V4.5M11.5 13.5V7" />
+    </svg>
+  )
+}

@@ -15,8 +15,10 @@ import '../globals.css'
  * Its own root layout — `<html>` and `<body>` included — because there is no
  * top-level `app/layout.tsx`: the storefront's root is `[locale]/layout.tsx`, and
  * the admin deliberately does not sit under it. It has no navbar, no cart, no
- * `next-intl` provider and no analytics, so nothing a customer sees can be broken
- * by a change here, and nothing the admin loads reaches a customer's browser.
+ * `next-intl` provider and no page-view beacon — the traffic page counts
+ * customers, never the shop looking at itself — so nothing a customer sees can
+ * be broken by a change here, and nothing the admin loads reaches a customer's
+ * browser.
  *
  * Bulgarian only. It is an internal tool read by the shop, not a page with an
  * audience, so its strings live beside it rather than in `messages/*.json`.

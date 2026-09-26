@@ -311,7 +311,7 @@
           },
           {
             "heading": "2. No accounts, no tracking",
-            "body": "This site has no user accounts — you do not register or create a password in order to buy. We load no analytics, advertising or tracking services, and we do not profile visitors. Exactly what we record when you order or write to us is set out in the next section."
+            "body": "This site has no user accounts — you do not register or create a password in order to buy. We load no third-party analytics, advertising or tracking services, and we do not profile visitors. We count our visits ourselves, without cookies: when a page is opened we record its address (without anything after a “?”), the site you came from (only its name, such as google.com, and only for the first page), the country our host derives from your IP address, and the kind of device (phone, tablet or computer). To tell two visitors apart on the same day, a code is calculated from your IP address and browser details with a key that changes every day; the IP address and browser details themselves are not recorded, and the code can neither identify you nor link visits made on different days. If your browser sends a “Do Not Track” or “Global Privacy Control” signal, the visit is not counted. Exactly what we record when you order or write to us is set out in the next section."
           },
           {
             "heading": "3. What we collect",
@@ -319,7 +319,7 @@
           },
           {
             "heading": "4. Why we process it, and on what legal basis",
-            "body": "To perform a contract with you (Art. 6(1)(b) GDPR) for orders and delivery; to comply with legal obligations (Art. 6(1)(c)) for accounting and tax records; with your consent (Art. 6(1)(a)) for marketing messages, which you may withdraw at any time; and for our legitimate interests (Art. 6(1)(f)) in securing the site and preventing fraud."
+            "body": "To perform a contract with you (Art. 6(1)(b) GDPR) for orders and delivery; to comply with legal obligations (Art. 6(1)(c)) for accounting and tax records; with your consent (Art. 6(1)(a)) for marketing messages, which you may withdraw at any time; and for our legitimate interests (Art. 6(1)(f)) in securing the site and preventing fraud, and in knowing how many people visit the site, where they come from and which pages they look at, through the cookieless statistics described in section 2."
           },
           {
             "heading": "5. Who we share it with",
@@ -331,7 +331,7 @@
           },
           {
             "heading": "7. How long we keep it",
-            "body": "Orders and the documents belonging to them are kept for 5 years from the end of the year in which the order was completed — the period for which Bulgarian tax law may ask for them. Accounting records and financial statements are kept for 10 years, as the Accountancy Act requires. Contact-form messages are kept for up to 12 months after the conversation ends. Consent records are kept while the consent stands and for 3 years after it is withdrawn, so that we can show when and for what it was given. Once those periods expire the data is deleted."
+            "body": "Orders and the documents belonging to them are kept for 5 years from the end of the year in which the order was completed — the period for which Bulgarian tax law may ask for them. Accounting records and financial statements are kept for 10 years, as the Accountancy Act requires. Contact-form messages are kept for up to 12 months after the conversation ends. Consent records are kept while the consent stands and for 3 years after it is withdrawn, so that we can show when and for what it was given. Records of visits to the site are kept for 12 months. Once those periods expire the data is deleted."
           },
           {
             "heading": "8. Your rights",
@@ -349,7 +349,7 @@
       },
       "cookies": {
         "title": "Cookie Policy",
-        "summary": "What we store on your device. Today: almost nothing.",
+        "summary": "What we store on your device. Today: almost nothing — and no tracking cookies.",
         "sections": [
           {
             "heading": "1. What cookies are",
@@ -357,15 +357,15 @@
           },
           {
             "heading": "2. What we use right now",
-            "body": "This site currently sets no analytics, advertising or tracking cookies. It loads no Google Analytics, no tag manager, no Meta pixel and no third-party tracker. Our fonts are served from our own domain, so no request is made to Google when you visit."
+            "body": "This site currently sets no analytics, advertising or tracking cookies. It loads no Google Analytics, no tag manager, no Meta pixel and no third-party tracker. Our fonts are served from our own domain, so no request is made to Google when you visit. We count visits ourselves, without cookies and without storing anything on your device — section 2 of our Privacy Policy explains exactly how."
           },
           {
             "heading": "3. Strictly necessary storage",
-            "body": "Your chosen language is part of the web address (/en or /bg) rather than a cookie. Once a shopping basket exists, keeping it between pages will require strictly necessary storage, which does not need your consent because the shop cannot work without it."
+            "body": "Your chosen language is part of the web address (/en or /bg) rather than a cookie. Your basket is kept in your browser’s local storage (localStorage) so that it survives moving between pages or closing the site. It holds only the candles you chose and their quantities, is not sent to us until you order, and you can clear it at any time by emptying it or deleting the site’s data in your browser. This is strictly necessary storage, which does not need your consent because the basket cannot work without it."
           },
           {
             "heading": "4. Consent",
-            "body": "If we ever add analytics or marketing technologies, we will ask for your consent first, by category, with refusing as easy as accepting, and you will be able to change your mind at any time from this page. We will not set any non-essential cookie before you agree."
+            "body": "Our visit statistics use no cookies and neither read nor store anything on your device, so they do not require consent. If we ever add analytics or marketing cookies, we will ask for your consent first, by category, with refusing as easy as accepting, and you will be able to change your mind at any time from this page. We will not set any non-essential cookie before you agree."
           },
           {
             "heading": "5. Controlling cookies",

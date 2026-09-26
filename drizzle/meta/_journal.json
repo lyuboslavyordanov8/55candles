@@ -64,6 +64,13 @@
       "when": 1790362268255,
       "tag": "0008_special_selene",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790430326654,
+      "tag": "0009_sudden_psynapse",
+      "breakpoints": true
     }
   ]
 }

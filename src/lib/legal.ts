@@ -13,8 +13,8 @@
  */
 export const LEGAL_DOCS = [
   { slug: 'terms', key: 'terms', lastUpdated: '2026-08-06' },
-  { slug: 'privacy', key: 'privacy', lastUpdated: '2026-08-06' },
-  { slug: 'cookies', key: 'cookies', lastUpdated: '2026-08-06' },
+  { slug: 'privacy', key: 'privacy', lastUpdated: '2026-09-26' },
+  { slug: 'cookies', key: 'cookies', lastUpdated: '2026-09-26' },
   { slug: 'returns', key: 'returns', lastUpdated: '2026-08-06' },
   { slug: 'complaints', key: 'complaints', lastUpdated: '2026-08-06' },
   { slug: 'delivery', key: 'delivery', lastUpdated: '2026-08-06' },
