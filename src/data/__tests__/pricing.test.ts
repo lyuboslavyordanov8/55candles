@@ -33,8 +33,8 @@ describe('pricing table', () => {
     }
   })
 
-  it("prices the winter edition at the owner's 22 EUR", () => {
-    expect(getPricing('winter-wonderland')?.price).toEqual({ amountMinor: 2200, currency: 'EUR' })
+  it("prices the winter edition at the owner's 25 EUR", () => {
+    expect(getPricing('winter-wonderland')?.price).toEqual({ amountMinor: 2500, currency: 'EUR' })
   })
 
   it('stores the price as integer cents, never a float', () => {
@@ -68,11 +68,25 @@ describe('pricing table', () => {
 })
 
 describe('isPurchasable', () => {
-  it('is true for every product while Winter Wonderland is in season', () => {
+  it('is true for every product but the coming-soon Winter Wonderland', () => {
     const purchasable = products.filter((p) => isPurchasable(p.slug)).map((p) => p.slug)
 
-    expect(purchasable).toHaveLength(6)
-    expect(purchasable).toContain('winter-wonderland')
+    expect(purchasable).toHaveLength(5)
+    expect(purchasable).not.toContain('winter-wonderland')
+  })
+
+  it('refuses a coming-soon product even in season and priced', () => {
+    const winter = products.find((p) => p.slug === 'winter-wonderland')!
+    expect(winter.seasonal).toEqual({ active: true })
+    expect(getPricing('winter-wonderland')).toBeDefined()
+
+    winter.comingSoon = false
+    try {
+      expect(isPurchasable('winter-wonderland')).toBe(true)
+    } finally {
+      winter.comingSoon = true
+    }
+    expect(isPurchasable('winter-wonderland')).toBe(false)
   })
 
   it('needs a weight as well as a price', () => {

@@ -11,6 +11,7 @@ import {
   type BillingField,
 } from '@/lib/billing-schema'
 import { calculateTotal, priceCart, type AppliedDiscount, type CartLine } from '@/lib/order-total'
+import { isPurchasable } from '@/data/pricing'
 import { evaluatePromoCode, PROMO_CODE_MAX, type PromoOutcome } from '@/lib/promo'
 import { resolveDeliveryRate } from '@/lib/shipping-rates'
 import { resolveOffice } from '@/lib/office-resolution'
@@ -300,6 +301,13 @@ export async function submitCheckout(
       unpriced: cart.unpriced,
       messageKey: 'notPricedYet',
     }
+  }
+
+  // The cart never offers these — out of season, or not launched yet — so a line
+  // for one only arrives in a stale basket or a hand-built request. Pricing
+  // alone would let it through: such a candle can already have its price.
+  if (lines.some((line) => !isPurchasable(line.slug))) {
+    return { status: 'invalid', values, messageKey: 'notAvailable' }
   }
 
   // Judged against the goods before anything else touches them, and never a

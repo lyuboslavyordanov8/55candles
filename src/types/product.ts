@@ -71,6 +71,13 @@ export type Product = {
   badge?: 'new' | 'bestseller' | 'winter'
 
   /**
+   * Announced but not open yet: the card shows it under a "coming soon"
+   * overlay, it has no page of its own, and nothing can buy it — not even a
+   * hand-crafted checkout request. Delete the flag to launch it.
+   */
+  comingSoon?: boolean
+
+  /**
    * Price deliberately does NOT live here.
    *
    * It needs integer minor units and a currency (AUDIT.md B-12), and a second

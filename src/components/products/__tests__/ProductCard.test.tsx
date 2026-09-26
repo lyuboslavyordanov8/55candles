@@ -79,8 +79,16 @@ describe('ProductCard', () => {
   })
 
   it('shows out-of-season overlay when seasonal product is inactive', () => {
-    renderCard({ ...winter, seasonal: { active: false } })
+    renderCard({ ...winter, comingSoon: false, seasonal: { active: false } })
     expect(screen.getByText(/seasonal/i)).toBeInTheDocument()
+  })
+
+  it('shows a coming-soon candle without a link or a way to buy it', () => {
+    renderCard(winter)
+    expect(screen.getByText('Coming soon')).toBeInTheDocument()
+    expect(screen.getByText('Winter Wonderland')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add/i })).not.toBeInTheDocument()
   })
 
   it('shows no overlay on a seasonal product while it is in season', () => {

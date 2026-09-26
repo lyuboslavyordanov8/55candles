@@ -98,6 +98,7 @@ describe('ProductDetailPage', () => {
     // it. A link here would lead to a checkout that refuses the order.
     const winter = products.find((p) => p.slug === 'winter-wonderland')!
     winter.seasonal = { active: false }
+    winter.comingSoon = false
     try {
       await renderPage('winter-wonderland')
 
@@ -105,7 +106,13 @@ describe('ProductDetailPage', () => {
       expect(screen.getByRole('button', { name: /not available yet/i })).toBeDisabled()
     } finally {
       winter.seasonal = { active: true }
+      winter.comingSoon = true
     }
+  })
+
+  it('calls notFound for a coming-soon product', async () => {
+    await expect(renderPage('winter-wonderland')).rejects.toThrow(NOT_FOUND)
+    expect(notFound).toHaveBeenCalled()
   })
 
   it('calls notFound for unknown slug', async () => {

@@ -56,7 +56,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...staticPaths.map(({ path, priority, changeFrequency }) =>
       entry(path, priority, changeFrequency)
     ),
-    ...products.map((product) => entry(`/products/${product.slug}`, 0.8, 'monthly')),
+    // A `comingSoon` candle has no page to list yet.
+    ...products
+      .filter((product) => !product.comingSoon)
+      .map((product) => entry(`/products/${product.slug}`, 0.8, 'monthly')),
     // Legal pages send `noindex` while they are unreviewed drafts, so listing
     // them here would ask Google to crawl what the page then tells it to drop.
     // They join the sitemap when LEGAL_IS_DRAFT flips to false.

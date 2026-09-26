@@ -16,7 +16,7 @@ import { BreadcrumbJsonLd, ProductJsonLd } from '@/components/seo/JsonLd'
 
 export async function generateStaticParams() {
   return locales.flatMap((locale) =>
-    products.map((p) => ({ locale, slug: p.slug }))
+    products.filter((p) => !p.comingSoon).map((p) => ({ locale, slug: p.slug }))
   )
 }
 
@@ -28,7 +28,7 @@ export async function generateMetadata({
   const { locale, slug } = await params
   const product = getProductBySlug(slug)
 
-  if (!product) return {}
+  if (!product || product.comingSoon) return {}
 
   const path = `/products/${slug}`
 
@@ -84,7 +84,7 @@ function ProductDetailContent({
   const copy = (field: string) => t(`copy.${product.slug}.${field}`)
 
   const related = products
-    .filter((p) => p.slug !== product.slug)
+    .filter((p) => p.slug !== product.slug && !p.comingSoon)
     .slice(0, 3)
 
   const galleryImages = productImages(product)
@@ -235,7 +235,8 @@ export default async function ProductDetailPage({
 
   const product = getProductBySlug(slug)
 
-  if (!product) {
+  // A `comingSoon` candle is announced on the cards but has no page yet.
+  if (!product || product.comingSoon) {
     notFound()
   }
 

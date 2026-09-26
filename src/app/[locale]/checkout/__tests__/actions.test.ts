@@ -176,6 +176,18 @@ describe('submitCheckout', () => {
     expect(state.messageKey).toBe('notPricedYet')
   })
 
+  // Priced and in season, so only the flag stops it — a crafted request must
+  // not be able to order what the storefront shows as coming soon.
+  it('refuses a coming-soon product that already has a price', async () => {
+    const state = await submitCheckout(
+      IDLE,
+      formData({ cart: JSON.stringify([{ slug: 'winter-wonderland', quantity: 1 }]) })
+    )
+
+    expect(state.status).toBe('invalid')
+    expect(state.messageKey).toBe('notAvailable')
+  })
+
   it('distinguishes an unset courier tariff from an unpriced product', async () => {
     withNothingConfigured()
     pricing.cherry = { price: eur(24.5), packedWeightGrams: 500 }

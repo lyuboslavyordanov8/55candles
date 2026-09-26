@@ -637,6 +637,7 @@
       "fixTheFields": "Please check the highlighted fields.",
       "reviewBeforeConfirming": "This is the final bill, delivery included. Check it and press “Confirm the order” — nothing has been ordered and no payment taken yet.",
       "cartEmpty": "Your basket is empty.",
+      "notAvailable": "One or more items in your basket aren't available right now. Please remove them and try again.",
       "cartUnreadable": "Something went wrong reading your basket. Please start again.",
       "notPricedYet": "One or more items in your basket has no price yet, so the order can't be completed. Please contact us and we'll help directly.",
       "deliveryNotPricedYet": "We can't calculate delivery for that choice yet. Please contact us and we'll arrange it directly.",

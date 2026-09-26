@@ -80,9 +80,10 @@ export const pricing: Partial<Record<string, ProductPricing>> = {
   strawberry: { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
   vanilla: { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
   'espresso-martini': { price: UNIFORM_PRICE, packedWeightGrams: CANDLE_WEIGHT_GRAMS },
-  // The owner's price for the winter edition (2026-09-25). Only buyable while
-  // in season — `isPurchasable` checks that independently of pricing.
-  'winter-wonderland': { price: eur(22), packedWeightGrams: CANDLE_WEIGHT_GRAMS },
+  // The owner's price for the winter edition (2026-09-26). Only buyable while
+  // in season and not `comingSoon` — `isPurchasable` checks both independently
+  // of pricing.
+  'winter-wonderland': { price: eur(25), packedWeightGrams: CANDLE_WEIGHT_GRAMS },
 }
 
 /** Referenced so the `eur` import documents the intended authoring style. */
@@ -102,7 +103,8 @@ export function getPricing(slug: string): ProductPricing | undefined {
  * checkout and fail there, having already taken the customer's time. Better to
  * present it as not-yet-available on the product page.
  *
- * Seasonal products that are out of season are excluded regardless of pricing.
+ * Seasonal products that are out of season, and products marked `comingSoon`,
+ * are excluded regardless of pricing.
  */
 export function isPurchasable(slug: string): boolean {
   const entry = pricing[slug]
@@ -110,6 +112,7 @@ export function isPurchasable(slug: string): boolean {
 
   const product = products.find((p) => p.slug === slug)
   if (!product) return false
+  if (product.comingSoon) return false
   if (product.seasonal !== null && !product.seasonal.active) return false
 
   return true

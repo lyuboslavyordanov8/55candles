@@ -180,6 +180,8 @@ export const products: Product[] = [
     // card then shows its out-of-season overlay and checkout refuses it.
     seasonal: { active: true },
     badge: 'winter',
+    // Locked until the owner opens it (2026-09-26): shown, not sold, no page.
+    comingSoon: true,
 
     imagePath: '/images/products/winter-wonderland.webp',
     imageWidth: 1087,

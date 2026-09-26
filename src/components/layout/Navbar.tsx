@@ -43,22 +43,25 @@ export default function Navbar() {
   // „череша“ finds the cherry candle. It came from the data before, which held
   // English only, so on the Bulgarian site the words on screen and the words the
   // search matched were different languages (AUDIT.md B-22).
-  const searchable: SearchableProduct[] = products.map((product) => ({
-    slug: product.slug,
-    name: product.name,
-    href: `/${locale}/products/${product.slug}`,
-    imagePath: product.imagePath,
-    haystack: [
-      product.name,
-      tProduct(`copy.${product.slug}.descriptor`),
-      tProduct(`copy.${product.slug}.mood`),
-      tProduct(`copy.${product.slug}.notes.top`),
-      tProduct(`copy.${product.slug}.notes.heart`),
-      tProduct(`copy.${product.slug}.notes.base`),
-    ]
-      .join(' ')
-      .toLowerCase(),
-  }))
+  // Not a `comingSoon` candle: a result has to lead to a page.
+  const searchable: SearchableProduct[] = products
+    .filter((product) => !product.comingSoon)
+    .map((product) => ({
+      slug: product.slug,
+      name: product.name,
+      href: `/${locale}/products/${product.slug}`,
+      imagePath: product.imagePath,
+      haystack: [
+        product.name,
+        tProduct(`copy.${product.slug}.descriptor`),
+        tProduct(`copy.${product.slug}.mood`),
+        tProduct(`copy.${product.slug}.notes.top`),
+        tProduct(`copy.${product.slug}.notes.heart`),
+        tProduct(`copy.${product.slug}.notes.base`),
+      ]
+        .join(' ')
+        .toLowerCase(),
+    }))
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">

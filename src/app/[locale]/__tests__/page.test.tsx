@@ -5,7 +5,7 @@ import { CartProvider } from '@/components/cart/CartProvider'
 import messages from '../../../../messages/en.json'
 import HomePage from '../page'
 import { homeBanner } from '@/content/home-banner'
-import { HOMEPAGE_PRODUCT_SLUGS } from '@/data/products'
+import { getProductBySlug, HOMEPAGE_PRODUCT_SLUGS } from '@/data/products'
 
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
@@ -81,7 +81,9 @@ describe('HomePage', () => {
       .map((a) => a.getAttribute('href') ?? '')
       .filter((href) => /^\/en\/products\/[a-z-]+$/.test(href))
 
-    expect(cardHrefs).toEqual(HOMEPAGE_PRODUCT_SLUGS.map((slug) => `/en/products/${slug}`))
+    // A coming-soon card is shown but links nowhere.
+    const linked = HOMEPAGE_PRODUCT_SLUGS.filter((slug) => !getProductBySlug(slug)?.comingSoon)
+    expect(cardHrefs).toEqual(linked.map((slug) => `/en/products/${slug}`))
   })
 
   it('leads with the winter edition while it is in season', async () => {

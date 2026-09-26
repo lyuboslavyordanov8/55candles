@@ -35,6 +35,9 @@ interface Props {
  * and one button, both reachable by keyboard, in the right reading order, with
  * no nesting.
  *
+ * A `comingSoon` candle has no page yet, so its name is plain text and the card
+ * links nowhere — only the overlay says why.
+ *
  * Server Component: the hover lift and image swap are CSS, so the only
  * JavaScript is the add-to-cart button itself.
  */
@@ -80,8 +83,17 @@ export default function ProductCard({ product, locale, priority = false }: Props
           </span>
         )}
 
+        {/* Announced, not open yet */}
+        {product.comingSoon && (
+          <div className="absolute inset-0 flex items-center justify-center bg-paper-soft/60 backdrop-blur-[2px]">
+            <span className="rounded-full bg-paper-soft/90 px-4 py-1.5 text-xs uppercase tracking-[0.15em] text-ink-primary">
+              {t('comingSoon')}
+            </span>
+          </div>
+        )}
+
         {/* Seasonal overlay */}
-        {isOutOfSeason && (
+        {isOutOfSeason && !product.comingSoon && (
           <div className="absolute inset-0 flex items-center justify-center bg-paper-soft/85 backdrop-blur-sm">
             <span className="text-xs uppercase tracking-[0.15em] text-ink-secondary">
               {t('seasonal')}
@@ -112,12 +124,16 @@ export default function ProductCard({ product, locale, priority = false }: Props
             The only link on the card. `after:` stretches its hit area over the
             whole card — including the image — without wrapping anything.
           */}
-          <Link
-            href={`/${locale}/products/${product.slug}`}
-            className="after:absolute after:inset-0 after:content-[''] hover:opacity-70"
-          >
-            {product.name}
-          </Link>
+          {product.comingSoon ? (
+            product.name
+          ) : (
+            <Link
+              href={`/${locale}/products/${product.slug}`}
+              className="after:absolute after:inset-0 after:content-[''] hover:opacity-70"
+            >
+              {product.name}
+            </Link>
+          )}
         </h3>
 
         {hasRating && (

@@ -31,7 +31,7 @@ describe('ProductsPage', () => {
 
   // The card itself is the link now — there is no separate "learn more"
   // control, so count the cards by where they point.
-  it('renders a card linking to every product', async () => {
+  it('renders a card linking to every product but the coming-soon one', async () => {
     await renderPage()
 
     const cardHrefs = screen
@@ -39,6 +39,7 @@ describe('ProductsPage', () => {
       .map((a) => a.getAttribute('href') ?? '')
       .filter((href) => /^\/en\/products\/[a-z-]+$/.test(href))
 
-    expect(cardHrefs).toHaveLength(6)
+    expect(cardHrefs).toHaveLength(5)
+    expect(cardHrefs).not.toContain('/en/products/winter-wonderland')
   })
 })
