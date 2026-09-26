@@ -26,6 +26,36 @@ const STANDARD_INGREDIENTS: readonly IngredientKey[] = [
  */
 export const products: Product[] = [
   {
+    slug: 'strawberry',
+    scent: 'strawberry',
+    name: 'Strawberry Cake',
+
+    ingredients: STANDARD_INGREDIENTS,
+
+    accentColor: '#e8408a',
+    glowColor: 'rgba(232,64,138,0.25)',
+
+    emoji: '🍓',
+
+    seasonal: null,
+
+    rating: 4.9,
+    reviewCount: 36,
+    // The owner's call: Strawberry Cake is the one that actually sells. Only
+    // one candle carries this at a time, so Electric Cherry now has no badge.
+    badge: 'bestseller',
+
+    imagePath: '/images/products/strawberry-cake.webp',
+    imageWidth: 1087,
+    imageHeight: 1087,
+    extraImages: [
+      '/images/products/strawberry-cake-front.webp',
+      '/images/products/strawberry-cake-side.webp',
+      '/images/products/strawberry-cake-tilted.webp',
+    ],
+  },
+
+  {
     slug: 'cherry',
     scent: 'cherry',
     name: 'Electric Cherry',
@@ -108,36 +138,6 @@ export const products: Product[] = [
   },
 
   {
-    slug: 'strawberry',
-    scent: 'strawberry',
-    name: 'Strawberry Cake',
-
-    ingredients: STANDARD_INGREDIENTS,
-
-    accentColor: '#e8408a',
-    glowColor: 'rgba(232,64,138,0.25)',
-
-    emoji: '🍓',
-
-    seasonal: null,
-
-    rating: 4.9,
-    reviewCount: 36,
-    // The owner's call: Strawberry Cake is the one that actually sells. Only
-    // one candle carries this at a time, so Electric Cherry now has no badge.
-    badge: 'bestseller',
-
-    imagePath: '/images/products/strawberry-cake.webp',
-    imageWidth: 1087,
-    imageHeight: 1087,
-    extraImages: [
-      '/images/products/strawberry-cake-front.webp',
-      '/images/products/strawberry-cake-side.webp',
-      '/images/products/strawberry-cake-tilted.webp',
-    ],
-  },
-
-  {
     slug: 'espresso-martini',
     scent: 'espresso-martini',
     name: 'Espresso Martini',
@@ -216,21 +216,22 @@ export function productImages(product: Product): string[] {
  *
  * **This is the list to edit to change the homepage grid.** It is deliberately
  * separate from `products`: the catalogue holds everything we sell, this holds
- * the ones we lead with. Winter Wonderland leads while it is in season; take
- * it out of this list when its season ends, or the homepage shows a candle
- * nobody can buy (`products.test.ts` fails if you forget).
+ * the ones we lead with. The bestseller leads; Winter Wonderland closes the
+ * second row while it is announced (owner's order, 2026-09-26). Take it out of
+ * this list when its season ends, or the homepage shows an out-of-season
+ * candle (`products.test.ts` fails if you forget).
  *
  * Note these are slugs, not display names. The slugs are load-bearing: they key
  * `pricing.ts`, the cart URL parameters and the product routes, so renaming a
  * candle means editing its `name` above, never its `slug`.
  */
 export const HOMEPAGE_PRODUCT_SLUGS = [
-  'winter-wonderland',
+  'strawberry',
   'vanilla',
   'orange',
-  'strawberry',
   'espresso-martini',
   'cherry',
+  'winter-wonderland',
 ] as const
 
 /** The homepage grid's products, resolved and ordered. */

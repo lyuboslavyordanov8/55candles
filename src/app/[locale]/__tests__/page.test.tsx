@@ -5,7 +5,7 @@ import { CartProvider } from '@/components/cart/CartProvider'
 import messages from '../../../../messages/en.json'
 import HomePage from '../page'
 import { homeBanner } from '@/content/home-banner'
-import { getProductBySlug, HOMEPAGE_PRODUCT_SLUGS } from '@/data/products'
+import { getProductBySlug, HOMEPAGE_PRODUCT_SLUGS, products } from '@/data/products'
 
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
@@ -86,7 +86,12 @@ describe('HomePage', () => {
     expect(cardHrefs).toEqual(linked.map((slug) => `/en/products/${slug}`))
   })
 
-  it('leads with the winter edition while it is in season', async () => {
+  it('leads with the bestseller and ends with the winter edition', () => {
+    expect(HOMEPAGE_PRODUCT_SLUGS[0]).toBe(products.find((p) => p.badge === 'bestseller')?.slug)
+    expect(HOMEPAGE_PRODUCT_SLUGS.at(-1)).toBe('winter-wonderland')
+  })
+
+  it('shows the winter edition while it is in season', async () => {
     await renderPage()
     expect(screen.getByText('Winter Wonderland')).toBeInTheDocument()
   })
