@@ -82,8 +82,8 @@ export default async function TrafficPage() {
 
       {!analyticsSecret() && (
         <Notice>
-          Няма ADMIN_SESSION_SECRET или ANALYTICS_SALT (поне 16 знака), затова посещенията не се
-          броят.
+          Посещенията не се броят: във Vercel липсва ANALYTICS_SALT. Добави я в Settings →
+          Environment Variables (Production) — случаен низ от поне 16 знака — и направи Redeploy.
         </Notice>
       )}
 
